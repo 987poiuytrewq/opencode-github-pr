@@ -1,9 +1,9 @@
 /** @jsxImportSource @opentui/solid */
 import { createSignal, createMemo, onMount, onCleanup, For, Show } from "solid-js"
 import type { TuiPlugin, TuiPluginApi, TuiPluginModule, TuiSlotPlugin } from "@opencode-ai/plugin/tui"
-import { spawn } from "bun"
+import { spawn } from "./bun-utils"
 
-type PR = {
+export type PR = {
   number: number
   title: string
   url: string
@@ -22,14 +22,14 @@ type PR = {
   assignees: Array<{ login: string }> | null
 }
 
-type Repo = { owner: string; repo: string } | null
+export type Repo = { owner: string; repo: string } | null
 
 type Status = "loading" | "ok" | "no-repo" | "error"
-type Filter = "author" | "assigned" | "all"
+export type Filter = "author" | "assigned" | "all"
 
-const FILTERS: Filter[] = ["author", "assigned", "all"]
+export const FILTERS: Filter[] = ["author", "assigned", "all"]
 
-function filterPRs(
+export function filterPRs(
   prs: PR[],
   filter: Filter,
   currentUser: string | null,
@@ -41,7 +41,7 @@ function filterPRs(
   return prs
 }
 
-type State = {
+export type State = {
   status: Status
   repo: Repo
   prs: PR[]
@@ -52,7 +52,7 @@ type State = {
   filter: Filter
 }
 
-const JSON_FIELDS = [
+export const JSON_FIELDS = [
   "number",
   "title",
   "url",
@@ -78,7 +78,7 @@ const command = {
   addCurrentBranch: "pr_dashboard.add_current_branch",
 }
 
-const SK = {
+export const SK = {
   panel: "#161616",
   panelAlt: "#1d1d1d",
   border: "#3a3a3a",
@@ -92,7 +92,7 @@ const SK = {
   draft: "#888888",
 }
 
-function toHex(c: { toInts(): [number, number, number, number] }): string {
+export function toHex(c: { toInts(): [number, number, number, number] }): string {
   const [r, g, b] = c.toInts()
   return (
     "#" +
@@ -102,7 +102,7 @@ function toHex(c: { toInts(): [number, number, number, number] }): string {
   )
 }
 
-function skin(api: TuiPluginApi) {
+export function skin(api: TuiPluginApi) {
   const t = api.theme.current
   return {
     panel: toHex(t.backgroundPanel),
@@ -118,7 +118,7 @@ function skin(api: TuiPluginApi) {
   }
 }
 
-function classifyCI(pr: PR): "pass" | "fail" | "pending" | "none" {
+export function classifyCI(pr: PR): "pass" | "fail" | "pending" | "none" {
   const checks = pr.statusCheckRollup ?? []
   if (checks.length === 0) return "none"
   let anyPending = false
@@ -134,7 +134,7 @@ function classifyCI(pr: PR): "pass" | "fail" | "pending" | "none" {
   return "pass"
 }
 
-function reviewSummary(pr: PR): {
+export function reviewSummary(pr: PR): {
   approved: number
   changes: number
   pending: number
@@ -167,13 +167,13 @@ function reviewSummary(pr: PR): {
   }
 }
 
-function missingReviewerCount(pr: PR, required: number | null | undefined): number {
+export function missingReviewerCount(pr: PR, required: number | null | undefined): number {
   if (required == null || required <= 0) return 0
   const r = reviewSummary(pr)
   return Math.max(0, required - r.approved - r.pending)
 }
 
-const BOT_ALIASES: Record<string, string> = {
+export const BOT_ALIASES: Record<string, string> = {
   "copilot-pull-request-reviewer": "copilot",
   "copilot-swe-agent": "copilot",
   "copilot": "copilot",
@@ -186,7 +186,7 @@ const BOT_ALIASES: Record<string, string> = {
   "graphite-ci": "graphite",
 }
 
-function displayLogin(login: string): string {
+export function displayLogin(login: string): string {
   const lower = login.toLowerCase()
   if (BOT_ALIASES[lower]) return BOT_ALIASES[lower]
   if (lower.endsWith("[bot]")) {
@@ -200,12 +200,12 @@ function displayLogin(login: string): string {
   return login
 }
 
-function ellipsize(name: string, maxLen = 9): string {
+export function ellipsize(name: string, maxLen = 9): string {
   if (name.length <= maxLen) return name
   return name.slice(0, 4) + "…" + name.slice(-4)
 }
 
-function isReadyToMerge(pr: PR, required: number | null | undefined): boolean {
+export function isReadyToMerge(pr: PR, required: number | null | undefined): boolean {
   if (pr.isDraft) return false
   if (pr.mergeStateStatus === "CONFLICTING" || pr.mergeable === "CONFLICTING") return false
   if (pr.mergeStateStatus && pr.mergeStateStatus !== "CLEAN" && pr.mergeStateStatus !== "UNSTABLE") {
@@ -221,7 +221,7 @@ function isReadyToMerge(pr: PR, required: number | null | undefined): boolean {
   return true
 }
 
-function fmtAge(iso: string): string {
+export function fmtAge(iso: string): string {
   const t = Date.parse(iso)
   if (Number.isNaN(t)) return ""
   const diff = Date.now() - t
@@ -235,7 +235,7 @@ function fmtAge(iso: string): string {
   return `${Math.floor(d / 30)}mo`
 }
 
-async function detectRepo(): Promise<Repo> {
+export async function detectRepo(): Promise<Repo> {
   try {
     const out = await new Promise<string>((resolve, reject) => {
       const proc = spawn({
@@ -259,7 +259,7 @@ async function detectRepo(): Promise<Repo> {
   }
 }
 
-async function fetchPRs(): Promise<PR[]> {
+export async function fetchPRs(): Promise<PR[]> {
   return new Promise<PR[]>((resolve, reject) => {
     const proc = spawn({
       cmd: [
@@ -294,7 +294,7 @@ async function fetchPRs(): Promise<PR[]> {
   })
 }
 
-async function currentBranchPR(): Promise<PR | null> {
+export async function currentBranchPR(): Promise<PR | null> {
   return new Promise<PR | null>((resolve) => {
     const proc = spawn({
       cmd: ["gh", "pr", "view", "--json", JSON_FIELDS],
@@ -321,7 +321,7 @@ async function currentBranchPR(): Promise<PR | null> {
   })
 }
 
-async function runGh(args: string[]): Promise<{ ok: boolean; output: string; error?: string }> {
+export async function runGh(args: string[]): Promise<{ ok: boolean; output: string; error?: string }> {
   return new Promise((resolve) => {
     const proc = spawn({ cmd: args, stdout: "pipe", stderr: "pipe" })
     const out: string[] = []
@@ -338,7 +338,7 @@ async function runGh(args: string[]): Promise<{ ok: boolean; output: string; err
   })
 }
 
-const THREAD_COUNT_QUERY = `query Q($owner: String!, $name: String!) {
+export const THREAD_COUNT_QUERY = `query Q($owner: String!, $name: String!) {
   repository(owner: $owner, name: $name) {
     pullRequests(states: OPEN, first: 50, orderBy: {field: UPDATED_AT, direction: DESC}) {
       nodes {
@@ -359,9 +359,9 @@ const THREAD_COUNT_QUERY = `query Q($owner: String!, $name: String!) {
   }
 }`
 
-type ReviewerThreadCounts = Map<string, { unresolved: number; resolved: number }>
+export type ReviewerThreadCounts = Map<string, { unresolved: number; resolved: number }>
 
-async function fetchReviewerThreadCounts(
+export async function fetchReviewerThreadCounts(
   owner: string,
   repo: string,
 ): Promise<Map<number, ReviewerThreadCounts>> {
@@ -408,7 +408,7 @@ async function fetchReviewerThreadCounts(
   return out
 }
 
-const REVIEWER_THREADS_QUERY = `query Q($owner: String!, $name: String!, $number: Int!) {
+export const REVIEWER_THREADS_QUERY = `query Q($owner: String!, $name: String!, $number: Int!) {
   repository(owner: $owner, name: $name) {
     pullRequest(number: $number) {
       reviewThreads(first: 100) {
@@ -430,7 +430,7 @@ const REVIEWER_THREADS_QUERY = `query Q($owner: String!, $name: String!, $number
   }
 }`
 
-async function fetchReviewerThreads(
+export async function fetchReviewerThreads(
   owner: string,
   repo: string,
   prNumber: number,
@@ -485,7 +485,7 @@ async function fetchReviewerThreads(
   }
 }
 
-async function fetchBranchRequiredReviews(owner: string, repo: string, branch: string): Promise<number | null> {
+export async function fetchBranchRequiredReviews(owner: string, repo: string, branch: string): Promise<number | null> {
   const res = await runGh([
     "gh",
     "api",
@@ -501,7 +501,7 @@ async function fetchBranchRequiredReviews(owner: string, repo: string, branch: s
   }
 }
 
-async function fetchOrgMembers(org: string): Promise<string[]> {
+export async function fetchOrgMembers(org: string): Promise<string[]> {
   const res = await runGh([
     "gh",
     "api",
@@ -516,14 +516,14 @@ async function fetchOrgMembers(org: string): Promise<string[]> {
     .filter(Boolean)
 }
 
-async function fetchCurrentUser(): Promise<string | null> {
+export async function fetchCurrentUser(): Promise<string | null> {
   const res = await runGh(["gh", "api", "user", "--jq", ".login"])
   if (!res.ok) return null
   const login = res.output.trim()
   return login || null
 }
 
-function useDashboard(api: TuiPluginApi) {
+export function useDashboard(api: TuiPluginApi) {
   const [state, setState] = createSignal<State>({
     status: "loading",
     repo: null,
@@ -661,7 +661,7 @@ function CIIndicator(props: { ci: ReturnType<typeof classifyCI>; pass: string; f
 
 const TITLE_BUDGET = 30
 
-function truncateTitle(title: string, numWidth: number): string {
+export function truncateTitle(title: string, numWidth: number): string {
   const budget = Math.max(8, TITLE_BUDGET - numWidth)
   if (title.length <= budget) return title
   return title.slice(0, budget - 1) + "…"

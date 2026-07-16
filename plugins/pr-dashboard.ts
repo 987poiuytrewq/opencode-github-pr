@@ -1,6 +1,6 @@
 import { tool, type Plugin, type Shell } from "@opencode-ai/plugin"
 
-type PR = {
+export type PR = {
   number: number
   title: string
   author: { login: string } | null
@@ -20,7 +20,7 @@ type PR = {
   latestReviews?: { author: { login: string }; state: string }[]
 }
 
-const JSON_FIELDS = [
+export const JSON_FIELDS = [
   "number",
   "title",
   "author",
@@ -36,7 +36,7 @@ const JSON_FIELDS = [
   "comments",
 ].join(",")
 
-async function detectRepo($: Shell, cwd: string): Promise<string | null> {
+export async function detectRepo($: Shell, cwd: string): Promise<string | null> {
   try {
     const out = await $`gh repo view --json nameWithOwner -q .nameWithOwner`
       .cwd(cwd)
@@ -49,14 +49,14 @@ async function detectRepo($: Shell, cwd: string): Promise<string | null> {
   }
 }
 
-async function listOpenPRs($: Shell, author: "me" | "any"): Promise<PR[]> {
+export async function listOpenPRs($: Shell, author: "me" | "any"): Promise<PR[]> {
   const authorFlag = author === "me" ? ["--author", "@me"] : []
   const out = await $`gh pr list --state open --json ${JSON_FIELDS} --limit 50 ${authorFlag}`
     .text()
   return JSON.parse(out) as PR[]
 }
 
-function ciBadge(pr: PR): string {
+export function ciBadge(pr: PR): string {
   const state = pr.statusCheckRollup?.state ?? null
   if (state === "SUCCESS") return "✓"
   if (state === "FAILURE") return "✗"
@@ -64,14 +64,14 @@ function ciBadge(pr: PR): string {
   return "—"
 }
 
-function reviewBadge(pr: PR): string {
+export function reviewBadge(pr: PR): string {
   const reviews = pr.reviews ?? []
   const approved = reviews.filter((r) => r.state === "APPROVED").length
   const changes = reviews.filter((r) => r.state === "CHANGES_REQUESTED").length
   return `✓${approved} ✗${changes}`
 }
 
-function formatDashboard(
+export function formatDashboard(
   repo: string,
   prs: PR[],
   author: "me" | "any",
@@ -104,7 +104,7 @@ function formatDashboard(
   return { text: lines.join("\n") }
 }
 
-function ageOf(createdAt: string): string {
+export function ageOf(createdAt: string): string {
   const ms = Date.now() - new Date(createdAt).getTime()
   const days = Math.floor(ms / 86400000)
   if (days >= 1) return `${days}d`
@@ -113,16 +113,16 @@ function ageOf(createdAt: string): string {
   return "<1h"
 }
 
-function noRepoError(cwd: string): string {
+export function noRepoError(cwd: string): string {
   return `Error: not a GitHub repository (no remote detected) at ${cwd}. Run \`gh repo view\` to verify.`
 }
 
-function ghListError(e: unknown): string {
+export function ghListError(e: unknown): string {
   const msg = e instanceof Error ? e.message : String(e)
   return `Error: failed to list PRs: ${msg}`
 }
 
-const PrDashboardPlugin: Plugin = async ({ $, directory }) => {
+export const PrDashboardPlugin: Plugin = async ({ $, directory }) => {
   const prEditReviewer = async (cwd: string, pr: number, reviewer: string) => {
     try {
       const out =
