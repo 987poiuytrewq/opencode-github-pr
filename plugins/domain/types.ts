@@ -57,7 +57,6 @@ export type State = {
   fetchedAt: number | null
   threadCounts: Map<number, ReviewerThreadCounts>
   branchRules: Map<string, number | null>
-  currentUser: string | null
   filter: Filter
 }
 

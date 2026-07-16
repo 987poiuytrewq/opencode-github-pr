@@ -15,7 +15,6 @@ const {
   currentBranchPR,
   detectRepo,
   fetchBranchRequiredReviews,
-  fetchCurrentUser,
   fetchOrgMembers,
   fetchPRs,
   fetchReviewerThreadCounts,
@@ -91,38 +90,38 @@ describe("detectRepo", () => {
 describe("fetchPRs", () => {
   test("parses JSON array on success", async () => {
     mockSpawn(() => ({ stdout: JSON.stringify(sampleTUIPRs) }))
-    const prs = await fetchPRs()
+    const prs = await fetchPRs("all")
     expect(prs).toHaveLength(sampleTUIPRs.length)
     expect(prs[0].number).toBe(10)
   })
 
   test("returns empty array on empty list", async () => {
     mockSpawn(() => ({ stdout: "[]" }))
-    expect(await fetchPRs()).toEqual([])
+    expect(await fetchPRs("all")).toEqual([])
   })
 
   test("rejects on gh failure", async () => {
     mockSpawn(() => ({ exitCode: 1, stderr: "auth required" }))
-    await expect(fetchPRs()).rejects.toThrow("auth required")
+    await expect(fetchPRs("all")).rejects.toThrow("auth required")
   })
 
   test("rejects on bad JSON", async () => {
     mockSpawn(() => ({ stdout: "not json{" }))
-    await expect(fetchPRs()).rejects.toThrow()
+    await expect(fetchPRs("all")).rejects.toThrow()
   })
 
   test("uses default error message on failure with empty stderr", async () => {
     mockSpawn(() => ({ exitCode: 1 }))
-    await expect(fetchPRs()).rejects.toThrow("gh pr list exited 1")
+    await expect(fetchPRs("all")).rejects.toThrow("gh pr list exited 1")
   })
 
-  test("invokes gh pr list with correct args", async () => {
+  test("invokes gh pr list with correct args (filter=all)", async () => {
     let captured: string[] = []
     mockSpawnSequence([(args) => {
       captured = args
       return { stdout: "[]" }
     }])
-    await fetchPRs()
+    await fetchPRs("all")
     expect(captured).toContain("pr")
     expect(captured).toContain("list")
     expect(captured).toContain("--state")
@@ -130,6 +129,34 @@ describe("fetchPRs", () => {
     expect(captured).toContain("--json")
     expect(captured).toContain("--limit")
     expect(captured).toContain("50")
+    expect(captured).not.toContain("--author")
+    expect(captured).not.toContain("--assignee")
+  })
+
+  test("passes --author @me when filter=author", async () => {
+    let captured: string[] = []
+    mockSpawnSequence([(args) => {
+      captured = args
+      return { stdout: "[]" }
+    }])
+    await fetchPRs("author")
+    const i = captured.indexOf("--author")
+    expect(i).toBeGreaterThan(-1)
+    expect(captured[i + 1]).toBe("@me")
+    expect(captured).not.toContain("--assignee")
+  })
+
+  test("passes --assignee @me when filter=assigned", async () => {
+    let captured: string[] = []
+    mockSpawnSequence([(args) => {
+      captured = args
+      return { stdout: "[]" }
+    }])
+    await fetchPRs("assigned")
+    const i = captured.indexOf("--assignee")
+    expect(i).toBeGreaterThan(-1)
+    expect(captured[i + 1]).toBe("@me")
+    expect(captured).not.toContain("--author")
   })
 })
 
@@ -207,27 +234,6 @@ describe("fetchOrgMembers", () => {
   })
 })
 
-describe("fetchCurrentUser", () => {
-  test("returns trimmed login on success", async () => {
-    mockSpawn(() => ({ stdout: "alice\n" }))
-    expect(await fetchCurrentUser()).toBe("alice")
-  })
-
-  test("returns null on failure", async () => {
-    mockSpawn(() => ({ exitCode: 1, stderr: "not authed" }))
-    expect(await fetchCurrentUser()).toBeNull()
-  })
-
-  test("returns null on empty output", async () => {
-    mockSpawn(() => ({ stdout: "" }))
-    expect(await fetchCurrentUser()).toBeNull()
-  })
-
-  test("returns null on whitespace-only output", async () => {
-    mockSpawn(() => ({ stdout: "   \n" }))
-    expect(await fetchCurrentUser()).toBeNull()
-  })
-})
 
 describe("fetchReviewerThreadCounts", () => {
   test("returns map keyed by PR number with reviewer counts", async () => {

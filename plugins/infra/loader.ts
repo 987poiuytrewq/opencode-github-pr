@@ -1,16 +1,17 @@
 // High-level data loaders for the PR dashboard.
 //
 // These functions wrap the raw `gh` CLI to fetch the data the TUI needs:
-// the current repo, the list of open PRs, the current branch's PR,
-// reviewer thread counts, branch protection rules, org membership, and
-// the authenticated user. All return value shapes (Maps, nulls, parsed
-// JSON) are owned by the loaders — callers stay focused on rendering.
+// the current repo, the list of open PRs (filterable server-side via
+// `--author @me` / `--assignee @me`), the current branch's PR, reviewer
+// thread counts, branch protection rules, and org membership. All return
+// value shapes (Maps, nulls, parsed JSON) are owned by the loaders —
+// callers stay focused on rendering.
 
 import { spawn } from "../bun-utils"
 import { runGh } from "./gh"
-import type { Repo, ReviewerThreadCounts, TuiPR } from "../domain/types"
+import type { Filter, Repo, ReviewerThreadCounts, TuiPR } from "../domain/types"
 
-export type { Repo, ReviewerThreadCounts, TuiPR }
+export type { Filter, Repo, ReviewerThreadCounts, TuiPR }
 
 export const JSON_FIELDS = [
   "number",
@@ -54,20 +55,23 @@ export async function detectRepo(): Promise<Repo> {
   }
 }
 
-export async function fetchPRs(): Promise<TuiPR[]> {
+export async function fetchPRs(filter: Filter): Promise<TuiPR[]> {
+  const cmd: string[] = [
+    "gh",
+    "pr",
+    "list",
+    "--state",
+    "open",
+    "--json",
+    JSON_FIELDS,
+    "--limit",
+    "50",
+  ]
+  if (filter === "author") cmd.push("--author", "@me")
+  else if (filter === "assigned") cmd.push("--assignee", "@me")
   return new Promise<TuiPR[]>((resolve, reject) => {
     const proc = spawn({
-      cmd: [
-        "gh",
-        "pr",
-        "list",
-        "--state",
-        "open",
-        "--json",
-        JSON_FIELDS,
-        "--limit",
-        "50",
-      ],
+      cmd,
       stdout: "pipe",
       stderr: "pipe",
     })
@@ -292,9 +296,3 @@ export async function fetchOrgMembers(org: string): Promise<string[]> {
     .filter(Boolean)
 }
 
-export async function fetchCurrentUser(): Promise<string | null> {
-  const res = await runGh(["gh", "api", "user", "--jq", ".login"])
-  if (!res.ok) return null
-  const login = res.output.trim()
-  return login || null
-}

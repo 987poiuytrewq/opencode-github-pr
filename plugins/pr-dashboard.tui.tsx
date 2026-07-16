@@ -12,13 +12,12 @@ import {
   isReadyToMerge,
   fmtAge,
 } from "./domain/pr-status"
-import { FILTERS, filterPRs } from "./domain/filter"
+import { FILTERS } from "./domain/filter"
 import { runGh } from "./infra/gh"
 import {
   currentBranchPR,
   detectRepo,
   fetchBranchRequiredReviews,
-  fetchCurrentUser,
   fetchOrgMembers,
   fetchPRs,
   fetchReviewerThreadCounts,
@@ -38,14 +37,13 @@ export {
   isReadyToMerge,
   fmtAge,
 }
-export { FILTERS, filterPRs }
+export { FILTERS }
 export { BOT_ALIASES, displayLogin, ellipsize }
 export { runGh } from "./infra/gh"
 export {
   currentBranchPR,
   detectRepo,
   fetchBranchRequiredReviews,
-  fetchCurrentUser,
   fetchOrgMembers,
   fetchPRs,
   fetchReviewerThreadCounts,
@@ -74,7 +72,6 @@ export function useDashboard(api: TuiPluginApi) {
     fetchedAt: null,
     threadCounts: new Map(),
     branchRules: new Map(),
-    currentUser: null,
     filter: "author",
   })
   const [selectedIdx, setSelectedIdx] = createSignal(0)
@@ -85,18 +82,20 @@ export function useDashboard(api: TuiPluginApi) {
     setState((s) => {
       const idx = FILTERS.indexOf(s.filter)
       const next = FILTERS[(idx + 1) % FILTERS.length]
-      return { ...s, filter: next }
+      return { ...s, filter: next, status: "loading" }
     })
+    refresh()
   }
 
   const refresh = async () => {
     const prev = state()
+    const filter = prev.filter
     const repo = await detectRepo()
     const isFirstLoad = prev.fetchedAt === null
     const isDirChange =
       !!prev.repo && !!repo && (prev.repo.owner !== repo.owner || prev.repo.repo !== repo.repo)
-    const showLoading = isFirstLoad || isDirChange
-    if (showLoading) {
+    const showLoading = isFirstLoad || isDirChange || prev.status === "loading"
+    if (showLoading && prev.status !== "loading") {
       setState((s) => ({ ...s, status: "loading" }))
     }
     if (!repo) {
@@ -112,7 +111,7 @@ export function useDashboard(api: TuiPluginApi) {
       return
     }
     try {
-      const prs = await fetchPRs()
+      const prs = await fetchPRs(filter)
       const [threadCounts, branchRules] = await Promise.all([
         fetchReviewerThreadCounts(repo.owner, repo.repo),
         (async () => {
@@ -175,9 +174,6 @@ export function useDashboard(api: TuiPluginApi) {
 
   onMount(() => {
     refresh()
-    fetchCurrentUser().then((login) => {
-      if (login) setState((s) => ({ ...s, currentUser: login }))
-    })
     const handle = setInterval(() => {
       if (api.route.current.name === "session") refresh()
     }, 60_000)
@@ -320,19 +316,16 @@ function DashboardView(props: {
   onToggleExpand: () => void
 }) {
   const sk = skin(props.api)
-  const filtered = createMemo(() =>
-    filterPRs(props.state.prs, props.filter, props.state.currentUser),
-  )
-  const visible = createMemo(() => filtered().slice(0, 30))
+  const visible = createMemo(() => props.state.prs.slice(0, 30))
   const counts = createMemo(() => {
     let ready = 0
     let notReady = 0
-    for (const pr of filtered()) {
+    for (const pr of props.state.prs) {
       const required = props.state.branchRules.get(pr.baseRefName) ?? null
       if (isReadyToMerge(pr, required)) ready++
       else notReady++
     }
-    return { ready, notReady, total: filtered().length }
+    return { ready, notReady, total: props.state.prs.length }
   })
 
   return (

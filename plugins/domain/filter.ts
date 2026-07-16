@@ -1,18 +1,8 @@
-// PR list filtering by author/assigned/all and current user.
+// Available filter modes for the PR list. Filtering is done server-side
+// by `fetchPRs(filter)` in infra/loader.ts, so this file only needs to
+// declare the modes and their canonical order (used by the cycle button).
 
-import type { TuiPR, Filter } from "./types"
+export { type Filter } from "./types"
+import type { Filter } from "./types"
 
 export const FILTERS: Filter[] = ["author", "assigned", "all"]
-
-export function filterPRs(
-  prs: TuiPR[],
-  filter: Filter,
-  currentUser: string | null,
-): TuiPR[] {
-  if (filter === "all") return prs
-  if (!currentUser) return []
-  if (filter === "author") return prs.filter((p) => p.author?.login === currentUser)
-  if (filter === "assigned")
-    return prs.filter((p) => p.assignees?.some((a) => a.login === currentUser))
-  return prs
-}
