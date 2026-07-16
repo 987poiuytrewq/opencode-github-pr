@@ -68,6 +68,74 @@ describe("filterPRs", () => {
     ]
     expect(filterPRs(withNull, "author", "alice")).toEqual([])
   })
+
+  test("handles PRs with null assignees", () => {
+    const withNull: PR[] = [
+      makeTUIPR({ number: 1, author: { login: "alice" }, assignees: null }),
+    ]
+    expect(filterPRs(withNull, "assigned", "alice")).toEqual([])
+  })
+
+  test("handles PRs with empty assignees array", () => {
+    const withEmpty: PR[] = [
+      makeTUIPR({ number: 1, author: { login: "alice" }, assignees: [] }),
+    ]
+    expect(filterPRs(withEmpty, "assigned", "alice")).toEqual([])
+  })
+
+  test("'assigned' matches when user is one of many assignees", () => {
+    const prsManyAssignees: PR[] = [
+      makeTUIPR({
+        number: 1,
+        author: { login: "bob" },
+        assignees: [{ login: "alice" }, { login: "carol" }, { login: "dave" }],
+      }),
+    ]
+    expect(filterPRs(prsManyAssignees, "assigned", "carol").map((p) => p.number)).toEqual([1])
+  })
+
+  test("matches are case-sensitive on login (no auto-lowercasing)", () => {
+    // The current implementation does exact string match. If the API returns
+    // "Alice" and currentUser is "alice", they don't match. Documenting the
+    // actual behavior so any future change to lowercase is intentional.
+    const result = filterPRs(prs, "author", "Alice")
+    expect(result).toEqual([])
+  })
+
+  test("empty PR list returns empty for any filter", () => {
+    expect(filterPRs([], "all", "alice")).toEqual([])
+    expect(filterPRs([], "author", "alice")).toEqual([])
+    expect(filterPRs([], "assigned", "alice")).toEqual([])
+  })
+
+  test("does not mutate the input array", () => {
+    const original = [...prs]
+    const snapshot = prs.map((p) => p.number)
+    filterPRs(prs, "author", "alice")
+    expect(prs).toEqual(original)
+    expect(prs.map((p) => p.number)).toEqual(snapshot)
+  })
+
+  test("'author' filter: PR where user is both author and assignee shows under both", () => {
+    const overlap: PR[] = [
+      makeTUIPR({
+        number: 1,
+        author: { login: "alice" },
+        assignees: [{ login: "alice" }],
+      }),
+    ]
+    expect(filterPRs(overlap, "author", "alice").map((p) => p.number)).toEqual([1])
+    expect(filterPRs(overlap, "assigned", "alice").map((p) => p.number)).toEqual([1])
+    expect(filterPRs(overlap, "all", "alice").map((p) => p.number)).toEqual([1])
+  })
+
+  test("PRs with empty-string author.login do not match any user", () => {
+    const withEmptyLogin: PR[] = [
+      makeTUIPR({ number: 1, author: { login: "" } }),
+    ]
+    expect(filterPRs(withEmptyLogin, "author", "")).toEqual([])
+    expect(filterPRs(withEmptyLogin, "author", "alice")).toEqual([])
+  })
 })
 
 describe("classifyCI", () => {
