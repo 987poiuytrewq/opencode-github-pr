@@ -32,8 +32,21 @@ describe("filterPRs", () => {
     expect(result.map((p) => p.number)).toEqual([1])
   })
 
-  test("'author' returns all PRs when no current user", () => {
-    expect(filterPRs(prs, "author", null)).toEqual(prs)
+  test("'author' returns empty when no current user (can't filter without identity)", () => {
+    expect(filterPRs(prs, "author", null)).toEqual([])
+  })
+
+  test("initial filter 'author' with current user shows only that user's PRs", () => {
+    // This mirrors the initial state of useDashboard: filter='author' and
+    // currentUser set after fetchCurrentUser resolves. The visible list
+    // should be just PRs where the current user is the author.
+    const result = filterPRs(prs, "author", "alice")
+    expect(result.map((p) => p.number)).toEqual([1])
+  })
+
+  test("'author' with different current user shows that user's PRs only", () => {
+    const result = filterPRs(prs, "author", "bob")
+    expect(result.map((p) => p.number)).toEqual([2])
   })
 
   test("'assigned' returns PRs where current user is assignee", () => {
@@ -41,8 +54,8 @@ describe("filterPRs", () => {
     expect(result.map((p) => p.number)).toEqual([3])
   })
 
-  test("'assigned' returns all PRs when no current user", () => {
-    expect(filterPRs(prs, "assigned", null)).toEqual(prs)
+  test("'assigned' returns empty when no current user (can't filter without identity)", () => {
+    expect(filterPRs(prs, "assigned", null)).toEqual([])
   })
 
   test("returns empty when no PRs match", () => {

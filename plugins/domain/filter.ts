@@ -9,7 +9,8 @@ export function filterPRs(
   filter: Filter,
   currentUser: string | null,
 ): TuiPR[] {
-  if (filter === "all" || !currentUser) return prs
+  if (filter === "all") return prs
+  if (!currentUser) return []
   if (filter === "author") return prs.filter((p) => p.author?.login === currentUser)
   if (filter === "assigned")
     return prs.filter((p) => p.assignees?.some((a) => a.login === currentUser))
