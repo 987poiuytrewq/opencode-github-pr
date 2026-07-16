@@ -14,6 +14,7 @@ import {
 } from "./domain/pr-status"
 import { FILTERS } from "./domain/filter"
 import { runGh } from "./infra/gh"
+import { Header } from "./app/Header"
 import {
   currentBranchPR,
   detectRepo,
@@ -53,6 +54,7 @@ export {
   THREAD_COUNT_QUERY,
   type ReviewerThreadCounts,
 } from "./infra/loader"
+export { Header } from "./app/Header"
 
 
 const command = {
@@ -330,36 +332,16 @@ function DashboardView(props: {
 
   return (
     <box flexDirection="column" paddingTop={1} paddingBottom={1} gap={0}>
-      <box flexDirection="row" gap={1} paddingLeft={0} paddingRight={1} onMouseUp={() => props.onToggleExpand()}>
-        <text fg={sk.text}>{props.expanded ? "▼" : "▶"}</text>
-        <text fg={sk.text}>
-          <b>PRs</b>
-        </text>
-        <Show when={props.state.status === "ok"}>
-          <text fg={sk.success}>{counts().ready}✓</text>
-          <text fg={sk.text}>{counts().notReady}•</text>
-        </Show>
-        <Show when={props.state.status === "loading"}>
-          <text fg={sk.muted}>loading…</text>
-        </Show>
-        <Show when={props.state.status === "error"}>
-          <text fg={sk.error}>error</text>
-        </Show>
-        <Show when={props.state.status === "no-repo"}>
-          <text fg={sk.muted}>no gh repo</text>
-        </Show>
-        <box flexGrow={1}></box>
-        <Show when={props.state.status !== "no-repo"}>
-          <box
-            onMouseUp={(e: any) => {
-              e?.stopPropagation?.()
-              props.onCycleFilter()
-            }}
-          >
-            <text fg={sk.muted}>{props.filter}</text>
-          </box>
-        </Show>
-      </box>
+      <Header
+        sk={sk}
+        status={props.state.status}
+        expanded={props.expanded}
+        onToggleExpand={props.onToggleExpand}
+        filter={props.filter}
+        onCycleFilter={props.onCycleFilter}
+        readyCount={counts().ready}
+        notReadyCount={counts().notReady}
+      />
 
       <Show when={props.state.status === "no-repo"}>
         <box flexDirection="column" paddingLeft={1} paddingTop={1} paddingRight={1}>
