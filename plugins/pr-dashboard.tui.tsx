@@ -12,6 +12,7 @@ import {
   isReadyToMerge,
   fmtAge,
 } from "./domain/pr-status"
+import { FILTERS, filterPRs } from "./domain/filter"
 
 export type { PR, Repo, Filter, State, Status }
 export { SK, skin, toHex, truncateTitle }
@@ -22,21 +23,8 @@ export {
   isReadyToMerge,
   fmtAge,
 }
+export { FILTERS, filterPRs }
 export { BOT_ALIASES, displayLogin, ellipsize }
-
-const FILTERS: Filter[] = ["author", "assigned", "all"]
-
-export function filterPRs(
-  prs: PR[],
-  filter: Filter,
-  currentUser: string | null,
-): PR[] {
-  if (filter === "all" || !currentUser) return prs
-  if (filter === "author") return prs.filter((p) => p.author?.login === currentUser)
-  if (filter === "assigned")
-    return prs.filter((p) => p.assignees?.some((a) => a.login === currentUser))
-  return prs
-}
 
 export const JSON_FIELDS = [
   "number",
