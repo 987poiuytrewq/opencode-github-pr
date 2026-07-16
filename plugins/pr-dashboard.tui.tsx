@@ -13,6 +13,7 @@ import {
   fmtAge,
 } from "./domain/pr-status"
 import { FILTERS, filterPRs } from "./domain/filter"
+import { runGh } from "./infra/gh"
 
 export type { PR, Repo, Filter, State, Status }
 export { SK, skin, toHex, truncateTitle }
@@ -25,6 +26,7 @@ export {
 }
 export { FILTERS, filterPRs }
 export { BOT_ALIASES, displayLogin, ellipsize }
+export { runGh } from "./infra/gh"
 
 export const JSON_FIELDS = [
   "number",
@@ -134,23 +136,6 @@ export async function currentBranchPR(): Promise<PR | null> {
       } catch {
         resolve(null)
       }
-    })
-  })
-}
-
-export async function runGh(args: string[]): Promise<{ ok: boolean; output: string; error?: string }> {
-  return new Promise((resolve) => {
-    const proc = spawn({ cmd: args, stdout: "pipe", stderr: "pipe" })
-    const out: string[] = []
-    const err: string[] = []
-    proc.stdout.pipeTo(new WritableStream({ write: (chunk) => (out.push(new TextDecoder().decode(chunk))) }))
-    proc.stderr.pipeTo(new WritableStream({ write: (chunk) => (err.push(new TextDecoder().decode(chunk))) }))
-    proc.exited.then((code) => {
-      resolve({
-        ok: code === 0,
-        output: out.join("").trim(),
-        error: code !== 0 ? err.join("").trim() || `gh exited ${code}` : undefined,
-      })
     })
   })
 }
