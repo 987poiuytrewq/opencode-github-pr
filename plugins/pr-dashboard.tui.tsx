@@ -3,8 +3,10 @@ import { createSignal, createMemo, onMount, onCleanup, For, Show } from "solid-j
 import type { TuiPlugin, TuiPluginApi, TuiPluginModule, TuiSlotPlugin } from "@opencode-ai/plugin/tui"
 import { spawn } from "./bun-utils"
 import type { TuiPR as PR, Repo, Filter, State, Status } from "./domain/types"
+import { BOT_ALIASES, displayLogin, ellipsize } from "./domain/login"
 
 export type { PR, Repo, Filter, State, Status }
+export { BOT_ALIASES, displayLogin, ellipsize }
 
 const FILTERS: Filter[] = ["author", "assigned", "all"]
 
@@ -139,38 +141,6 @@ export function missingReviewerCount(pr: PR, required: number | null | undefined
   if (required == null || required <= 0) return 0
   const r = reviewSummary(pr)
   return Math.max(0, required - r.approved - r.pending)
-}
-
-export const BOT_ALIASES: Record<string, string> = {
-  "copilot-pull-request-reviewer": "copilot",
-  "copilot-swe-agent": "copilot",
-  "copilot": "copilot",
-  "dependabot": "dependabot",
-  "dependabot-preview": "dependabot",
-  "github-actions": "github-actions",
-  "renovate": "renovate",
-  "renovate-bot": "renovate",
-  "graphite-app": "graphite",
-  "graphite-ci": "graphite",
-}
-
-export function displayLogin(login: string): string {
-  const lower = login.toLowerCase()
-  if (BOT_ALIASES[lower]) return BOT_ALIASES[lower]
-  if (lower.endsWith("[bot]")) {
-    const base = lower.slice(0, -5)
-    return BOT_ALIASES[base] ?? base
-  }
-  if (lower.endsWith("-bot")) {
-    const base = lower.slice(0, -4)
-    return BOT_ALIASES[base] ?? base
-  }
-  return login
-}
-
-export function ellipsize(name: string, maxLen = 9): string {
-  if (name.length <= maxLen) return name
-  return name.slice(0, 4) + "…" + name.slice(-4)
 }
 
 export function isReadyToMerge(pr: PR, required: number | null | undefined): boolean {
