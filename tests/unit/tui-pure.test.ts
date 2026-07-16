@@ -94,12 +94,11 @@ describe("filterPRs", () => {
     expect(filterPRs(prsManyAssignees, "assigned", "carol").map((p) => p.number)).toEqual([1])
   })
 
-  test("matches are case-sensitive on login (no auto-lowercasing)", () => {
-    // The current implementation does exact string match. If the API returns
-    // "Alice" and currentUser is "alice", they don't match. Documenting the
-    // actual behavior so any future change to lowercase is intentional.
-    const result = filterPRs(prs, "author", "Alice")
-    expect(result).toEqual([])
+  test("matches are case-insensitive (GitHub logins are)", () => {
+    // GitHub logins are case-insensitive. gh CLI may return "Duncan" for the
+    // current user and "duncan" for a PR author; the filter must still match.
+    const result = filterPRs(prs, "author", "ALICE")
+    expect(result).toEqual([prs[0]])
   })
 
   test("empty PR list returns empty for any filter", () => {
