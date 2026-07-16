@@ -349,7 +349,7 @@ export function useDashboard(api: TuiPluginApi) {
     threadCounts: new Map(),
     branchRules: new Map(),
     currentUser: null,
-    filter: "author",
+    filter: "all",
   })
   const [selectedIdx, setSelectedIdx] = createSignal(0)
   const [expanded, setExpanded] = createSignal(true)
