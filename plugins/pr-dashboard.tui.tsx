@@ -4,8 +4,10 @@ import type { TuiPlugin, TuiPluginApi, TuiPluginModule, TuiSlotPlugin } from "@o
 import { spawn } from "./bun-utils"
 import type { TuiPR as PR, Repo, Filter, State, Status } from "./domain/types"
 import { BOT_ALIASES, displayLogin, ellipsize } from "./domain/login"
+import { SK, skin, toHex, truncateTitle } from "./domain/format"
 
 export type { PR, Repo, Filter, State, Status }
+export { SK, skin, toHex, truncateTitle }
 export { BOT_ALIASES, displayLogin, ellipsize }
 
 const FILTERS: Filter[] = ["author", "assigned", "all"]
@@ -46,46 +48,6 @@ const command = {
   addReviewer: "pr_dashboard.add_reviewer",
   reRequestReview: "pr_dashboard.rerequest_review",
   addCurrentBranch: "pr_dashboard.add_current_branch",
-}
-
-export const SK = {
-  panel: "#161616",
-  panelAlt: "#1d1d1d",
-  border: "#3a3a3a",
-  borderActive: "#5f87ff",
-  text: "#e5e5e5",
-  muted: "#888888",
-  accent: "#5f87ff",
-  success: "#5fbf5f",
-  warning: "#d8a657",
-  error: "#d86565",
-  draft: "#888888",
-}
-
-export function toHex(c: { toInts(): [number, number, number, number] }): string {
-  const [r, g, b] = c.toInts()
-  return (
-    "#" +
-    [r, g, b]
-      .map((n) => Math.max(0, Math.min(255, n)).toString(16).padStart(2, "0"))
-      .join("")
-  )
-}
-
-export function skin(api: TuiPluginApi) {
-  const t = api.theme.current
-  return {
-    panel: toHex(t.backgroundPanel),
-    panelAlt: toHex(t.backgroundElement),
-    border: toHex(t.border),
-    borderActive: toHex(t.borderActive),
-    text: toHex(t.text),
-    muted: toHex(t.textMuted),
-    accent: toHex(t.primary),
-    success: toHex(t.success),
-    warning: toHex(t.warning),
-    error: toHex(t.error),
-  }
 }
 
 export function classifyCI(pr: PR): "pass" | "fail" | "pending" | "none" {
@@ -595,14 +557,6 @@ function CIIndicator(props: { ci: ReturnType<typeof classifyCI>; pass: string; f
   const sym = { pass: "✓", fail: "✗", pending: "•", none: " " }[props.ci]
   const color = { pass: props.pass, fail: props.fail, pending: props.warn, none: props.muted }[props.ci]
   return <text fg={color}>{sym}</text>
-}
-
-const TITLE_BUDGET = 30
-
-export function truncateTitle(title: string, numWidth: number): string {
-  const budget = Math.max(8, TITLE_BUDGET - numWidth)
-  if (title.length <= budget) return title
-  return title.slice(0, budget - 1) + "…"
 }
 
 function PRRow(props: {
