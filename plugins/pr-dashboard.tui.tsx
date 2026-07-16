@@ -2,32 +2,11 @@
 import { createSignal, createMemo, onMount, onCleanup, For, Show } from "solid-js"
 import type { TuiPlugin, TuiPluginApi, TuiPluginModule, TuiSlotPlugin } from "@opencode-ai/plugin/tui"
 import { spawn } from "./bun-utils"
+import type { TuiPR as PR, Repo, Filter, State, Status } from "./domain/types"
 
-export type PR = {
-  number: number
-  title: string
-  url: string
-  isDraft: boolean
-  author: { login: string } | null
-  headRefName: string
-  baseRefName: string
-  reviewDecision: string | null
-  mergeable: string
-  mergeStateStatus: string | null
-  createdAt: string
-  updatedAt: string
-  statusCheckRollup: Array<{ name: string; conclusion: string | null; status: string; state?: string }> | null
-  reviewRequests: Array<{ login: string }> | null
-  latestReviews: Array<{ author: { login: string }; state: string; createdAt: string }> | null
-  assignees: Array<{ login: string }> | null
-}
+export type { PR, Repo, Filter, State, Status }
 
-export type Repo = { owner: string; repo: string } | null
-
-type Status = "loading" | "ok" | "no-repo" | "error"
-export type Filter = "author" | "assigned" | "all"
-
-export const FILTERS: Filter[] = ["author", "assigned", "all"]
+const FILTERS: Filter[] = ["author", "assigned", "all"]
 
 export function filterPRs(
   prs: PR[],
@@ -39,17 +18,6 @@ export function filterPRs(
   if (filter === "assigned")
     return prs.filter((p) => p.assignees?.some((a) => a.login === currentUser))
   return prs
-}
-
-export type State = {
-  status: Status
-  repo: Repo
-  prs: PR[]
-  fetchedAt: number | null
-  threadCounts: Map<number, ReviewerThreadCounts>
-  branchRules: Map<string, number | null>
-  currentUser: string | null
-  filter: Filter
 }
 
 export const JSON_FIELDS = [
@@ -359,7 +327,7 @@ export const THREAD_COUNT_QUERY = `query Q($owner: String!, $name: String!) {
   }
 }`
 
-export type ReviewerThreadCounts = Map<string, { unresolved: number; resolved: number }>
+export { type ReviewerThreadCounts } from "./domain/types"
 
 export async function fetchReviewerThreadCounts(
   owner: string,

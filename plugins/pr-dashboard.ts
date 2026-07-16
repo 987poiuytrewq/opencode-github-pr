@@ -1,24 +1,7 @@
 import { tool, type Plugin, type Shell } from "@opencode-ai/plugin"
+import type { ServerPR as PR } from "./domain/types"
 
-export type PR = {
-  number: number
-  title: string
-  author: { login: string } | null
-  headRefName: string
-  baseRefName: string
-  url: string
-  createdAt: string
-  isDraft: boolean
-  mergeable: "MERGEABLE" | "CONFLICTING" | "UNKNOWN"
-  reviewDecision: "APPROVED" | "CHANGES_REQUESTED" | "REVIEW_REQUIRED" | null
-  statusCheckRollup: {
-    state: "SUCCESS" | "FAILURE" | "PENDING" | "NEUTRAL" | null
-    contexts?: { name?: string; state?: string }[]
-  } | null
-  reviews?: { author: { login: string }; state: string }[]
-  comments?: { totalCount: number }[]
-  latestReviews?: { author: { login: string }; state: string }[]
-}
+export type { PR }
 
 export const JSON_FIELDS = [
   "number",
