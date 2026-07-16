@@ -1,10 +1,126 @@
-import { tool, type Plugin } from "@opencode-ai/plugin"
-import { detectRepo, listOpenPRs } from "./pr-dashboard/infra/server-gh"
-import {
-  formatDashboard,
-  noRepoError,
-  ghListError,
-} from "./pr-dashboard/application/format-dashboard"
+import { tool, type Plugin, type Shell } from "@opencode-ai/plugin"
+
+type PR = {
+  number: number
+  title: string
+  author: { login: string } | null
+  headRefName: string
+  baseRefName: string
+  url: string
+  createdAt: string
+  isDraft: boolean
+  mergeable: "MERGEABLE" | "CONFLICTING" | "UNKNOWN"
+  reviewDecision: "APPROVED" | "CHANGES_REQUESTED" | "REVIEW_REQUIRED" | null
+  statusCheckRollup: {
+    state: "SUCCESS" | "FAILURE" | "PENDING" | "NEUTRAL" | null
+    contexts?: { name?: string; state?: string }[]
+  } | null
+  reviews?: { author: { login: string }; state: string }[]
+  comments?: { totalCount: number }[]
+  latestReviews?: { author: { login: string }; state: string }[]
+}
+
+const JSON_FIELDS = [
+  "number",
+  "title",
+  "author",
+  "headRefName",
+  "baseRefName",
+  "url",
+  "createdAt",
+  "isDraft",
+  "mergeable",
+  "reviewDecision",
+  "statusCheckRollup",
+  "reviews",
+  "comments",
+].join(",")
+
+async function detectRepo($: Shell, cwd: string): Promise<string | null> {
+  try {
+    const out = await $`gh repo view --json nameWithOwner -q .nameWithOwner`
+      .cwd(cwd)
+      .text()
+    const trimmed = out.trim()
+    const [owner, repo] = trimmed.split("/")
+    return owner && repo ? `${owner}/${repo}` : null
+  } catch {
+    return null
+  }
+}
+
+async function listOpenPRs($: Shell, author: "me" | "any"): Promise<PR[]> {
+  const authorFlag = author === "me" ? ["--author", "@me"] : []
+  const out = await $`gh pr list --state open --json ${JSON_FIELDS} --limit 50 ${authorFlag}`
+    .text()
+  return JSON.parse(out) as PR[]
+}
+
+function ciBadge(pr: PR): string {
+  const state = pr.statusCheckRollup?.state ?? null
+  if (state === "SUCCESS") return "✓"
+  if (state === "FAILURE") return "✗"
+  if (state === "PENDING") return "●"
+  return "—"
+}
+
+function reviewBadge(pr: PR): string {
+  const reviews = pr.reviews ?? []
+  const approved = reviews.filter((r) => r.state === "APPROVED").length
+  const changes = reviews.filter((r) => r.state === "CHANGES_REQUESTED").length
+  return `✓${approved} ✗${changes}`
+}
+
+function formatDashboard(
+  repo: string,
+  prs: PR[],
+  author: "me" | "any",
+): { text: string } {
+  const lines: string[] = []
+  lines.push(`# PR Dashboard — ${repo}`)
+  lines.push(
+    author === "me"
+      ? "Filter: PRs I authored"
+      : "Filter: all open PRs",
+  )
+  lines.push("")
+  if (prs.length === 0) {
+    lines.push("No open PRs.")
+    return { text: lines.join("\n") }
+  }
+  lines.push(
+    "CI  Review           PR   Title                                       Author         Branch                              Age",
+  )
+  for (const pr of prs) {
+    const ci = ciBadge(pr).padEnd(3)
+    const rev = reviewBadge(pr).padEnd(16)
+    const num = `#${pr.number}`.padEnd(4)
+    const title = pr.title.slice(0, 42).padEnd(42)
+    const login = (pr.author?.login ?? "?").slice(0, 14).padEnd(14)
+    const branch = `${pr.headRefName} → ${pr.baseRefName}`.slice(0, 34).padEnd(34)
+    const age = ageOf(pr.createdAt)
+    lines.push(`${ci} ${rev} ${num} ${title} ${login} ${branch} ${age}`)
+  }
+  return { text: lines.join("\n") }
+}
+
+function ageOf(createdAt: string): string {
+  const ms = Date.now() - new Date(createdAt).getTime()
+  const days = Math.floor(ms / 86400000)
+  if (days >= 1) return `${days}d`
+  const hours = Math.floor(ms / 3600000)
+  if (hours >= 1) return `${hours}h`
+  return "<1h"
+}
+
+function noRepoError(cwd: string): string {
+  return `Error: not a GitHub repository (no remote detected) at ${cwd}. Run \`gh repo view\` to verify.`
+}
+
+function ghListError(e: unknown): string {
+  const msg = e instanceof Error ? e.message : String(e)
+  return `Error: failed to list PRs: ${msg}`
+}
 
 const PrDashboardPlugin: Plugin = async ({ $, directory }) => {
   const prEditReviewer = async (cwd: string, pr: number, reviewer: string) => {
