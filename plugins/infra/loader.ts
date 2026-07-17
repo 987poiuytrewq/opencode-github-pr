@@ -1,123 +1,86 @@
 // High-level data loaders for the PR dashboard.
 //
-// These functions wrap the raw `gh` CLI to fetch the data the TUI needs:
-// the current repo, the list of open PRs (filterable server-side via
-// `--author @me` / `--assignee @me`), the current branch's PR, reviewer
-// thread counts, branch protection rules, and org membership. All return
-// value shapes (Maps, nulls, parsed JSON) are owned by the loaders —
-// callers stay focused on rendering.
+// Backed by Octokit (REST + GraphQL), which gives us built-in throttling,
+// retry, and timeouts — replacing the per-call `gh` spawn approach. The
+// caller-facing shape of each function is unchanged.
 
-import { spawn } from "../bun-utils"
-import { runGh } from "./gh"
-import type { Filter, Repo, ReviewerThreadCounts, TuiPR } from "../domain/types"
+import { getOctokit, currentUser } from "./octokit"
+import { originRemoteUrl, parseGitHubRemote, currentBranch, type Repo as GitRepo } from "./git"
+import type { Filter, ReviewerThreadCounts, TuiPR } from "../domain/types"
 
-export type { Filter, Repo, ReviewerThreadCounts, TuiPR }
+export type { Filter, ReviewerThreadCounts, TuiPR }
 
-export const JSON_FIELDS = [
-  "number",
-  "title",
-  "url",
-  "isDraft",
-  "author",
-  "headRefName",
-  "baseRefName",
-  "reviewDecision",
-  "mergeable",
-  "mergeStateStatus",
-  "createdAt",
-  "updatedAt",
-  "statusCheckRollup",
-  "reviewRequests",
-  "latestReviews",
-].join(",")
+export type Repo = GitRepo
 
-export async function detectRepo(): Promise<Repo> {
-  try {
-    const out = await new Promise<string>((resolve, reject) => {
-      const proc = spawn({
-        cmd: ["gh", "repo", "view", "--json", "nameWithOwner", "-q", ".nameWithOwner"],
-        stdout: "pipe",
-        stderr: "pipe",
-      })
-      const text: string[] = []
-      const err: string[] = []
-      proc.stdout.pipeTo(new WritableStream({ write: (chunk) => (text.push(new TextDecoder().decode(chunk))) }))
-      proc.stderr.pipeTo(new WritableStream({ write: (chunk) => (err.push(new TextDecoder().decode(chunk))) }))
-      proc.exited.then((code) => {
-        if (code === 0) resolve(text.join("").trim())
-        else reject(new Error(err.join("").trim() || `gh exited ${code}`))
-      })
-    })
-    const [owner, repo] = out.split("/")
-    return owner && repo ? { owner, repo } : null
-  } catch {
-    return null
+export function detectRepo(cwd: string = process.cwd()): Repo {
+  const url = originRemoteUrl(cwd)
+  if (!url) return null
+  return parseGitHubRemote(url)
+}
+
+type OctokitPull = Awaited<ReturnType<Awaited<ReturnType<typeof getOctokit>>["pulls"]["list"]>>["data"][number]
+
+function mapPull(p: OctokitPull): TuiPR {
+  return {
+    number: p.number,
+    title: p.title,
+    url: p.html_url,
+    isDraft: p.draft ?? false,
+    author: p.user ? { login: p.user.login } : null,
+    headRefName: p.head.ref,
+    baseRefName: p.base.ref,
+    reviewDecision: p.review_decision ?? null,
+    mergeable: p.mergeable ? "MERGEABLE" : p.mergeable === false ? "CONFLICTING" : "UNKNOWN",
+    mergeStateStatus: p.mergeable_state ?? null,
+    createdAt: p.created_at,
+    updatedAt: p.updated_at,
+    statusCheckRollup: p.status_check_rollup ?? null,
+    reviewRequests: (p.requested_reviewers ?? []).map((r) => ({ login: r.login })),
+    latestReviews: (p.latest_reviews ?? []).map((r) => ({
+      author: { login: r.user?.login ?? "" },
+      state: r.state,
+      createdAt: r.submitted_at ?? "",
+    })),
+    assignees: (p.assignees ?? []).map((a) => ({ login: a.login })),
   }
 }
 
-export async function fetchPRs(filter: Filter): Promise<TuiPR[]> {
-  const cmd: string[] = [
-    "gh",
-    "pr",
-    "list",
-    "--state",
-    "open",
-    "--json",
-    JSON_FIELDS,
-    "--limit",
-    "50",
-  ]
-  if (filter === "author") cmd.push("--author", "@me")
-  else if (filter === "assigned") cmd.push("--assignee", "@me")
-  return new Promise<TuiPR[]>((resolve, reject) => {
-    const proc = spawn({
-      cmd,
-      stdout: "pipe",
-      stderr: "pipe",
-    })
-    const text: string[] = []
-    const err: string[] = []
-    proc.stdout.pipeTo(new WritableStream({ write: (chunk) => (text.push(new TextDecoder().decode(chunk))) }))
-    proc.stderr.pipeTo(new WritableStream({ write: (chunk) => (err.push(new TextDecoder().decode(chunk))) }))
-    proc.exited.then((code) => {
-      if (code !== 0) {
-        reject(new Error(err.join("").trim() || `gh pr list exited ${code}`))
-        return
-      }
-      try {
-        resolve(JSON.parse(text.join("")) as TuiPR[])
-      } catch (e) {
-        reject(e instanceof Error ? e : new Error(String(e)))
-      }
-    })
+export async function fetchPRs(filter: Filter, repo: GitRepo): Promise<TuiPR[]> {
+  if (!repo) return []
+  const octokit = await getOctokit()
+  const { data } = await octokit.pulls.list({
+    owner: repo.owner,
+    repo: repo.repo,
+    state: "open",
+    per_page: 50,
+    sort: "updated",
+    direction: "desc",
   })
+  const me = filter === "all" ? null : await currentUser()
+  const filtered =
+    filter === "author"
+      ? data.filter((p) => p.user?.login === me)
+      : filter === "assigned"
+        ? data.filter((p) => p.assignees?.some((a) => a.login === me))
+        : data
+  return filtered.map(mapPull)
 }
 
-export async function currentBranchPR(): Promise<TuiPR | null> {
-  return new Promise<TuiPR | null>((resolve) => {
-    const proc = spawn({
-      cmd: ["gh", "pr", "view", "--json", JSON_FIELDS],
-      stdout: "pipe",
-      stderr: "pipe",
-    })
-    const text: string[] = []
-    const err: string[] = []
-    proc.stdout.pipeTo(new WritableStream({ write: (chunk) => (text.push(new TextDecoder().decode(chunk))) }))
-    proc.stderr.pipeTo(new WritableStream({ write: (chunk) => (err.push(new TextDecoder().decode(chunk))) }))
-    proc.exited.then((code) => {
-      if (code !== 0) {
-        resolve(null)
-        return
-      }
-      try {
-        const data = JSON.parse(text.join(""))
-        if (data && typeof data.number === "number") resolve(data as TuiPR)
-        else resolve(null)
-      } catch {
-        resolve(null)
-      }
-    })
+export async function currentBranchPR(repo: GitRepo, cwd: string = process.cwd()): Promise<TuiPR | null> {
+  if (!repo) return null
+  const branch = currentBranch(cwd)
+  if (!branch) return null
+  const me = await currentUser()
+  const octokit = await getOctokit()
+  const { data } = await octokit.pulls.list({
+    owner: repo.owner,
+    repo: repo.repo,
+    state: "open",
+    head: `${me}:${branch}`,
+    per_page: 1,
   })
+  const pr = data[0]
+  return pr ? mapPull(pr) : null
 }
 
 export const THREAD_COUNT_QUERY = `query Q($owner: String!, $name: String!) {
@@ -145,22 +108,11 @@ export async function fetchReviewerThreadCounts(
   owner: string,
   repo: string,
 ): Promise<Map<number, ReviewerThreadCounts>> {
-  const res = await runGh([
-    "gh",
-    "api",
-    "graphql",
-    "-f",
-    `owner=${owner}`,
-    "-f",
-    `name=${repo}`,
-    "-f",
-    `query=${THREAD_COUNT_QUERY}`,
-  ])
   const out = new Map<number, ReviewerThreadCounts>()
-  if (!res.ok) return out
   try {
-    const data = JSON.parse(res.output)
-    const nodes = data?.data?.repository?.pullRequests?.nodes ?? []
+    const octokit = await getOctokit()
+    const data: any = await octokit.graphql(THREAD_COUNT_QUERY, { owner, name: repo })
+    const nodes = data?.repository?.pullRequests?.nodes ?? []
     const normalize = (l: string) => l.replace(/\[bot\]$/, "")
     for (const n of nodes) {
       const threads = n.reviewThreads?.nodes ?? []
@@ -216,23 +168,14 @@ export async function fetchReviewerThreads(
   prNumber: number,
   reviewerLogin: string,
 ): Promise<string> {
-  const res = await runGh([
-    "gh",
-    "api",
-    "graphql",
-    "-F",
-    `owner=${owner}`,
-    "-F",
-    `name=${repo}`,
-    "-F",
-    `number=${prNumber}`,
-    "-F",
-    `query=${REVIEWER_THREADS_QUERY}`,
-  ])
-  if (!res.ok) return `_Failed to fetch threads: ${res.error ?? "unknown error"}_`
   try {
-    const data = JSON.parse(res.output)
-    const threads: any[] = data?.data?.repository?.pullRequest?.reviewThreads?.nodes ?? []
+    const octokit = await getOctokit()
+    const data: any = await octokit.graphql(REVIEWER_THREADS_QUERY, {
+      owner,
+      name: repo,
+      number: prNumber,
+    })
+    const threads: any[] = data?.repository?.pullRequest?.reviewThreads?.nodes ?? []
     const normalize = (l: string) => l.replace(/\[bot\]$/, "")
     const target = normalize(reviewerLogin)
     const rows: string[] = []
@@ -260,39 +203,37 @@ export async function fetchReviewerThreads(
     }
     const header = `| File | Line | Comment | Date |\n|------|------|---------|------|`
     return `Unresolved comments from @${reviewerLogin} on #${prNumber}:\n\n${header}\n${rows.join("\n")}`
-  } catch {
-    return "_Failed to parse response_"
+  } catch (e: any) {
+    return `_Failed to fetch threads: ${e?.message ?? "unknown error"}_`
   }
 }
 
-export async function fetchBranchRequiredReviews(owner: string, repo: string, branch: string): Promise<number | null> {
-  const res = await runGh([
-    "gh",
-    "api",
-    `repos/${owner}/${repo}/branches/${branch}/protection/required_pull_request_reviews`,
-  ])
-  if (!res.ok) return null
+export async function fetchBranchRequiredReviews(
+  owner: string,
+  repo: string,
+  branch: string,
+): Promise<number | null> {
   try {
-    const data = JSON.parse(res.output)
-    const n = data?.required_approving_reviewers_count
-    return typeof n === "number" ? n : null
+    const octokit = await getOctokit()
+    const { data } = await octokit.repos.getBranchProtection({ owner, repo, branch })
+    return data.required_pull_request_reviews?.required_approving_review_count ?? null
   } catch {
     return null
   }
 }
 
 export async function fetchOrgMembers(org: string): Promise<string[]> {
-  const res = await runGh([
-    "gh",
-    "api",
-    `orgs/${org}/members`,
-    "--jq",
-    ".[].login",
-  ])
-  if (!res.ok) return []
-  return res.output
-    .split("\n")
-    .map((s) => s.trim())
-    .filter(Boolean)
+  try {
+    const octokit = await getOctokit()
+    const members: string[] = []
+    for await (const res of octokit.paginate.iterator(octokit.orgs.listMembers, {
+      org,
+      per_page: 100,
+    })) {
+      for (const m of res.data) members.push(m.login)
+    }
+    return members
+  } catch {
+    return []
+  }
 }
-

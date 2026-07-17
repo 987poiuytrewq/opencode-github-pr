@@ -1,15 +1,15 @@
 import { createSignal, onMount, onCleanup } from "solid-js"
 import type { TuiPluginApi } from "@opencode-ai/plugin/tui"
-import { spawn } from "../bun-utils"
-import type { State, TuiPR as PR } from "../domain/types"
+import type { State, TuiPR } from "../domain/types"
 import { FILTERS } from "../domain/filter"
 import {
   detectRepo,
   fetchBranchRequiredReviews,
   fetchPRs,
   fetchReviewerThreadCounts,
-  JSON_FIELDS,
+  type Repo,
 } from "../infra/loader"
+import { getOctokit } from "../infra/octokit"
 
 export function useDashboard(api: TuiPluginApi) {
   const [state, setState] = createSignal<State>({
@@ -37,7 +37,7 @@ export function useDashboard(api: TuiPluginApi) {
   const refresh = async () => {
     const prev = state()
     const filter = prev.filter
-    const repo = await detectRepo()
+    const repo = detectRepo()
     const isFirstLoad = prev.fetchedAt === null
     const isDirChange =
       !!prev.repo && !!repo && (prev.repo.owner !== repo.owner || prev.repo.repo !== repo.repo)
@@ -58,7 +58,7 @@ export function useDashboard(api: TuiPluginApi) {
       return
     }
     try {
-      const prs = await fetchPRs(filter)
+      const prs = await fetchPRs(filter, repo)
       const [threadCounts, branchRules] = await Promise.all([
         fetchReviewerThreadCounts(repo.owner, repo.repo),
         (async () => {
@@ -101,26 +101,25 @@ export function useDashboard(api: TuiPluginApi) {
     const prs = state().prs
     const idx = prs.findIndex((p) => p.number === n)
     if (idx < 0) return
+    const repo = state().repo as Repo | null
+    if (!repo) return
     try {
-      const proc = spawn({
-        cmd: ["gh", "pr", "view", String(n), "--json", JSON_FIELDS],
-        stdout: "pipe",
-        stderr: "pipe",
+      const octokit = await getOctokit()
+      const { data } = await octokit.pulls.get({
+        owner: repo.owner,
+        repo: repo.repo,
+        pull_number: n,
       })
-      const out: string[] = []
-      proc.stdout.pipeTo(new WritableStream({ write: (c) => out.push(new TextDecoder().decode(c)) }))
-      await proc.exited
-      const fresh = JSON.parse(out.join("")) as PR
+      const updated = mapPull(data)
       setState((s) => ({
         ...s,
-        prs: s.prs.map((p) => (p.number === n ? fresh : p)),
+        prs: s.prs.map((p) => (p.number === n ? updated : p)),
         fetchedAt: Date.now(),
       }))
     } catch {}
   }
 
   onMount(() => {
-    console.log("[pr-dashboard] useDashboard onMount fired (extracted)")
     refresh()
     const handle = setInterval(() => {
       if (api.route.current.name === "session") refresh()
@@ -137,5 +136,30 @@ export function useDashboard(api: TuiPluginApi) {
     expanded,
     toggleExpanded,
     cycleFilter,
+  }
+}
+
+function mapPull(p: any): TuiPR {
+  return {
+    number: p.number,
+    title: p.title,
+    url: p.html_url,
+    isDraft: p.draft ?? false,
+    author: p.user ? { login: p.user.login } : null,
+    headRefName: p.head.ref,
+    baseRefName: p.base.ref,
+    reviewDecision: p.review_decision ?? null,
+    mergeable: p.mergeable ? "MERGEABLE" : p.mergeable === false ? "CONFLICTING" : "UNKNOWN",
+    mergeStateStatus: p.mergeable_state ?? null,
+    createdAt: p.created_at,
+    updatedAt: p.updated_at,
+    statusCheckRollup: p.status_check_rollup ?? null,
+    reviewRequests: (p.requested_reviewers ?? []).map((r: any) => ({ login: r.login })),
+    latestReviews: (p.latest_reviews ?? []).map((r: any) => ({
+      author: { login: r.user?.login ?? "" },
+      state: r.state,
+      createdAt: r.submitted_at ?? "",
+    })),
+    assignees: (p.assignees ?? []).map((a: any) => ({ login: a.login })),
   }
 }

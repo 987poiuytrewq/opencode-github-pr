@@ -1,10 +1,12 @@
 // Low-level wrapper around `bun.spawn` for invoking `gh` commands.
 //
-// `runGh` is the only direct spawn call site: it returns a discriminated
-// `{ok, output, error}` shape so callers don't have to wrangle exit codes,
-// stdout/stderr streams, or default error messages. Higher-level fetch
-// functions (`fetchPRs`, `fetchReviewerThreads`, etc.) compose this with
-// the specific `gh` subcommand and flags they need.
+// After the Octokit migration, this is used only for `gh auth token`
+// (which has no Octokit equivalent and is needed once at startup to
+// read the user's existing gh auth state). All other GitHub calls go
+// through Octokit directly.
+//
+// Includes a default timeout so a hung `gh` process can't block plugin
+// init indefinitely.
 
 import { spawn } from "../bun-utils"
 
@@ -12,9 +14,16 @@ export type GhResult = {
   ok: boolean
   output: string
   error?: string
+  timedOut?: boolean
 }
 
-export async function runGh(args: string[]): Promise<GhResult> {
+const DEFAULT_TIMEOUT_MS = 10_000
+
+export async function runGh(
+  args: string[],
+  opts: { timeoutMs?: number } = {},
+): Promise<GhResult> {
+  const timeoutMs = opts.timeoutMs ?? DEFAULT_TIMEOUT_MS
   return new Promise((resolve) => {
     const proc = spawn({ cmd: args, stdout: "pipe", stderr: "pipe" })
     const out: string[] = []
@@ -29,11 +38,24 @@ export async function runGh(args: string[]): Promise<GhResult> {
         write: (chunk) => err.push(new TextDecoder().decode(chunk)),
       }),
     )
+    const timer = setTimeout(() => {
+      try {
+        proc.kill?.()
+      } catch {}
+      resolve({
+        ok: false,
+        output: out.join("").trim(),
+        error: `gh timed out after ${timeoutMs}ms`,
+        timedOut: true,
+      })
+    }, timeoutMs)
     proc.exited.then((code) => {
+      clearTimeout(timer)
       resolve({
         ok: code === 0,
         output: out.join("").trim(),
         error: code !== 0 ? err.join("").trim() || `gh exited ${code}` : undefined,
+        timedOut: false,
       })
     })
   })

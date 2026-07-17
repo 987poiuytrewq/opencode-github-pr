@@ -13,7 +13,6 @@ import {
   fmtAge,
 } from "./domain/pr-status"
 import { FILTERS } from "./domain/filter"
-import { runGh } from "./infra/gh"
 import { Header } from "./app/Header"
 import { PRRow } from "./app/PRRow"
 import { DashboardView } from "./app/DashboardView"
@@ -21,16 +20,11 @@ import { useDashboard } from "./app/usePRData"
 import {
   currentBranchPR,
   detectRepo,
-  fetchBranchRequiredReviews,
   fetchOrgMembers,
-  fetchPRs,
-  fetchReviewerThreadCounts,
   fetchReviewerThreads,
-  JSON_FIELDS,
-  REVIEWER_THREADS_QUERY,
-  THREAD_COUNT_QUERY,
   type ReviewerThreadCounts,
 } from "./infra/loader"
+import { getOctokit } from "./infra/octokit"
 
 export type { PR, Repo, Filter, State, Status }
 export { SK, skin, toHex, truncateTitle }
@@ -52,11 +46,13 @@ export {
   fetchPRs,
   fetchReviewerThreadCounts,
   fetchReviewerThreads,
-  JSON_FIELDS,
   REVIEWER_THREADS_QUERY,
   THREAD_COUNT_QUERY,
   type ReviewerThreadCounts,
+  type Repo,
 } from "./infra/loader"
+export { getOctokit, currentUser, setOctokit, setCurrentUser, createOctokit } from "./infra/octokit"
+export { originRemoteUrl, parseGitHubRemote, currentBranch } from "./infra/git"
 export { Header } from "./app/Header"
 export { PRRow } from "./app/PRRow"
 export { DashboardView } from "./app/DashboardView"
@@ -118,13 +114,25 @@ const tui: TuiPlugin = async (api, options) => {
               api.ui.dialog.clear()
               return
             }
-            const res = await runGh(["gh", "pr", "edit", String(n), "--add-reviewer", reviewer])
+            const cur = ctx.state().repo
+            if (!cur) {
+              api.ui.dialog.clear()
+              api.ui.toast({ variant: "error", message: "No repo detected", duration: 2000 })
+              return
+            }
             api.ui.dialog.clear()
-            if (res.ok) {
+            try {
+              const octokit = await getOctokit()
+              await octokit.pulls.requestReviewers({
+                owner: cur.owner,
+                repo: cur.repo,
+                pull_number: n,
+                reviewers: [reviewer],
+              })
               api.ui.toast({ variant: "success", message: `Requested @${reviewer} on #${n}`, duration: 2000 })
               ctx.refreshOne(n)
-            } else {
-              api.ui.toast({ variant: "error", message: `Failed: ${res.error ?? "unknown"}`, duration: 4000 })
+            } catch (e: any) {
+              api.ui.toast({ variant: "error", message: `Failed: ${e?.message ?? "unknown"}`, duration: 4000 })
             }
           }}
           onCancel={() => api.ui.dialog.clear()}
@@ -243,7 +251,12 @@ const tui: TuiPlugin = async (api, options) => {
         namespace: "palette",
         slashName: "pr-add-reviewer-current",
         run: async () => {
-          const pr = await currentBranchPR()
+          const repo = ctx.state().repo
+          if (!repo) {
+            api.ui.toast({ variant: "warning", message: "No repo detected", duration: 2000 })
+            return
+          }
+          const pr = await currentBranchPR(repo)
           if (!pr) {
             api.ui.toast({ variant: "warning", message: "No PR for current branch", duration: 2000 })
             return
@@ -256,7 +269,6 @@ const tui: TuiPlugin = async (api, options) => {
   })
 
   api.event.on("session.idle", () => {
-    console.log("[pr-dashboard] session.idle fired")
     ctx.refresh()
   })
 }
