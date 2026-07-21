@@ -1,0 +1,153 @@
+import { spawn, type Subprocess } from "bun"
+
+export class TmuxSession {
+  readonly name: string
+  readonly cols: number
+  readonly rows: number
+
+  private constructor(name: string, cols: number, rows: number) {
+    this.name = name
+    this.cols = cols
+    this.rows = rows
+  }
+
+  static async create(opts: {
+    name: string
+    cols: number
+    rows: number
+    cwd: string
+    env?: Record<string, string>
+    command: string[]
+  }): Promise<TmuxSession> {
+    const session = new TmuxSession(opts.name, opts.cols, opts.rows)
+    const args = [
+      "new-session",
+      "-d",
+      "-s", opts.name,
+      "-x", String(opts.cols),
+      "-y", String(opts.rows),
+      "-c", opts.cwd,
+    ]
+    for (const [k, v] of Object.entries(opts.env ?? {})) {
+      args.push("-e", `${k}=${v}`)
+    }
+    args.push("--", ...opts.command)
+    await session.run("tmux", args)
+    await session.run("tmux", ["set-option", "-t", opts.name, "mouse", "off"])
+    return session
+  }
+
+  private run(cmd: string, args: string[]): Promise<string> {
+    return new Promise((resolve, reject) => {
+      const proc = spawn([cmd, ...args], {
+        stdout: "pipe",
+        stderr: "pipe",
+      })
+      const stdout = proc.stdout as ReadableStream<Uint8Array>
+      const stderr = proc.stderr as ReadableStream<Uint8Array>
+      let out = ""
+      let err = ""
+      const text = (s: ReadableStream<Uint8Array>) =>
+        new Response(s).text()
+      Promise.all([text(stdout), text(stderr), proc.exited]).then(([o, e, code]) => {
+        out = o
+        err = e
+        if (code !== 0) {
+          reject(new Error(`${cmd} ${args.join(" ")} exited ${code}: ${err}`))
+        } else {
+          resolve(out)
+        }
+      })
+    })
+  }
+
+  sendKeys(text: string): Promise<void> {
+    return this.run("tmux", ["send-keys", "-t", this.name, text]).then(() => {})
+  }
+
+  sendRaw(bytes: string): Promise<void> {
+    return this.run("tmux", ["send-keys", "-t", this.name, "-l", bytes]).then(() => {})
+  }
+
+  async capturePane(): Promise<string> {
+    return this.run("tmux", [
+      "capture-pane",
+      "-t", this.name,
+      "-p",
+      "-e",
+    ])
+  }
+
+  async capturePanePlain(): Promise<string> {
+    return this.run("tmux", [
+      "capture-pane",
+      "-t", this.name,
+      "-p",
+    ])
+  }
+
+  async waitFor(
+    predicate: (screen: string) => boolean,
+    opts: { timeoutMs?: number; intervalMs?: number; label?: string } = {},
+  ): Promise<void> {
+    const timeoutMs = opts.timeoutMs ?? 30_000
+    const intervalMs = opts.intervalMs ?? 200
+    const label = opts.label ?? "condition"
+    const deadline = Date.now() + timeoutMs
+    let last = ""
+    while (Date.now() < deadline) {
+      last = await this.capturePanePlain()
+      if (predicate(last)) return
+      await Bun.sleep(intervalMs)
+    }
+    throw new Error(
+      `waitFor(${label}) timed out after ${timeoutMs}ms. Last screen:\n${last}`,
+    )
+  }
+
+  async waitForText(text: string, opts: { timeoutMs?: number; intervalMs?: number } = {}): Promise<void> {
+    return this.waitFor(
+      (s) => s.includes(text),
+      { ...opts, label: `text=${JSON.stringify(text)}` },
+    )
+  }
+
+  async click(col: number, row: number): Promise<void> {
+    // SGR mouse coordinates are 1-based; text capture is 0-based.
+    const c = col + 1
+    const r = row + 1
+    const press = `\x1b[<0;${c};${r}M`
+    const release = `\x1b[<0;${c};${r}m`
+    await this.sendRaw(press)
+    await Bun.sleep(20)
+    await this.sendRaw(release)
+  }
+
+  async paneTty(): Promise<string> {
+    return this.run("tmux", ["display", "-t", this.name, "-p", "#{pane_tty}"])
+  }
+
+  async writeToTty(bytes: string): Promise<void> {
+    const tty = await this.paneTty()
+    await Bun.write(Bun.file(tty), bytes)
+  }
+
+  async kill(): Promise<void> {
+    try {
+      await this.run("tmux", ["kill-session", "-t", this.name])
+    } catch {}
+  }
+}
+
+export function isE2E(): boolean {
+  return process.env.E2E === "1" || process.env.E2E === "true"
+}
+
+export function e2eDescribe(name: string, fn: () => void): void {
+  const { describe, test } = require("bun:test")
+  if (isE2E()) {
+    describe(name, fn)
+  } else {
+    describe.skip(name, fn)
+  }
+}
