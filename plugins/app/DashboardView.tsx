@@ -1,23 +1,22 @@
 /** @jsxImportSource @opentui/solid */
 import { createMemo, For, Show } from "solid-js"
 import type { TuiPluginApi } from "@opencode-ai/plugin/tui"
-import type { Filter, State } from "../domain/types"
-import { SK, skin } from "../domain/format"
+import { DashboardStatus, type PRFilter, type DashboardState, type ReviewerThreadCounts } from "../domain/types"
+import { skin } from "./theme"
 import { isReadyToMerge } from "../domain/pr-status"
-import { Header } from "./Header"
+import { errorMessages } from "../domain/messages"
 import { PRRow } from "./PRRow"
-import type { ReviewerThreadCounts } from "../infra/loader"
 
 export function DashboardView(props: {
   api: TuiPluginApi
-  state: State
+  state: DashboardState
   onRefresh: () => void
   selectedIdx: number
   setSelectedIdx: (n: number) => void
   onOpen: (n: number) => void
   onAddReviewer: (n: number) => void
   onReviewerComments: (n: number, login: string) => void
-  filter: Filter
+  filter: PRFilter
   onCycleFilter: () => void
   expanded: boolean
   onToggleExpand: () => void
@@ -37,37 +36,62 @@ export function DashboardView(props: {
 
   return (
     <box flexDirection="column" paddingTop={1} paddingBottom={1} gap={0}>
-      <Header
-        sk={sk}
-        status={props.state.status}
-        expanded={props.expanded}
-        onToggleExpand={props.onToggleExpand}
-        filter={props.filter}
-        onCycleFilter={props.onCycleFilter}
-        readyCount={counts().ready}
-        notReadyCount={counts().notReady}
-      />
-
-      <Show when={props.state.status === "no-repo"}>
-        <box flexDirection="column" paddingLeft={1} paddingTop={1} paddingRight={1}>
-          <text fg={sk.muted}>No GitHub repo detected in this directory.</text>
-          <text fg={sk.muted}>Run `gh auth status` to confirm authentication.</text>
-        </box>
-      </Show>
-
-      <Show when={props.state.status === "error"}>
-        <box flexDirection="column" paddingLeft={1} paddingTop={1} paddingRight={1}>
+      <box
+        flexDirection="row"
+        gap={1}
+        paddingLeft={0}
+        paddingRight={0}
+        onMouseUp={() => props.onToggleExpand()}
+      >
+        <text fg={sk.text}>{props.expanded ? "▼" : "▶"}</text>
+        <text fg={sk.text}>
+          <b>PRs</b>
+        </text>
+        <Show when={props.state.status === DashboardStatus.Ok}>
+          <text fg={sk.success}>{counts().ready}✓</text>
+          <text fg={sk.text}>{counts().notReady}•</text>
+        </Show>
+        <Show when={props.state.status === DashboardStatus.Loading}>
+          <text fg={sk.muted}>Loading</text>
+        </Show>
+        <Show when={props.state.status === DashboardStatus.Error}>
           <text fg={sk.error}>Error</text>
+        </Show>
+        <Show when={props.state.status === DashboardStatus.NoRepo}>
+          <text fg={sk.muted}>{errorMessages.noRepo}</text>
+        </Show>
+        <box flexGrow={1}></box>
+        <Show when={props.state.status !== DashboardStatus.NoRepo}>
+          <box
+            onMouseUp={(e: any) => {
+              e?.stopPropagation?.()
+              props.onCycleFilter()
+            }}
+          >
+            <text fg={sk.muted}>{`${props.filter}:@me`}</text>
+          </box>
+        </Show>
+      </box>
+
+      <Show when={props.state.status === DashboardStatus.NoRepo}>
+        <box flexDirection="column" paddingLeft={1} paddingTop={1} paddingRight={1} selectable={false}>
+          <text fg={sk.muted} selectable={false}>{errorMessages.noRepo}</text>
         </box>
       </Show>
 
-      <Show when={props.expanded && props.state.status === "ok" && props.state.prs.length === 0}>
-        <box flexDirection="column" paddingLeft={1} paddingTop={1} paddingRight={1}>
-          <text fg={sk.muted}>No open PRs.</text>
+      <Show when={props.state.status === DashboardStatus.Error}>
+        <box flexDirection="column" paddingLeft={1} paddingTop={1} paddingRight={1} gap={1} selectable={false}>
+          <text fg={sk.error} selectable={false}>{props.state.error ?? errorMessages.unknown}</text>
         </box>
       </Show>
 
-      <Show when={props.expanded && props.state.status === "ok" && props.state.prs.length > 0}>
+      <Show when={props.expanded && props.state.status === DashboardStatus.Ok && props.state.prs.length === 0}>
+        <box flexDirection="column" paddingLeft={1} paddingTop={1} paddingRight={1} selectable={false}>
+          <text fg={sk.muted} selectable={false}>{errorMessages.noOpenPRs}</text>
+        </box>
+      </Show>
+
+      <Show when={props.expanded && props.state.status === DashboardStatus.Ok && props.state.prs.length > 0}>
         <box flexDirection="column" gap={1} paddingTop={0}>
           <For each={visible()}>
             {(pr, i) => (
@@ -90,7 +114,7 @@ export function DashboardView(props: {
                 pass={sk.success}
                 fail={sk.error}
                 warn={sk.warning}
-                draft={SK.draft}
+                draft={sk.draft}
                 required={props.state.branchRules.get(pr.baseRefName) ?? null}
                 threadCount={
                   props.state.threadCounts.get(pr.number) ??

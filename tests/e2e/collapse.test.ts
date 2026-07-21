@@ -4,14 +4,14 @@ import { makeTempRepo, type TempRepo } from "./fixtures"
 
 const OPENCODE = "/opt/homebrew/bin/opencode"
 
-describe.skipIf(!isE2E())("E2E: minimal plugin collapse", () => {
+describe.skipIf(!isE2E())("E2E: PR dashboard collapse", () => {
   let session: TmuxSession
   let repo: TempRepo
 
   beforeAll(async () => {
     repo = await makeTempRepo()
     session = await TmuxSession.create({
-      name: `e2e-min-${Date.now()}`,
+      name: `e2e-collapse-${Date.now()}`,
       cols: 140,
       rows: 40,
       cwd: repo.dir,
@@ -35,12 +35,7 @@ describe.skipIf(!isE2E())("E2E: minimal plugin collapse", () => {
     expect(screen).toContain("PRs")
   }, 30_000)
 
-  test("Loading text visible when expanded", async () => {
-    const screen = await session.capturePanePlain()
-    expect(screen).toContain("Loading PRs from GitHub")
-  }, 30_000)
-
-  test("clicking ▼ collapses to ▶ and hides Loading text", async () => {
+  test("clicking ▼ collapses to ▶ and hides PR list", async () => {
     const screen = await session.capturePanePlain()
     const lines = screen.split("\n")
     let col = -1, row = -1
@@ -53,16 +48,14 @@ describe.skipIf(!isE2E())("E2E: minimal plugin collapse", () => {
       }
     }
     expect(col).toBeGreaterThan(-1)
-    console.log(`Clicking ▼ at col=${col}, row=${row}`)
     await session.click(col, row)
     await Bun.sleep(1500)
     const after = await session.capturePanePlain()
-    console.log("After click:", after.split("\n").filter(l => l.includes("PRs") || l.includes("▶") || l.includes("▼") || l.includes("Loading")).join("\n"))
     expect(after).toContain("▶")
-    expect(after).not.toContain("Loading PRs from GitHub")
+    expect(after).not.toContain("No open PRs")
   }, 30_000)
 
-  test("clicking ▶ expands back to ▼ and shows Loading text", async () => {
+  test("clicking ▶ expands back to ▼", async () => {
     const screen = await session.capturePanePlain()
     const lines = screen.split("\n")
     let col = -1, row = -1
@@ -79,6 +72,10 @@ describe.skipIf(!isE2E())("E2E: minimal plugin collapse", () => {
     await Bun.sleep(1500)
     const after = await session.capturePanePlain()
     expect(after).toContain("▼")
-    expect(after).toContain("Loading PRs from GitHub")
+  }, 30_000)
+
+  test("filter label shows author:@me", async () => {
+    const screen = await session.capturePanePlain()
+    expect(screen).toContain("author:@me")
   }, 30_000)
 })

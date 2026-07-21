@@ -6,6 +6,9 @@
 
 import { existsSync, readFileSync } from "node:fs"
 import { join } from "node:path"
+import type { Repo } from "../domain/types"
+
+export type { Repo }
 
 const HEAD_REF_PREFIX = "ref: refs/heads/"
 
@@ -29,8 +32,6 @@ export function originRemoteUrl(cwd: string): string | null {
   return urlMatch ? urlMatch[1].trim() : null
 }
 
-export type Repo = { owner: string; repo: string }
-
 const SSH_PREFIX = "git" + "@" + "github.com:"
 const HTTPS_PREFIXES = ["https://github.com/", "http://github.com/"]
 
@@ -46,6 +47,12 @@ export function parseGitHubRemote(url: string): Repo | null {
     }
   }
   return null
+}
+
+export function detectRepo(cwd: string = process.cwd()): Repo | null {
+  const url = originRemoteUrl(cwd)
+  if (!url) return null
+  return parseGitHubRemote(url)
 }
 
 function splitOwnerRepo(path: string): Repo | null {

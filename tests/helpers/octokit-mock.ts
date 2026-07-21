@@ -1,10 +1,14 @@
 import { mock } from "bun:test"
-import { setOctokit, setCurrentUser } from "../../plugins/infra/octokit"
+import { setOctokit } from "../../plugins/infra/octokit"
 
+// Op-specific handlers receive just the request params (the op is already
+// matched). The default handler receives (op, params) so it can dispatch
+// across multiple operations in a single test.
 export type OctokitHandler = (params: any) => any
+export type OctokitDefaultHandler = (op: string, params: any) => any
 
 const handlers: { match: (op: string, params: any) => boolean; respond: OctokitHandler }[] = []
-let defaultHandler: OctokitHandler | null = null
+let defaultHandler: OctokitDefaultHandler | null = null
 
 export function mockOctokitOp(op: string, respond: OctokitHandler) {
   handlers.push({
@@ -13,7 +17,7 @@ export function mockOctokitOp(op: string, respond: OctokitHandler) {
   })
 }
 
-export function mockOctokitDefault(respond: OctokitHandler) {
+export function mockOctokitDefault(respond: OctokitDefaultHandler) {
   defaultHandler = respond
 }
 
@@ -24,7 +28,6 @@ export function clearOctokitMocks() {
   // trying real auth (which would hang in tests). The client will throw
   // clean errors if test code calls an un-mocked operation.
   setOctokit(buildMockClient())
-  setCurrentUser(null)
 }
 
 function buildMockClient() {
@@ -41,10 +44,6 @@ function buildMockClient() {
       listMembers: (params: any) => dispatch("orgs.listMembers", params),
     },
     graphql: async (query: string, params: any) => dispatch("graphql", { query, params }),
-    users: {
-      getAuthenticated: async () =>
-        dispatch("users.getAuthenticated", {}) ?? { data: { login: "testuser" } },
-    },
     paginate: {
       iterator: (fn: any, params: any) => {
         return (async function* () {
@@ -60,15 +59,10 @@ async function dispatch(op: string, params: any): Promise<any> {
   for (const h of handlers) {
     if (h.match(op, params)) return h.respond(params)
   }
-  if (defaultHandler) return defaultHandler({ op, params })
+  if (defaultHandler) return defaultHandler(op, params)
   throw new Error(`No Octokit mock for ${op}: ${JSON.stringify(params)}`)
 }
 
 export function installOctokitMock() {
   setOctokit(buildMockClient())
-  setCurrentUser("testuser")
-}
-
-export function mockOctokitData(handler: OctokitHandler) {
-  defaultHandler = handler
 }

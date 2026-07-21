@@ -1,26 +1,29 @@
 import { describe, expect, test } from "bun:test"
+import { BOT_ALIASES, displayLogin, ellipsize } from "../../plugins/domain/login"
 import {
-  BOT_ALIASES,
   classifyCI,
-  displayLogin,
-  ellipsize,
-  fmtAge,
-  isReadyToMerge,
-  missingReviewerCount,
   reviewSummary,
-  toHex,
-  truncateTitle,
-  type PR,
-} from "../../plugins/pr-dashboard.tui"
+  missingReviewerCount,
+  isReadyToMerge,
+} from "../../plugins/domain/pr-status"
+import { toHex } from "../../plugins/app/theme"
+import { truncateTitle, formatAge } from "../../plugins/domain/format"
+import type { PR as PR } from "../../plugins/domain/types"
 import { makeTUIPR } from "../helpers/tui-fixtures"
 
 
 describe("classifyCI", () => {
-  test("returns 'none' for null rollup", () => {
-    expect(classifyCI(makeTUIPR({ statusCheckRollup: null }))).toBe("none")
+  test("returns 'none' for null rollup and null mergeStateStatus", () => {
+    expect(classifyCI(makeTUIPR({ statusCheckRollup: null, mergeStateStatus: null }))).toBe("none")
   })
-  test("returns 'none' for empty rollup", () => {
-    expect(classifyCI(makeTUIPR({ statusCheckRollup: [] }))).toBe("none")
+  test("returns 'none' for empty rollup and null mergeStateStatus", () => {
+    expect(classifyCI(makeTUIPR({ statusCheckRollup: [], mergeStateStatus: null }))).toBe("none")
+  })
+  test("returns 'pass' for CLEAN mergeStateStatus when no rollup", () => {
+    expect(classifyCI(makeTUIPR({ statusCheckRollup: null, mergeStateStatus: "CLEAN" }))).toBe("pass")
+  })
+  test("returns 'pending' for UNSTABLE mergeStateStatus when no rollup", () => {
+    expect(classifyCI(makeTUIPR({ statusCheckRollup: null, mergeStateStatus: "UNSTABLE" }))).toBe("pending")
   })
   test("returns 'pass' when all SUCCESS", () => {
     expect(
@@ -322,13 +325,13 @@ describe("isReadyToMerge", () => {
     })
     expect(isReadyToMerge(pr, 2)).toBe(true)
   })
-  test("returns true for UNSTABLE state", () => {
+  test("returns false for UNSTABLE state (checks not all passing)", () => {
     expect(
       isReadyToMerge(
         makeTUIPR({ mergeStateStatus: "UNSTABLE" as any }),
         null,
       ),
-    ).toBe(true)
+    ).toBe(false)
   })
   test("returns false for BEHIND state", () => {
     expect(
@@ -355,28 +358,28 @@ describe("isReadyToMerge", () => {
   })
 })
 
-describe("fmtAge", () => {
+describe("formatAge", () => {
   test("returns 'now' for very recent", () => {
-    expect(fmtAge(new Date().toISOString())).toBe("now")
+    expect(formatAge(new Date().toISOString())).toBe("now")
   })
   test("returns minutes", () => {
     const d = new Date(Date.now() - 5 * 60_000)
-    expect(fmtAge(d.toISOString())).toBe("5m")
+    expect(formatAge(d.toISOString())).toBe("5m")
   })
   test("returns hours", () => {
     const d = new Date(Date.now() - 3 * 3600_000)
-    expect(fmtAge(d.toISOString())).toBe("3h")
+    expect(formatAge(d.toISOString())).toBe("3h")
   })
   test("returns days", () => {
     const d = new Date(Date.now() - 5 * 86_400_000)
-    expect(fmtAge(d.toISOString())).toBe("5d")
+    expect(formatAge(d.toISOString())).toBe("5d")
   })
   test("returns months", () => {
     const d = new Date(Date.now() - 90 * 86_400_000)
-    expect(fmtAge(d.toISOString())).toBe("3mo")
+    expect(formatAge(d.toISOString())).toBe("3mo")
   })
   test("returns empty string for invalid input", () => {
-    expect(fmtAge("not-a-date")).toBe("")
+    expect(formatAge("not-a-date")).toBe("")
   })
 })
 

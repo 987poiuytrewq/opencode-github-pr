@@ -1,25 +1,30 @@
-// PR status evaluation: CI classification, review rollup, ready-to-merge,
-// age formatting. Pure functions over the TuiPR type.
+// PR status evaluation: CI classification, review rollup, ready-to-merge.
+// Pure functions over the PR type. Age formatting lives in ./format.
 
-import type { TuiPR } from "./types"
+import type { PR } from "./types"
 
-export function classifyCI(pr: TuiPR): "pass" | "fail" | "pending" | "none" {
+export function classifyCI(pr: PR): "pass" | "fail" | "pending" | "none" {
   const checks = pr.statusCheckRollup ?? []
-  if (checks.length === 0) return "none"
-  let anyPending = false
-  let anyFail = false
-  for (const c of checks) {
-    const v = c.conclusion ?? c.status ?? c.state ?? ""
-    if (v === "SUCCESS") continue
-    if (v === "FAILURE" || v === "ERROR" || v === "TIMED_OUT") anyFail = true
-    else anyPending = true
+  if (checks.length > 0) {
+    let anyPending = false
+    let anyFail = false
+    for (const c of checks) {
+      const v = c.conclusion ?? c.status ?? c.state ?? ""
+      if (v === "SUCCESS") continue
+      if (v === "FAILURE" || v === "ERROR" || v === "TIMED_OUT") anyFail = true
+      else anyPending = true
+    }
+    if (anyFail) return "fail"
+    if (anyPending) return "pending"
+    return "pass"
   }
-  if (anyFail) return "fail"
-  if (anyPending) return "pending"
-  return "pass"
+  const ms = pr.mergeStateStatus?.toUpperCase() ?? ""
+  if (ms === "CLEAN" || ms === "HAS_HOOKS") return "pass"
+  if (ms === "UNSTABLE") return "pending"
+  return "none"
 }
 
-export function reviewSummary(pr: TuiPR): {
+export function reviewSummary(pr: PR): {
   approved: number
   changes: number
   pending: number
@@ -52,13 +57,13 @@ export function reviewSummary(pr: TuiPR): {
   }
 }
 
-export function missingReviewerCount(pr: TuiPR, required: number | null | undefined): number {
+export function missingReviewerCount(pr: PR, required: number | null | undefined): number {
   if (required == null || required <= 0) return 0
   const r = reviewSummary(pr)
   return Math.max(0, required - r.approved - r.pending)
 }
 
-export function isReadyToMerge(pr: TuiPR, required: number | null | undefined): boolean {
+export function isReadyToMerge(pr: PR, required: number | null | undefined): boolean {
   if (pr.isDraft) return false
   if (pr.mergeStateStatus === "CONFLICTING" || pr.mergeable === "CONFLICTING") return false
   if (pr.mergeStateStatus && pr.mergeStateStatus !== "CLEAN" && pr.mergeStateStatus !== "UNSTABLE") {
@@ -72,18 +77,4 @@ export function isReadyToMerge(pr: TuiPR, required: number | null | undefined): 
     if (r.approved < required) return false
   }
   return true
-}
-
-export function fmtAge(iso: string): string {
-  const t = Date.parse(iso)
-  if (Number.isNaN(t)) return ""
-  const diff = Date.now() - t
-  const m = Math.floor(diff / 60_000)
-  if (m < 1) return "now"
-  if (m < 60) return `${m}m`
-  const h = Math.floor(m / 60)
-  if (h < 24) return `${h}h`
-  const d = Math.floor(h / 24)
-  if (d < 30) return `${d}d`
-  return `${Math.floor(d / 30)}mo`
 }

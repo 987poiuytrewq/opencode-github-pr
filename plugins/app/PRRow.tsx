@@ -1,14 +1,25 @@
 /** @jsxImportSource @opentui/solid */
-import { Show } from "solid-js"
-import type { TuiPR as PR, ReviewerThreadCounts } from "../infra/loader"
+import { For, Show, createMemo } from "solid-js"
+import type { PR, ReviewerThreadCounts } from "../domain/types"
 import { ellipsize, displayLogin } from "../domain/login"
-import { SK, truncateTitle } from "../domain/format"
+import { truncateTitle } from "../domain/format"
 import {
   classifyCI,
   reviewSummary,
   missingReviewerCount,
   isReadyToMerge,
 } from "../domain/pr-status"
+
+type ReviewerKind = "approved" | "changes" | "pending" | "commented"
+type ReviewerEntry = { login: string; kind: ReviewerKind }
+
+const UNRESOLVED_DIGITS = ["➀", "➁", "➂", "➃", "➄", "➅", "➆", "➇", "➈", "➉"]
+
+function unresolvedIcons(n: number): string {
+  const cap = UNRESOLVED_DIGITS.length
+  if (n <= cap) return UNRESOLVED_DIGITS.slice(0, n).join("")
+  return UNRESOLVED_DIGITS.join("") + `+${n - cap}`
+}
 
 function CIIndicator(props: {
   ci: ReturnType<typeof classifyCI>
@@ -19,7 +30,7 @@ function CIIndicator(props: {
 }) {
   const sym = { pass: "✓", fail: "✗", pending: "•", none: " " }[props.ci]
   const color = { pass: props.pass, fail: props.fail, pending: props.warn, none: props.muted }[props.ci]
-  return <text fg={color}>{sym}</text>
+  return <text fg={color} selectable={false}>{sym}</text>
 }
 
 export function PRRow(props: {
@@ -50,42 +61,18 @@ export function PRRow(props: {
   const showAdd =
     missing > 0 || (r.approved === 0 && r.changes === 0 && r.pending === 0 && r.commented === 0)
 
-  const reviewerBoxes: any[] = []
-  const pushReviewer = (el: any) => {
-    if (reviewerBoxes.length > 0) reviewerBoxes.push(<text>{" "}</text>)
-    reviewerBoxes.push(el)
-  }
+  const reviewers = createMemo<ReviewerEntry[]>(() => [
+    ...r.approvedLogins.map((l) => ({ login: l, kind: "approved" as const })),
+    ...r.changesLogins.map((l) => ({ login: l, kind: "changes" as const })),
+    ...r.pendingLogins.map((l) => ({ login: l, kind: "pending" as const })),
+    ...r.commentedLogins.map((l) => ({ login: l, kind: "commented" as const })),
+  ])
 
-  r.approvedLogins.forEach((l) =>
-    pushReviewer(<text fg={props.pass}>{`${ellipsize(displayLogin(l))}✓ `}</text>),
-  )
-  r.changesLogins.forEach((l) =>
-    pushReviewer(<text fg={props.fail}>{`${ellipsize(displayLogin(l))}± `}</text>),
-  )
-  r.pendingLogins.forEach((l) =>
-    pushReviewer(<text fg={props.warn}>{`${ellipsize(displayLogin(l))}• `}</text>),
-  )
-  r.commentedLogins.forEach((l) => {
-    const tc = props.threadCount.get(l) ?? { unresolved: 0, resolved: 0 }
-    const icon = tc.unresolved > 0 ? "☐" : tc.resolved > 0 ? "☑" : ""
-    const login = displayLogin(l)
-    if (tc.unresolved > 0) {
-      pushReviewer(
-        <box
-          onMouseUp={(e: any) => {
-            e?.stopPropagation?.()
-            props.onReviewerComments(l)
-          }}
-        >
-          <text fg={props.muted}>
-            <u>{`${ellipsize(login)}${icon} `}</u>
-          </text>
-        </box>,
-      )
-    } else {
-      pushReviewer(<text fg={props.muted}>{`${ellipsize(login)}${icon} `}</text>)
-    }
-  })
+  const reviewerColor = (kind: ReviewerKind): string =>
+    kind === "approved" ? props.pass
+    : kind === "changes" ? props.fail
+    : kind === "pending" ? props.warn
+    : props.muted
 
   return (
     <box
@@ -94,9 +81,10 @@ export function PRRow(props: {
       paddingRight={1}
       paddingTop={0}
       paddingBottom={0}
+      selectable={false}
       onMouseUp={() => props.onClick()}
     >
-      <box flexDirection="row" gap={1}>
+      <box flexDirection="row" gap={1} selectable={false}>
         <CIIndicator
           ci={classifyCI(props.pr)}
           pass={props.pass}
@@ -104,23 +92,58 @@ export function PRRow(props: {
           warn={props.warn}
           muted={props.muted}
         />
-        <text fg={numColor}>
+        <text fg={numColor} selectable={false}>
           <b>#{numStr}</b>
         </text>
-        <text fg={titleColor}>{title}</text>
+        <text fg={titleColor} selectable={false}>{title}</text>
       </box>
-      <box flexDirection="row" flexWrap="no-wrap" gap={0} paddingLeft={2}>
-        <Show when={reviewerBoxes.length > 0} fallback={<text> </text>}>
-          {reviewerBoxes}
+      <box flexDirection="row" flexWrap="no-wrap" gap={0} paddingLeft={2} selectable={false}>
+        <Show when={reviewers().length > 0} fallback={<text selectable={false}> </text>}>
+          <For each={reviewers()}>
+            {(rv, i) => (
+              <>
+                <Show when={i() > 0}>
+                  <text selectable={false}> </text>
+                </Show>
+                <Show
+                  when={rv.kind === "commented" && (props.threadCount.get(rv.login)?.unresolved ?? 0) > 0}
+                  fallback={
+                    <text fg={reviewerColor(rv.kind)} selectable={false}>
+                      {`${ellipsize(displayLogin(rv.login))}${
+                        rv.kind === "commented"
+                          ? (props.threadCount.get(rv.login)?.resolved ?? 0) > 0 ? "⬤" : ""
+                          : rv.kind === "approved" ? "✓"
+                          : rv.kind === "changes" ? "±"
+                          : "⬤"
+                      } `}
+                    </text>
+                  }
+                >
+                  <box
+                    selectable={false}
+                    onMouseUp={(e: any) => {
+                      e?.stopPropagation?.()
+                      props.onReviewerComments(rv.login)
+                    }}
+                  >
+                    <text fg={props.muted} selectable={false}>
+                      <u>{`${ellipsize(displayLogin(rv.login))}${unresolvedIcons(props.threadCount.get(rv.login)!.unresolved)} `}</u>
+                    </text>
+                  </box>
+                </Show>
+              </>
+            )}
+          </For>
         </Show>
         <Show when={showAdd}>
           <box
+            selectable={false}
             onMouseUp={(e: any) => {
               e?.stopPropagation?.()
               props.onReviewer()
             }}
           >
-            <text fg={props.muted}>
+            <text fg={props.muted} selectable={false}>
               <u> add {missing > 0 ? missing : "reviewers"}</u>
             </text>
           </box>

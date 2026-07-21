@@ -1,19 +1,15 @@
 /** @jsxImportSource @opentui/solid */
 import { Show } from "solid-js"
-import type { Filter, Status } from "../domain/types"
+import { DashboardStatus, type PRFilter } from "../domain/types"
+import { errorMessages } from "../domain/messages"
+import type { Skin } from "./theme"
 
 export function Header(props: {
-  sk: {
-    text: string
-    muted: string
-    success: string
-    error: string
-    warning: string
-  }
-  status: Status
+  sk: Skin
+  status: DashboardStatus
   expanded: boolean
   onToggleExpand: () => void
-  filter: Filter
+  filter: PRFilter
   onCycleFilter: () => void
   readyCount: number
   notReadyCount: number
@@ -23,35 +19,35 @@ export function Header(props: {
       flexDirection="row"
       gap={1}
       paddingLeft={0}
-      paddingRight={1}
+      paddingRight={0}
       onMouseUp={() => props.onToggleExpand()}
     >
       <text fg={props.sk.text}>{props.expanded ? "▼" : "▶"}</text>
       <text fg={props.sk.text}>
         <b>PRs</b>
       </text>
-      <Show when={props.status === "ok"}>
+      <Show when={props.status === DashboardStatus.Ok}>
         <text fg={props.sk.success}>{props.readyCount}✓</text>
         <text fg={props.sk.text}>{props.notReadyCount}•</text>
       </Show>
-      <Show when={props.status === "loading"}>
-        <text fg={props.sk.muted}>loading…</text>
+      <Show when={props.status === DashboardStatus.Loading}>
+        <text fg={props.sk.muted}>Loading</text>
       </Show>
-      <Show when={props.status === "error"}>
-        <text fg={props.sk.error}>error</text>
+      <Show when={props.status === DashboardStatus.Error}>
+        <text fg={props.sk.error}>Error</text>
       </Show>
-      <Show when={props.status === "no-repo"}>
-        <text fg={props.sk.muted}>no gh repo</text>
+      <Show when={props.status === DashboardStatus.NoRepo}>
+        <text fg={props.sk.muted}>{errorMessages.noRepo}</text>
       </Show>
       <box flexGrow={1}></box>
-      <Show when={props.status !== "no-repo"}>
+      <Show when={props.status !== DashboardStatus.NoRepo}>
         <box
           onMouseUp={(e: any) => {
             e?.stopPropagation?.()
             props.onCycleFilter()
           }}
         >
-          <text fg={props.sk.muted}>{props.filter}</text>
+          <text fg={props.sk.muted}>{`${props.filter}:@me`}</text>
         </box>
       </Show>
     </box>

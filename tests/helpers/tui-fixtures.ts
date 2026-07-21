@@ -1,4 +1,6 @@
-import type { PR } from "../../plugins/pr-dashboard.tui"
+import type { PR } from "../../plugins/domain/types"
+
+export type PR = PR
 
 export function makeTUIPR(overrides: Partial<PR> = {}): PR {
   return {
