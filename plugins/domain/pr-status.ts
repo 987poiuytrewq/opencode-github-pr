@@ -5,23 +5,18 @@ import type { PR } from "./types"
 
 export function classifyCI(pr: PR): "pass" | "fail" | "pending" | "none" {
   const checks = pr.statusCheckRollup ?? []
-  if (checks.length > 0) {
-    let anyPending = false
-    let anyFail = false
-    for (const c of checks) {
-      const v = c.conclusion ?? c.status ?? c.state ?? ""
-      if (v === "SUCCESS") continue
-      if (v === "FAILURE" || v === "ERROR" || v === "TIMED_OUT") anyFail = true
-      else anyPending = true
-    }
-    if (anyFail) return "fail"
-    if (anyPending) return "pending"
-    return "pass"
+  if (checks.length === 0) return "none"
+  let anyPending = false
+  let anyFail = false
+  for (const c of checks) {
+    const v = c.conclusion ?? c.status ?? c.state ?? ""
+    if (v === "SUCCESS") continue
+    if (v === "FAILURE" || v === "ERROR" || v === "TIMED_OUT") anyFail = true
+    else anyPending = true
   }
-  const ms = pr.mergeStateStatus?.toUpperCase() ?? ""
-  if (ms === "CLEAN" || ms === "HAS_HOOKS") return "pass"
-  if (ms === "UNSTABLE") return "pending"
-  return "none"
+  if (anyFail) return "fail"
+  if (anyPending) return "pending"
+  return "pass"
 }
 
 export function reviewSummary(pr: PR): {

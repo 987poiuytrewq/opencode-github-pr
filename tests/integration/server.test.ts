@@ -1,30 +1,14 @@
 import { beforeEach, describe, expect, test } from "bun:test"
-import { mkdtempSync, mkdirSync, rmSync, writeFileSync } from "node:fs"
-import { tmpdir } from "node:os"
-import { join } from "node:path"
+import { rmSync } from "node:fs"
 import { PrDashboardPlugin } from "../../plugins/pr-dashboard"
 import {
   clearOctokitMocks,
   installOctokitMock,
   mockOctokitOp,
 } from "../helpers/octokit-mock"
+import { makeFakeRepo } from "../helpers/graphql-mock"
 
 installOctokitMock()
-
-function makeRepoDir(owner = "foo", repo = "bar"): string {
-  const dir = mkdtempSync(join(tmpdir(), "pr-dash-server-"))
-  mkdirSync(join(dir, ".git"))
-  writeFileSync(
-    join(dir, ".git", "config"),
-    `[core]
-\trepositoryformatversion = 0
-[remote "origin"]
-\turl = https://github.com/${owner}/${repo}.git
-\tfetch = +refs/heads/*:refs/remotes/origote/*
-`,
-  )
-  return dir
-}
 
 function buildApi(directory: string) {
   return {
@@ -52,7 +36,7 @@ describe("PrDashboardPlugin", () => {
 
   describe("pr_add_reviewer tool", () => {
     test("calls requestReviewers with the right args", async () => {
-      const dir = makeRepoDir()
+      const dir = makeFakeRepo("foo", "bar")
       let captured: any = null
       mockOctokitOp("pulls.requestReviewers", (params: any) => {
         captured = params
@@ -75,7 +59,7 @@ describe("PrDashboardPlugin", () => {
     })
 
     test("returns error message on failure", async () => {
-      const dir = makeRepoDir()
+      const dir = makeFakeRepo("foo", "bar")
       mockOctokitOp("pulls.requestReviewers", () => {
         const e: any = new Error("permission denied")
         e.status = 403
@@ -94,7 +78,7 @@ describe("PrDashboardPlugin", () => {
 
   describe("pr_rerequest_review tool", () => {
     test("calls requestReviewers with the right args", async () => {
-      const dir = makeRepoDir()
+      const dir = makeFakeRepo("foo", "bar")
       let captured: any = null
       mockOctokitOp("pulls.requestReviewers", (params: any) => {
         captured = params
@@ -116,7 +100,7 @@ describe("PrDashboardPlugin", () => {
     })
 
     test("returns error message on failure", async () => {
-      const dir = makeRepoDir()
+      const dir = makeFakeRepo("foo", "bar")
       mockOctokitOp("pulls.requestReviewers", () => {
         const e: any = new Error("not allowed")
         e.status = 403
@@ -133,7 +117,7 @@ describe("PrDashboardPlugin", () => {
     })
 
     test("falls back to plugin directory when context has none", async () => {
-      const dir = makeRepoDir()
+      const dir = makeFakeRepo("foo", "bar")
       let captured: any = null
       mockOctokitOp("pulls.requestReviewers", (params: any) => {
         captured = params

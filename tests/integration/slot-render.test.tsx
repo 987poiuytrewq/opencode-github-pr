@@ -48,10 +48,6 @@ describe("slot render: sidebar_content produces visible output", () => {
         { width: 50, height: 20 },
       )
 
-      for (let i = 0; i < 50; i++) {
-        if (api.theme) break
-        await new Promise((res) => setTimeout(res, 10))
-      }
       await r.flush()
       const frame = r.captureCharFrame()
       expect(frame).toContain("PRs")
@@ -103,10 +99,6 @@ describe("slot render: sidebar_content produces visible output", () => {
         () => slotFn(ctx, props),
         { width: 50, height: 20 },
       )
-      for (let i = 0; i < 50; i++) {
-        if (api.theme) break
-        await new Promise((res) => setTimeout(res, 10))
-      }
       await r.flush()
       const frame = r.captureCharFrame()
       expect(frame).toContain("author:@me")

@@ -13,8 +13,6 @@ export function createDashboard(api: TuiPluginApi) {
     repo: null,
     prs: [],
     fetchedAt: null,
-    threadCounts: new Map(),
-    branchRules: new Map(),
     filter: PRFilter.Author,
   })
   const dash = useDashboard(api, state, setState)

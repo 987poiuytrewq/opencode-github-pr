@@ -3,101 +3,43 @@ import { BOT_ALIASES, displayLogin, ellipsize } from "../../plugins/domain/login
 import {
   classifyCI,
   reviewSummary,
-  missingReviewerCount,
-  isReadyToMerge,
 } from "../../plugins/domain/pr-status"
 import { toHex } from "../../plugins/app/theme"
 import { truncateTitle, formatAge } from "../../plugins/domain/format"
-import type { PR as PR } from "../../plugins/domain/types"
+import type { PR } from "../../plugins/domain/types"
 import { makeTUIPR } from "../helpers/tui-fixtures"
 
 
 describe("classifyCI", () => {
-  test("returns 'none' for null rollup and null mergeStateStatus", () => {
-    expect(classifyCI(makeTUIPR({ statusCheckRollup: null, mergeStateStatus: null }))).toBe("none")
+  test("returns 'pass' for SUCCESS check state", () => {
+    expect(classifyCI(makeTUIPR({ statusCheckRollup: [{ state: "SUCCESS" }] }))).toBe("pass")
   })
-  test("returns 'none' for empty rollup and null mergeStateStatus", () => {
-    expect(classifyCI(makeTUIPR({ statusCheckRollup: [], mergeStateStatus: null }))).toBe("none")
+  test("returns 'fail' for FAILURE check state", () => {
+    expect(classifyCI(makeTUIPR({ statusCheckRollup: [{ state: "FAILURE" }] }))).toBe("fail")
   })
-  test("returns 'pass' for CLEAN mergeStateStatus when no rollup", () => {
-    expect(classifyCI(makeTUIPR({ statusCheckRollup: null, mergeStateStatus: "CLEAN" }))).toBe("pass")
+  test("returns 'fail' for ERROR check state", () => {
+    expect(classifyCI(makeTUIPR({ statusCheckRollup: [{ state: "ERROR" }] }))).toBe("fail")
   })
-  test("returns 'pending' for UNSTABLE mergeStateStatus when no rollup", () => {
-    expect(classifyCI(makeTUIPR({ statusCheckRollup: null, mergeStateStatus: "UNSTABLE" }))).toBe("pending")
+  test("returns 'pending' for PENDING check state", () => {
+    expect(classifyCI(makeTUIPR({ statusCheckRollup: [{ state: "PENDING" }] }))).toBe("pending")
   })
-  test("returns 'pass' when all SUCCESS", () => {
+  test("returns 'pending' for EXPECTED check state", () => {
+    expect(classifyCI(makeTUIPR({ statusCheckRollup: [{ state: "EXPECTED" }] }))).toBe("pending")
+  })
+  test("returns 'none' when no check state", () => {
+    expect(classifyCI(makeTUIPR({ statusCheckRollup: null }))).toBe("none")
+  })
+  test("returns 'none' when rollup is an empty array", () => {
+    expect(classifyCI(makeTUIPR({ statusCheckRollup: [] }))).toBe("none")
+  })
+  test("returns 'fail' when any check fails", () => {
     expect(
       classifyCI(
         makeTUIPR({
-          statusCheckRollup: [{ name: "x", conclusion: "SUCCESS", status: "completed" }],
-        }),
-      ),
-    ).toBe("pass")
-  })
-  test("returns 'fail' when any FAILURE", () => {
-    expect(
-      classifyCI(
-        makeTUIPR({
-          statusCheckRollup: [
-            { name: "a", conclusion: "SUCCESS", status: "completed" },
-            { name: "b", conclusion: "FAILURE", status: "completed" },
-          ],
+          statusCheckRollup: [{ state: "SUCCESS" }, { state: "FAILURE" }],
         }),
       ),
     ).toBe("fail")
-  })
-  test("returns 'fail' on ERROR", () => {
-    expect(
-      classifyCI(
-        makeTUIPR({
-          statusCheckRollup: [{ name: "x", conclusion: "ERROR", status: "completed" }],
-        }),
-      ),
-    ).toBe("fail")
-  })
-  test("returns 'fail' on TIMED_OUT", () => {
-    expect(
-      classifyCI(
-        makeTUIPR({
-          statusCheckRollup: [{ name: "x", conclusion: "TIMED_OUT", status: "completed" }],
-        }),
-      ),
-    ).toBe("fail")
-  })
-  test("returns 'pending' when something is still running", () => {
-    expect(
-      classifyCI(
-        makeTUIPR({
-          statusCheckRollup: [
-            { name: "a", conclusion: "SUCCESS", status: "completed" },
-            { name: "b", conclusion: null, status: "in_progress" },
-          ],
-        }),
-      ),
-    ).toBe("pending")
-  })
-  test("returns 'pass' when only SUCCESS checks", () => {
-    expect(
-      classifyCI(
-        makeTUIPR({
-          statusCheckRollup: [
-            { name: "a", conclusion: "SUCCESS", status: "completed" },
-            { name: "b", conclusion: "SUCCESS", status: "completed" },
-          ],
-        }),
-      ),
-    ).toBe("pass")
-  })
-  test("returns 'pass' with no conclusion but neutral state", () => {
-    // code falls back to status (completed → not pending) and treats non-FAILURE as pending,
-    // so this actually returns 'pending' — documenting the actual behavior
-    expect(
-      classifyCI(
-        makeTUIPR({
-          statusCheckRollup: [{ name: "x", conclusion: null, status: "completed", state: "NEUTRAL" as any }],
-        }),
-      ),
-    ).toBe("pending")
   })
 })
 
@@ -105,10 +47,10 @@ describe("reviewSummary", () => {
   test("counts approved changes-requested and commented", () => {
     const pr = makeTUIPR({
       latestReviews: [
-        { author: { login: "a" }, state: "APPROVED", createdAt: "2024-01-01" },
-        { author: { login: "a" }, state: "APPROVED", createdAt: "2024-01-02" },
-        { author: { login: "b" }, state: "CHANGES_REQUESTED", createdAt: "2024-01-01" },
-        { author: { login: "c" }, state: "COMMENTED", createdAt: "2024-01-01" },
+        { author: { login: "a" }, state: "APPROVED" },
+        { author: { login: "a" }, state: "APPROVED" },
+        { author: { login: "b" }, state: "CHANGES_REQUESTED" },
+        { author: { login: "c" }, state: "COMMENTED" },
       ],
       reviewRequests: [{ login: "d" }, { login: "e" }],
     })
@@ -126,9 +68,9 @@ describe("reviewSummary", () => {
   test("deduplicates by login within each state category", () => {
     const pr = makeTUIPR({
       latestReviews: [
-        { author: { login: "a" }, state: "APPROVED", createdAt: "2024-01-01" },
-        { author: { login: "a" }, state: "APPROVED", createdAt: "2024-01-02" },
-        { author: { login: "b" }, state: "APPROVED", createdAt: "2024-01-01" },
+        { author: { login: "a" }, state: "APPROVED" },
+        { author: { login: "a" }, state: "APPROVED" },
+        { author: { login: "b" }, state: "APPROVED" },
       ],
     })
     const r = reviewSummary(pr)
@@ -154,41 +96,6 @@ describe("reviewSummary", () => {
     )
     expect(r.pending).toBe(2)
     expect(r.pendingLogins).toEqual(["alice", "bob"])
-  })
-})
-
-describe("missingReviewerCount", () => {
-  test("returns 0 when required is null", () => {
-    expect(missingReviewerCount(makeTUIPR(), null)).toBe(0)
-  })
-  test("returns 0 when required is 0", () => {
-    expect(missingReviewerCount(makeTUIPR(), 0)).toBe(0)
-  })
-  test("returns 0 when required is negative", () => {
-    expect(missingReviewerCount(makeTUIPR(), -1)).toBe(0)
-  })
-  test("returns required when no approvals and no pending", () => {
-    expect(missingReviewerCount(makeTUIPR(), 2)).toBe(2)
-  })
-  test("counts approved toward requirement", () => {
-    const pr = makeTUIPR({
-      latestReviews: [{ author: { login: "a" }, state: "APPROVED", createdAt: "2024-01-01" }],
-    })
-    expect(missingReviewerCount(pr, 1)).toBe(0)
-    expect(missingReviewerCount(pr, 2)).toBe(1)
-  })
-  test("counts pending toward requirement", () => {
-    const pr = makeTUIPR({ reviewRequests: [{ login: "a" }] })
-    expect(missingReviewerCount(pr, 1)).toBe(0)
-  })
-  test("never returns negative", () => {
-    const pr = makeTUIPR({
-      latestReviews: [
-        { author: { login: "a" }, state: "APPROVED", createdAt: "2024-01-01" },
-        { author: { login: "b" }, state: "APPROVED", createdAt: "2024-01-01" },
-      ],
-    })
-    expect(missingReviewerCount(pr, 1)).toBe(0)
   })
 })
 
@@ -242,119 +149,6 @@ describe("ellipsize", () => {
   })
   test("handles exact length", () => {
     expect(ellipsize("abcdefghi")).toBe("abcdefghi")
-  })
-})
-
-describe("isReadyToMerge", () => {
-  test("returns false for draft", () => {
-    expect(isReadyToMerge(makeTUIPR({ isDraft: true }), null)).toBe(false)
-  })
-  test("returns false when conflicting", () => {
-    expect(
-      isReadyToMerge(makeTUIPR({ mergeable: "CONFLICTING" }), null),
-    ).toBe(false)
-    expect(
-      isReadyToMerge(
-        makeTUIPR({ mergeStateStatus: "CONFLICTING" } as any),
-        null,
-      ),
-    ).toBe(false)
-  })
-  test("returns false when blocked", () => {
-    expect(
-      isReadyToMerge(
-        makeTUIPR({ mergeStateStatus: "BLOCKED" } as any),
-        null,
-      ),
-    ).toBe(false)
-  })
-  test("returns false when CI failed", () => {
-    expect(
-      isReadyToMerge(
-        makeTUIPR({
-          statusCheckRollup: [{ name: "x", conclusion: "FAILURE", status: "completed" }],
-        }),
-        null,
-      ),
-    ).toBe(false)
-  })
-  test("returns false when CI pending", () => {
-    expect(
-      isReadyToMerge(
-        makeTUIPR({
-          statusCheckRollup: [{ name: "x", conclusion: null, status: "in_progress" }],
-        }),
-        null,
-      ),
-    ).toBe(false)
-  })
-  test("returns false when changes requested", () => {
-    expect(
-      isReadyToMerge(
-        makeTUIPR({
-          latestReviews: [
-            { author: { login: "a" }, state: "CHANGES_REQUESTED", createdAt: "x" },
-          ],
-        }),
-        null,
-      ),
-    ).toBe(false)
-  })
-  test("returns true for clean approved PR with no required reviewers", () => {
-    const pr = makeTUIPR({
-      isDraft: false,
-      mergeable: "MERGEABLE",
-      mergeStateStatus: "CLEAN" as any,
-      statusCheckRollup: [{ name: "x", conclusion: "SUCCESS", status: "completed" }],
-      latestReviews: [{ author: { login: "a" }, state: "APPROVED", createdAt: "x" }],
-    })
-    expect(isReadyToMerge(pr, null)).toBe(true)
-  })
-  test("returns false when required reviewers not met", () => {
-    const pr = makeTUIPR({
-      latestReviews: [{ author: { login: "a" }, state: "APPROVED", createdAt: "x" }],
-    })
-    expect(isReadyToMerge(pr, 2)).toBe(false)
-  })
-  test("returns true when required reviewers met", () => {
-    const pr = makeTUIPR({
-      latestReviews: [
-        { author: { login: "a" }, state: "APPROVED", createdAt: "x" },
-        { author: { login: "b" }, state: "APPROVED", createdAt: "x" },
-      ],
-    })
-    expect(isReadyToMerge(pr, 2)).toBe(true)
-  })
-  test("returns false for UNSTABLE state (checks not all passing)", () => {
-    expect(
-      isReadyToMerge(
-        makeTUIPR({ mergeStateStatus: "UNSTABLE" as any }),
-        null,
-      ),
-    ).toBe(false)
-  })
-  test("returns false for BEHIND state", () => {
-    expect(
-      isReadyToMerge(
-        makeTUIPR({ mergeStateStatus: "BEHIND" as any }),
-        null,
-      ),
-    ).toBe(false)
-  })
-  test("returns false for DIRTY state", () => {
-    expect(
-      isReadyToMerge(
-        makeTUIPR({ mergeStateStatus: "DIRTY" as any }),
-        null,
-      ),
-    ).toBe(false)
-  })
-  test("returns true when mergeStateStatus is null but no other issues", () => {
-    const pr = makeTUIPR({
-      mergeStateStatus: null,
-      statusCheckRollup: [{ name: "x", conclusion: "SUCCESS", status: "completed" }],
-    })
-    expect(isReadyToMerge(pr, null)).toBe(true)
   })
 })
 

@@ -4,10 +4,6 @@
 // (scope requirements, field selection) without scrolling through the
 // orchestration code. Each query is consumed by exactly one loader.
 
-// PR search with review threads inline — combines what was previously
-// PR_SEARCH_QUERY + THREAD_COUNT_QUERY into a single call.  The
-// statusCheckRollup field is omitted because it requires checks:read
-// scope that many PATs lack, causing "Resource not accessible" errors.
 export const DASHBOARD_QUERY = `query Dashboard($q: String!) {
   search(query: $q, type: ISSUE, first: 50) {
     nodes {
@@ -22,6 +18,7 @@ export const DASHBOARD_QUERY = `query Dashboard($q: String!) {
         reviewDecision
         mergeable
         mergeStateStatus
+        statusCheckRollup { state }
         createdAt
         updatedAt
         reviewRequests(first: 10) {
@@ -56,8 +53,6 @@ export const DASHBOARD_QUERY = `query Dashboard($q: String!) {
   }
 }`
 
-// Lightweight PR lookup without review threads — used by currentBranchPR
-// where thread counts are not needed.
 export const PR_LOOKUP_QUERY = `query Lookup($q: String!) {
   search(query: $q, type: ISSUE, first: 50) {
     nodes {
@@ -72,6 +67,7 @@ export const PR_LOOKUP_QUERY = `query Lookup($q: String!) {
         reviewDecision
         mergeable
         mergeStateStatus
+        statusCheckRollup { state }
         createdAt
         updatedAt
         reviewRequests(first: 10) {
