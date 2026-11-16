@@ -2,10 +2,12 @@
 import { describe, expect, test, beforeEach, afterEach } from "bun:test"
 import { testRender } from "@opentui/solid"
 import { installOctokitMock, mockOctokitDefault, clearOctokitMocks } from "../helpers/octokit-mock"
+import { mkdtempSync, rmSync } from "node:fs"
+import { tmpdir } from "node:os"
+import { join } from "node:path"
 import {
   makeFakeRepo,
   makeSearchResponse,
-  makeBranchProtectionResponse,
   makeThreadCountResponse,
 } from "../helpers/graphql-mock"
 import { createMockTuiApi } from "../helpers/tui-api-mock"
@@ -29,12 +31,12 @@ describe("useDashboard initialization", () => {
       mockOctokitDefault((op, params) => {
         if (op === "graphql") {
           const query: string = params?.query ?? ""
-          if (query.includes("search(")) return makeSearchResponse(2)
+          if (query.includes("query Viewer")) return { viewer: { login: "octocat" } }
+          if (query.includes("pullRequests(")) return makeSearchResponse(2)
           return makeThreadCountResponse().data
         }
-        if (op === "repos.getBranchProtection") return makeBranchProtectionResponse()
         if (op === "pulls.get") {
-          const node = makeSearchResponse(1).search.nodes[0]
+          const node = makeSearchResponse(1).repository.pullRequests.nodes[0]
           return { data: node }
         }
         return null
@@ -97,15 +99,23 @@ describe("useDashboard initialization", () => {
   })
 
   test("transitions to no-repo when detectRepo returns null", async () => {
+    const cwd = mkdtempSync(join(tmpdir(), "pr-dash-no-repo-"))
+    const origCwd = process.cwd()
+    process.chdir(cwd)
     const { api } = createMockTuiApi()
-    const { state } = createDashboard(api)
+    try {
+      const { state } = createDashboard(api)
 
-    for (let i = 0; i < 50; i++) {
-      if (state().status === DashboardStatus.NoRepo) break
-      await new Promise((r) => setTimeout(r, 10))
+      for (let i = 0; i < 50; i++) {
+        if (state().status === DashboardStatus.NoRepo) break
+        await new Promise((r) => setTimeout(r, 10))
+      }
+
+      expect(state().status).toBe(DashboardStatus.NoRepo)
+    } finally {
+      process.chdir(origCwd)
+      rmSync(cwd, { recursive: true, force: true })
     }
-
-    expect(state().status).toBe(DashboardStatus.NoRepo)
   })
 
   test("transitions to error on timeout when fetchPRs hangs", async () => {

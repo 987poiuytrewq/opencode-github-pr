@@ -26,18 +26,18 @@ exports[`DashboardView render loading state 1`] = `
 
 exports[`DashboardView render ok state with PRs 1`] = `
 "                                                  
-▼ PRs                                   author:@me
+▼ PRs 0✓ 4•                             author:@me
   #10 Add login flow                              
   bob✓                                            
+                                                  
   #11 Fix race condition                          
   carol±                                          
+                                                  
   #12 WIP: refactor                               
-   add reviewers                                  
+    add reviewers                                 
+                                                  
   #13 Update docs                                 
-   add reviewers                                  
-                                                  
-                                                  
-                                                  
+    add reviewers                                 
                                                   
                                                   
                                                   
@@ -98,7 +98,7 @@ exports[`DashboardView render error state 1`] = `
 
 exports[`DashboardView render collapsed state 1`] = `
 "                                                  
-▶ PRs                                   author:@me
+▶ PRs 0✓ 4•                             author:@me
                                                   
                                                   
                                                   
@@ -122,7 +122,7 @@ exports[`DashboardView render collapsed state 1`] = `
 
 exports[`DashboardView render ok state with empty PRs 1`] = `
 "                                                  
-▼ PRs                                   author:@me
+▼ PRs 0✓ 0•                             author:@me
                                                   
  No open PRs                                      
                                                   

@@ -2,6 +2,7 @@ import { describe, expect, test } from "bun:test"
 import { BOT_ALIASES, displayLogin, ellipsize } from "../../plugins/domain/login"
 import {
   classifyCI,
+  classifyRowState,
   reviewSummary,
 } from "../../plugins/domain/pr-status"
 import { toHex } from "../../plugins/app/theme"
@@ -12,34 +13,47 @@ import { makeTUIPR } from "../helpers/tui-fixtures"
 
 describe("classifyCI", () => {
   test("returns 'pass' for SUCCESS check state", () => {
-    expect(classifyCI(makeTUIPR({ statusCheckRollup: [{ state: "SUCCESS" }] }))).toBe("pass")
+    expect(classifyCI(makeTUIPR({ statusCheckRollup: { state: "SUCCESS" } }))).toBe("pass")
   })
   test("returns 'fail' for FAILURE check state", () => {
-    expect(classifyCI(makeTUIPR({ statusCheckRollup: [{ state: "FAILURE" }] }))).toBe("fail")
+    expect(classifyCI(makeTUIPR({ statusCheckRollup: { state: "FAILURE" } }))).toBe("fail")
   })
   test("returns 'fail' for ERROR check state", () => {
-    expect(classifyCI(makeTUIPR({ statusCheckRollup: [{ state: "ERROR" }] }))).toBe("fail")
+    expect(classifyCI(makeTUIPR({ statusCheckRollup: { state: "ERROR" } }))).toBe("fail")
   })
   test("returns 'pending' for PENDING check state", () => {
-    expect(classifyCI(makeTUIPR({ statusCheckRollup: [{ state: "PENDING" }] }))).toBe("pending")
+    expect(classifyCI(makeTUIPR({ statusCheckRollup: { state: "PENDING" } }))).toBe("pending")
   })
   test("returns 'pending' for EXPECTED check state", () => {
-    expect(classifyCI(makeTUIPR({ statusCheckRollup: [{ state: "EXPECTED" }] }))).toBe("pending")
+    expect(classifyCI(makeTUIPR({ statusCheckRollup: { state: "EXPECTED" } }))).toBe("pending")
   })
   test("returns 'none' when no check state", () => {
     expect(classifyCI(makeTUIPR({ statusCheckRollup: null }))).toBe("none")
   })
-  test("returns 'none' when rollup is an empty array", () => {
-    expect(classifyCI(makeTUIPR({ statusCheckRollup: [] }))).toBe("none")
+  test("returns 'none' for an unknown check state", () => {
+    expect(classifyCI(makeTUIPR({ statusCheckRollup: { state: "UNKNOWN" } }))).toBe("none")
   })
-  test("returns 'fail' when any check fails", () => {
-    expect(
-      classifyCI(
-        makeTUIPR({
-          statusCheckRollup: [{ state: "SUCCESS" }, { state: "FAILURE" }],
-        }),
-      ),
-    ).toBe("fail")
+})
+
+describe("classifyRowState", () => {
+  test("draft state takes precedence", () => {
+    expect(classifyRowState(makeTUIPR({ isDraft: true, mergeable: "CONFLICTING" }))).toBe("draft")
+  })
+  test("conflicts are blocked", () => {
+    expect(classifyRowState(makeTUIPR({ mergeable: "CONFLICTING" }))).toBe("blocked")
+  })
+  test("passing CI with no changes requested is ready", () => {
+    expect(classifyRowState(makeTUIPR({ statusCheckRollup: { state: "SUCCESS" } }))).toBe("ready")
+  })
+  test("failed or pending CI is not ready", () => {
+    expect(classifyRowState(makeTUIPR({ statusCheckRollup: { state: "FAILURE" } }))).toBe("default")
+    expect(classifyRowState(makeTUIPR({ statusCheckRollup: { state: "PENDING" } }))).toBe("default")
+  })
+  test("changes requested is not ready", () => {
+    expect(classifyRowState(makeTUIPR({
+      statusCheckRollup: { state: "SUCCESS" },
+      latestReviews: [{ author: { login: "alice" }, state: "CHANGES_REQUESTED" }],
+    }))).toBe("default")
   })
 })
 

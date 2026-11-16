@@ -2,7 +2,7 @@
 import { describe, expect, test, beforeEach, afterEach } from "bun:test"
 import { testRender } from "@opentui/solid"
 import { installOctokitMock, mockOctokitDefault, clearOctokitMocks } from "../helpers/octokit-mock"
-import { makeFakeRepo, makeSearchResponse, makeBranchProtectionResponse, makeThreadCountResponse } from "../helpers/graphql-mock"
+import { makeFakeRepo, makeSearchResponse, makeThreadCountResponse } from "../helpers/graphql-mock"
 import { createMockTuiApi } from "../helpers/tui-api-mock"
 import { DashboardStatus } from "../../plugins/domain/types"
 
@@ -26,10 +26,10 @@ describe("slot render: sidebar_content produces visible output", () => {
       mockOctokitDefault((op, params) => {
         if (op === "graphql") {
           const query: string = params?.query ?? ""
-          if (query.includes("search(")) return makeSearchResponse(2)
+          if (query.includes("query Viewer")) return { viewer: { login: "octocat" } }
+          if (query.includes("pullRequests(")) return makeSearchResponse(2)
           return makeThreadCountResponse().data
         }
-        if (op === "repos.getBranchProtection") return makeBranchProtectionResponse()
         return null
       })
 
@@ -81,10 +81,10 @@ describe("slot render: sidebar_content produces visible output", () => {
       mockOctokitDefault((op, params) => {
         if (op === "graphql") {
           const query: string = params?.query ?? ""
-          if (query.includes("search(")) return makeSearchResponse(1)
+          if (query.includes("query Viewer")) return { viewer: { login: "octocat" } }
+          if (query.includes("pullRequests(")) return makeSearchResponse(1)
           return makeThreadCountResponse().data
         }
-        if (op === "repos.getBranchProtection") return makeBranchProtectionResponse()
         return null
       })
 

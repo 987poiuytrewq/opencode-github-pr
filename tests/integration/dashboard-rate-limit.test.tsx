@@ -8,7 +8,6 @@ import {
 import {
   makeFakeRepo,
   makeSearchResponse,
-  makeBranchProtectionResponse,
   makeThreadCountResponse,
 } from "../helpers/graphql-mock"
 import { createMockTuiApi } from "../helpers/tui-api-mock"
@@ -34,7 +33,8 @@ describe("useDashboard rate limit handling", () => {
       mockOctokitDefault((op, params) => {
         if (op === "graphql") {
           const query: string = params?.query ?? ""
-          if (query.includes("search(")) {
+          if (query.includes("query Viewer")) return { viewer: { login: "octocat" } }
+          if (query.includes("pullRequests(")) {
             const err: any = new Error(
               "Request failed due to following response errors: - API rate limit already exceeded for user ID 12345.",
             )
@@ -44,7 +44,6 @@ describe("useDashboard rate limit handling", () => {
           }
           return makeThreadCountResponse()
         }
-        if (op === "repos.getBranchProtection") return makeBranchProtectionResponse()
         return null
       })
 
@@ -73,7 +72,8 @@ describe("useDashboard rate limit handling", () => {
       mockOctokitDefault((op, params) => {
         if (op === "graphql") {
           const query: string = params?.query ?? ""
-          if (query.includes("search(")) {
+          if (query.includes("query Viewer")) return { viewer: { login: "octocat" } }
+          if (query.includes("pullRequests(")) {
             const err: any = new Error("API rate limit exceeded for installation ID 99999")
             err.status = 403
             err.response = { headers: {} }
@@ -81,7 +81,6 @@ describe("useDashboard rate limit handling", () => {
           }
           return makeThreadCountResponse()
         }
-        if (op === "repos.getBranchProtection") return makeBranchProtectionResponse()
         return null
       })
 
@@ -110,7 +109,8 @@ describe("useDashboard rate limit handling", () => {
       mockOctokitDefault((op, params) => {
         if (op === "graphql") {
           const query: string = params?.query ?? ""
-          if (query.includes("search(")) {
+          if (query.includes("query Viewer")) return { viewer: { login: "octocat" } }
+          if (query.includes("pullRequests(")) {
             callIndex++
             if (callIndex === 1) return makeSearchResponse(3)
             // Second call: rate limited.
@@ -121,7 +121,6 @@ describe("useDashboard rate limit handling", () => {
           }
           return makeThreadCountResponse()
         }
-        if (op === "repos.getBranchProtection") return makeBranchProtectionResponse()
         return null
       })
 
@@ -155,14 +154,14 @@ describe("useDashboard rate limit handling", () => {
       mockOctokitDefault((op, params) => {
         if (op === "graphql") {
           const query: string = params?.query ?? ""
-          if (query.includes("search(")) {
+          if (query.includes("query Viewer")) return { viewer: { login: "octocat" } }
+          if (query.includes("pullRequests(")) {
             callIndex++
             if (callIndex === 1) return makeSearchResponse(2)
             throw new Error("Network unreachable")
           }
           return makeThreadCountResponse()
         }
-        if (op === "repos.getBranchProtection") return makeBranchProtectionResponse()
         return null
       })
 

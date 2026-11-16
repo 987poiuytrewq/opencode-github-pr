@@ -1,25 +1,16 @@
 /** @jsxImportSource @opentui/solid */
 import { For, Show, createMemo } from "solid-js"
-import type { PR, ReviewerThreadCounts } from "../domain/types"
+import type { PR } from "../domain/types"
 import { ellipsize, displayLogin } from "../domain/login"
 import { truncateTitle } from "../domain/format"
 import {
   classifyCI,
+  classifyRowState,
   reviewSummary,
-  missingReviewerCount,
-  isReadyToMerge,
 } from "../domain/pr-status"
 
 type ReviewerKind = "approved" | "changes" | "pending" | "commented"
 type ReviewerEntry = { login: string; kind: ReviewerKind }
-
-const UNRESOLVED_DIGITS = ["➀", "➁", "➂", "➃", "➄", "➅", "➆", "➇", "➈", "➉"]
-
-function unresolvedIcons(n: number): string {
-  const cap = UNRESOLVED_DIGITS.length
-  if (n <= cap) return UNRESOLVED_DIGITS.slice(0, n).join("")
-  return UNRESOLVED_DIGITS.join("") + `+${n - cap}`
-}
 
 function CIIndicator(props: {
   ci: ReturnType<typeof classifyCI>
@@ -44,22 +35,18 @@ export function PRRow(props: {
   fail: string
   warn: string
   draft: string
-  required: number | null | undefined
-  threadCount: ReviewerThreadCounts
 }) {
   const numStr = String(props.pr.number)
   const title = truncateTitle(props.pr.title, numStr.length + 1)
-  const ready = isReadyToMerge(props.pr, props.required)
-  const blocked =
-    props.pr.mergeStateStatus === "CONFLICTING" ||
-    props.pr.mergeable === "CONFLICTING" ||
-    reviewSummary(props.pr).changes > 0
-  const numColor = props.pr.isDraft || blocked ? props.draft : ready ? props.pass : props.text
+  const rowState = classifyRowState(props.pr)
+  const numColor =
+    rowState === "draft" ? props.draft
+    : rowState === "blocked" ? props.fail
+    : rowState === "ready" ? props.pass
+    : props.text
   const titleColor = numColor
   const r = reviewSummary(props.pr)
-  const missing = missingReviewerCount(props.pr, props.required)
-  const showAdd =
-    missing > 0 || (r.approved === 0 && r.changes === 0 && r.pending === 0 && r.commented === 0)
+  const showAdd = r.approved === 0 && r.changes === 0 && r.pending === 0 && r.commented === 0
 
   const reviewers = createMemo<ReviewerEntry[]>(() => [
     ...r.approvedLogins.map((l) => ({ login: l, kind: "approved" as const })),
@@ -105,20 +92,15 @@ export function PRRow(props: {
                 <Show when={i() > 0}>
                   <text selectable={false}> </text>
                 </Show>
-                <Show
-                  when={rv.kind === "commented" && (props.threadCount.get(rv.login)?.unresolved ?? 0) > 0}
-                  fallback={
-                    <text fg={reviewerColor(rv.kind)} selectable={false}>
-                      {`${ellipsize(displayLogin(rv.login))}${
-                        rv.kind === "commented"
-                          ? (props.threadCount.get(rv.login)?.resolved ?? 0) > 0 ? "⬤" : ""
-                          : rv.kind === "approved" ? "✓"
-                          : rv.kind === "changes" ? "±"
-                          : "⬤"
-                      } `}
-                    </text>
-                  }
-                >
+                <Show when={rv.kind === "commented"} fallback={
+                  <text fg={reviewerColor(rv.kind)} selectable={false}>
+                    {`${ellipsize(displayLogin(rv.login))}${
+                      rv.kind === "approved" ? "✓"
+                      : rv.kind === "changes" ? "±"
+                      : "⬤"
+                    } `}
+                  </text>
+                }>
                   <box
                     selectable={false}
                     onMouseUp={(e: any) => {
@@ -127,7 +109,7 @@ export function PRRow(props: {
                     }}
                   >
                     <text fg={props.muted} selectable={false}>
-                      <u>{`${ellipsize(displayLogin(rv.login))}${unresolvedIcons(props.threadCount.get(rv.login)!.unresolved)} `}</u>
+                      <u>{`${ellipsize(displayLogin(rv.login))}⬤ `}</u>
                     </text>
                   </box>
                 </Show>
@@ -144,7 +126,7 @@ export function PRRow(props: {
             }}
           >
             <text fg={props.muted} selectable={false}>
-              <u> add {missing > 0 ? missing : "reviewers"}</u>
+              <u> add reviewers</u>
             </text>
           </box>
         </Show>

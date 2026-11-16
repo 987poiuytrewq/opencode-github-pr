@@ -35,10 +35,10 @@ describe("currentBranchPR", () => {
     let lastQuery = ""
     mockOctokitDefault((op, params) => {
       if (op === "graphql") {
-        lastQuery = params?.params?.q ?? ""
+        lastQuery = params?.query ?? ""
         return {
-          search: {
-            nodes: [{
+          repository: {
+            pullRequests: { nodes: [{
               number: 7,
               title: "PR 7",
               url: "https://github.com/foo/bar/pull/7",
@@ -48,14 +48,14 @@ describe("currentBranchPR", () => {
               statusCheckRollup: { state: "SUCCESS" },
               reviewRequests: { nodes: [] },
               latestReviews: { nodes: [] },
-            }],
+            }] },
           },
         }
       }
       return null
     })
     const pr = await currentBranchPR({ owner: "foo", repo: "bar" }, dir)
-    expect(lastQuery).toContain("head:main")
+    expect(lastQuery).toContain("headRefName: $head")
     expect(pr?.number).toBe(7)
     rmSync(dir, { recursive: true, force: true })
   })
@@ -63,7 +63,7 @@ describe("currentBranchPR", () => {
   test("returns null when no PR for branch", async () => {
     const dir = makeFakeRepo("foo", "bar")
     mockOctokitDefault((op) => {
-      if (op === "graphql") return { search: { nodes: [] } }
+      if (op === "graphql") return { repository: { pullRequests: { nodes: [] } } }
       return null
     })
     const pr = await currentBranchPR({ owner: "foo", repo: "bar" }, dir)
@@ -96,25 +96,45 @@ describe("fetchDashboardData", () => {
       baseRefName: "main",
       mergeable: "MERGEABLE",
       statusCheckRollup: { state: "SUCCESS" },
+      author: { login: "octocat" },
+      assignees: { nodes: [] },
       reviewRequests: { nodes: [] },
       latestReviews: { nodes: [] },
     }
   }
 
-  test("returns PR array from search query", async () => {
+  test("returns PR array from repository pull request query", async () => {
     let lastQuery = ""
+    let lastParams: any
     mockOctokitDefault((op, params) => {
       if (op === "graphql") {
-        lastQuery = params.params.q ?? ""
-        return { search: { nodes: [makeSearchPR({ number: 10 })] } }
+        lastQuery = params.query ?? ""
+        lastParams = params.params
+        return { repository: { pullRequests: { nodes: [makeSearchPR({ number: 10 })] } } }
       }
       return null
     })
-    const prs = await fetchDashboardData(PRFilter.Author, { owner: "foo", repo: "bar" })
-    expect(lastQuery).toContain("author:@me")
-    expect(lastQuery).toContain("repo:foo/bar")
+    const prs = await fetchDashboardData(PRFilter.Author, { owner: "foo", repo: "bar" }, "octocat")
+    expect(lastQuery).toContain("repository(owner: $owner, name: $name)")
+    expect(lastQuery).toContain("pullRequests(")
+    expect(lastParams).toEqual({ owner: "foo", name: "bar" })
     expect(prs).toHaveLength(1)
     expect(prs[0].number).toBe(10)
+  })
+
+  test("filters by author and assignee using the viewer login", async () => {
+    mockOctokitDefault((op) => {
+      if (op === "graphql") return {
+        repository: { pullRequests: { nodes: [
+          { ...makeSearchPR({ number: 10 }), author: { login: "octocat" }, assignees: { nodes: [] } },
+          { ...makeSearchPR({ number: 11 }), author: { login: "someone" }, assignees: { nodes: [{ login: "OctoCat" }] } },
+        ] } },
+      }
+      return null
+    })
+    const repo = { owner: "foo", repo: "bar" }
+    expect((await fetchDashboardData(PRFilter.Author, repo, "octocat")).map((pr) => pr.number)).toEqual([10])
+    expect((await fetchDashboardData(PRFilter.Assignee, repo, "octocat")).map((pr) => pr.number)).toEqual([11])
   })
 
   test("returns empty array when repo is null", async () => {
@@ -125,11 +145,11 @@ describe("fetchDashboardData", () => {
   test("returns partial data when GraphQL errors include accessible data", async () => {
     mockOctokitDefault(() => {
       const err = new Error("Resource not accessible") as any
-      err.data = { search: { nodes: [makeSearchPR({ number: 1 })] } }
+      err.data = { repository: { pullRequests: { nodes: [makeSearchPR({ number: 1 })] } } }
       err.errors = [{ type: "FORBIDDEN", message: "Resource not accessible" }]
       throw err
     })
-    const prs = await fetchDashboardData(PRFilter.Author, { owner: "foo", repo: "bar" })
+    const prs = await fetchDashboardData(PRFilter.Author, { owner: "foo", repo: "bar" }, null)
     expect(prs).toHaveLength(1)
     expect(prs[0].number).toBe(1)
   })

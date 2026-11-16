@@ -1,9 +1,9 @@
 /** @jsxImportSource @opentui/solid */
 import { createMemo, For, Show } from "solid-js"
 import type { TuiPluginApi } from "@opencode-ai/plugin/tui"
-import { DashboardStatus, type PRFilter, type DashboardState, type ReviewerThreadCounts } from "../domain/types"
+import { DashboardStatus, type PRFilter, type DashboardState } from "../domain/types"
 import { skin } from "./theme"
-import { isReadyToMerge } from "../domain/pr-status"
+import { classifyRowState } from "../domain/pr-status"
 import { errorMessages } from "../domain/messages"
 import { PRRow } from "./PRRow"
 
@@ -27,8 +27,7 @@ export function DashboardView(props: {
     let ready = 0
     let notReady = 0
     for (const pr of props.state.prs) {
-      const required = props.state.branchRules.get(pr.baseRefName) ?? null
-      if (isReadyToMerge(pr, required)) ready++
+      if (classifyRowState(pr) === "ready") ready++
       else notReady++
     }
     return { ready, notReady, total: props.state.prs.length }
@@ -115,11 +114,6 @@ export function DashboardView(props: {
                 fail={sk.error}
                 warn={sk.warning}
                 draft={sk.draft}
-                required={props.state.branchRules.get(pr.baseRefName) ?? null}
-                threadCount={
-                  props.state.threadCounts.get(pr.number) ??
-                  (new Map() as ReviewerThreadCounts)
-                }
               />
             )}
           </For>

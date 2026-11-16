@@ -25,8 +25,6 @@ const tui: TuiPlugin = async (api, options) => {
     repo: null,
     prs: [],
     fetchedAt: null,
-    threadCounts: new Map(),
-    branchRules: new Map(),
     filter: PRFilter.Author,
   })
   const [selectedIdx, setSelectedIdx] = createSignal(0)

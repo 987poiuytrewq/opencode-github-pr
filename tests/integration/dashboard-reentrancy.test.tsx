@@ -9,7 +9,6 @@ import {
 import {
   makeFakeRepo,
   makeSearchResponse,
-  makeBranchProtectionResponse,
   makeThreadCountResponse,
 } from "../helpers/graphql-mock"
 import { createMockTuiApi } from "../helpers/tui-api-mock"
@@ -35,18 +34,14 @@ describe("useDashboard reentrancy and cancellation", () => {
       // second call lands.
       mockOctokitOp("graphql", async (params) => {
         const query: string = params?.query ?? ""
-        if (query.includes("search(")) {
+        if (query.includes("query Viewer")) return { viewer: { login: "octocat" } }
+        if (query.includes("pullRequests(")) {
           searchCalls++
           await new Promise((r) => setTimeout(r, 50))
           return makeSearchResponse(2)
         }
         return makeThreadCountResponse()
       })
-      mockOctokitDefault((op) => {
-        if (op === "repos.getBranchProtection") return makeBranchProtectionResponse()
-        return null
-      })
-
       const { api } = createMockTuiApi()
       const { state, refresh } = createDashboard(api)
 
@@ -76,18 +71,14 @@ describe("useDashboard reentrancy and cancellation", () => {
       // lands the state in "ok".
       mockOctokitOp("graphql", async (params) => {
         const query: string = params?.query ?? ""
-        if (query.includes("search(")) {
+        if (query.includes("query Viewer")) return { viewer: { login: "octocat" } }
+        if (query.includes("pullRequests(")) {
           callIndex++
           if (callIndex === 1) return new Promise(() => {})
           return makeSearchResponse(1)
         }
         return makeThreadCountResponse()
       })
-      mockOctokitDefault((op) => {
-        if (op === "repos.getBranchProtection") return makeBranchProtectionResponse()
-        return null
-      })
-
       const { api } = createMockTuiApi()
       const { state, refresh } = createDashboard(api)
 

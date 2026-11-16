@@ -16,7 +16,7 @@ import {
   type Repo,
 } from "../domain/types"
 import { detectRepo } from "../infra/git"
-import { fetchDashboardData, fetchOnePR } from "../infra/loader"
+import { fetchDashboardData, fetchOnePR, fetchViewerLogin } from "../infra/loader"
 import { prListErrorMessage, parseRateLimitError } from "../domain/messages"
 
 export function useDashboard(
@@ -76,16 +76,15 @@ export function useDashboard(
             prs: [],
             error: undefined,
             fetchedAt: Date.now(),
-            threadCounts: new Map(),
-            branchRules: new Map(),
           }))
           rateLimitedUntil = 0
           return
         }
         const TIMEOUT_MS = 15_000
-        const { prs, threadCounts, branchRules } = await timeoutRace(TIMEOUT_MS, () =>
-          fetchDashboardData(filter, repo),
-        )
+        const prs = await timeoutRace(TIMEOUT_MS, async () => {
+          const viewerLogin = await fetchViewerLogin()
+          return fetchDashboardData(filter, repo, viewerLogin)
+        })
         if (isStale()) return
         setState((s) => ({
           ...s,
@@ -94,8 +93,6 @@ export function useDashboard(
           prs,
           error: undefined,
           fetchedAt: Date.now(),
-          threadCounts,
-          branchRules,
         }))
         rateLimitedUntil = 0
       } catch (e: any) {
@@ -109,8 +106,6 @@ export function useDashboard(
           prs: rl.isRateLimit ? s.prs : [],
           error: rl.message ?? prListErrorMessage(e),
           fetchedAt: Date.now(),
-          threadCounts: rl.isRateLimit ? s.threadCounts : new Map(),
-          branchRules: rl.isRateLimit ? s.branchRules : new Map(),
         }))
       }
     })()

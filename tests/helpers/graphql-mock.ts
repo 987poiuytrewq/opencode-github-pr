@@ -24,32 +24,28 @@ export function makeFakeRepo(owner = "owner", repo = "repo"): string {
   return dir
 }
 
-// GraphQL search response with N fake PRs. Matches the shape produced by
-// DASHBOARD_QUERY / PR_LOOKUP_QUERY.
+// GraphQL repository connection response with N fake PRs. Matches the shape
+// produced by DASHBOARD_QUERY / PR_LOOKUP_QUERY.
 export function makeSearchResponse(prCount = 2) {
+  const nodes = Array.from({ length: prCount }, (_, i) => ({
+    number: i + 1,
+    title: `Test PR #${i + 1}`,
+    url: `https://github.com/owner/repo/pull/${i + 1}`,
+    isDraft: false,
+    baseRefName: "main",
+    mergeable: "MERGEABLE",
+    statusCheckRollup: { state: "SUCCESS" },
+    author: { login: "octocat" },
+    assignees: { nodes: [] },
+    reviewRequests: { nodes: [] },
+    latestReviews: { nodes: [] },
+  }))
   return {
-    search: {
-      nodes: Array.from({ length: prCount }, (_, i) => ({
-        number: i + 1,
-        title: `Test PR #${i + 1}`,
-        url: `https://github.com/owner/repo/pull/${i + 1}`,
-        isDraft: false,
-        baseRefName: "main",
-        mergeable: "MERGEABLE",
-        statusCheckRollup: { state: "SUCCESS" },
-        reviewRequests: { nodes: [] },
-        latestReviews: { nodes: [] },
-      })),
-    },
+    repository: { pullRequests: { nodes } },
   }
 }
 
-// Empty GraphQL fallback for non-search queries (e.g. REVIEWER_THREADS_QUERY).
+// Empty GraphQL fallback for non-dashboard queries.
 export function makeThreadCountResponse() {
   return { data: { repository: { pullRequests: { nodes: [] } } } }
-}
-
-// Empty REST response fallback (e.g. for branch protection queries).
-export function makeBranchProtectionResponse() {
-  return { data: {} }
 }
