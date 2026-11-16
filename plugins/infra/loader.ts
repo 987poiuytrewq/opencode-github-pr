@@ -1,92 +1,24 @@
 // High-level data loaders for the PR dashboard.
-//
 // Backed by Octokit (REST + GraphQL), which gives us built-in throttling,
-// retry, and timeouts — replacing the per-call `gh` spawn approach. The
-// caller-facing shape of each function is unchanged.
+// retry, and timeouts.
 
 import { getOctokit } from "./octokit"
 import { currentBranch } from "./git"
-import {
-  PRFilter,
-  type Repo,
-  type ReviewerThreadCounts,
-  type ReviewThread,
-  type PR,
-} from "../domain/types"
+import { PRFilter, type Repo, type ReviewThread, type PR } from "../domain/types"
 import { mapPullFromSearch, mapPullFromREST } from "./mappers"
 import {
   DASHBOARD_QUERY,
   PR_LOOKUP_QUERY,
-  BRANCH_RULES_QUERY,
   REVIEWER_THREADS_QUERY,
+  VIEWER_QUERY,
 } from "./queries"
 
-export type { PRFilter, Repo, ReviewerThreadCounts, PR }
-
-// ─── Mappers ───
-
-function extractThreadCounts(nodes: any[]): Map<number, ReviewerThreadCounts> {
-  const out = new Map<number, ReviewerThreadCounts>()
-  const normalize = (l: string) => l.replace(/\[bot\]$/, "")
-  for (const n of nodes) {
-    if (!n || !n.number) continue
-    const threads = n.reviewThreads?.nodes ?? []
-    const byReviewer = new Map<string, { unresolved: number; resolved: number }>()
-    const bump = (login: string, kind: "unresolved" | "resolved") => {
-      const key = normalize(login)
-      if (!key) return
-      const cur = byReviewer.get(key) ?? { unresolved: 0, resolved: 0 }
-      cur[kind]++
-      byReviewer.set(key, cur)
-    }
-    for (const t of threads) {
-      const authors = new Set<string>()
-      for (const c of t.comments?.nodes ?? []) {
-        const a = c.author?.login
-        if (a) authors.add(a)
-      }
-      for (const a of authors) {
-        bump(a, t.isResolved ? "resolved" : "unresolved")
-      }
-    }
-    out.set(n.number, byReviewer)
-  }
-  return out
-}
-
-// ─── Branch pattern matching ───
-
-function matchesBranchPattern(pattern: string, branch: string): boolean {
-  if (pattern === "*") return true
-  if (pattern === branch) return true
-  if (pattern.endsWith("/*")) {
-    return branch.startsWith(pattern.slice(0, -1))
-  }
-  return false
-}
-
-function resolveBranchRule(
-  branch: string,
-  rules: { pattern: string; count: number | null }[],
-): number | null {
-  let best: { pattern: string; count: number | null } | null = null
-  for (const r of rules) {
-    if (matchesBranchPattern(r.pattern, branch)) {
-      if (!best || r.pattern.length > best.pattern.length) {
-        best = r
-      }
-    }
-  }
-  return best?.count ?? null
-}
-
-// ─── Loaders ───
+export type { PRFilter, Repo, PR }
 
 // Wraps octokit.graphql to return partial data when some fields error.
 // GitHub's GraphQL API returns both `data` and `errors` when specific
-// fields are inaccessible (e.g. mergeStateStatus without admin scope).
-// Octokit throws on any errors, but the partial data is still usable —
-// errored fields are null in the response.
+// fields are inaccessible. Octokit throws on any errors, but the partial
+// data is still usable — errored fields are null in the response.
 async function graphqlPartial(query: string, vars: Record<string, unknown>): Promise<any> {
   try {
     return await getOctokit().graphql(query, vars)
@@ -99,50 +31,39 @@ async function graphqlPartial(query: string, vars: Record<string, unknown>): Pro
 export async function fetchDashboardData(
   filter: PRFilter,
   repo: Repo | null,
-): Promise<{
-  prs: PR[]
-  threadCounts: Map<number, ReviewerThreadCounts>
-  branchRules: Map<string, number | null>
-}> {
-  if (!repo) return { prs: [], threadCounts: new Map(), branchRules: new Map() }
-
-  const qualifier = filter === PRFilter.Author ? "author:@me" : "assignee:@me"
-  const q = `is:pr is:open repo:${repo.owner}/${repo.repo} ${qualifier} sort:updated-desc`
-
-  const [prResult, branchRulesData] = await Promise.all([
-    graphqlPartial(DASHBOARD_QUERY, { q }),
-    fetchBranchProtectionRules(repo),
-  ])
-
-  const nodes: any[] = prResult?.search?.nodes ?? []
-  const filtered = nodes.filter(Boolean)
-  const prs = filtered.map(mapPullFromSearch)
-  const threadCounts = extractThreadCounts(filtered)
-
-  const uniqueBranches = Array.from(new Set(prs.map((p) => p.baseRefName)))
-  const branchRules = new Map<string, number | null>()
-  for (const branch of uniqueBranches) {
-    branchRules.set(branch, resolveBranchRule(branch, branchRulesData))
+  viewerLogin: string | null,
+): Promise<PR[]> {
+  if (!repo) return []
+  const data: any = await graphqlPartial(DASHBOARD_QUERY, {
+    owner: repo.owner,
+    name: repo.repo,
+  })
+  const nodes: any[] = data?.repository?.pullRequests?.nodes ?? []
+  const prs = nodes.filter(Boolean).map(mapPullFromSearch)
+  if (!viewerLogin) return prs
+  // Client-side filter: the search API supported author:/assignee: qualifiers
+  // but required extra scope to read statusCheckRollup.  We switched to the
+  // direct connection for CI status, so filtering moves here.
+  const lower = viewerLogin.toLowerCase()
+  if (filter === PRFilter.Author) {
+    return prs.filter((p) => p._authorLogin?.toLowerCase() === lower)
   }
-
-  return { prs, threadCounts, branchRules }
+  return prs.filter((p) =>
+    p._assigneeLogins?.some((l: string) => l.toLowerCase() === lower),
+  )
 }
 
-async function fetchBranchProtectionRules(
-  repo: Repo,
-): Promise<{ pattern: string; count: number | null }[]> {
+let cachedViewerLogin: string | null = null
+
+export async function fetchViewerLogin(): Promise<string | null> {
+  if (cachedViewerLogin) return cachedViewerLogin
   try {
-    const octokit = getOctokit()
-    const data: any = await octokit.graphql(BRANCH_RULES_QUERY, {
-      owner: repo.owner,
-      name: repo.repo,
-    })
-    return (data?.repository?.branchProtectionRules?.nodes ?? []).map((r: any) => ({
-      pattern: r.pattern as string,
-      count: r.requiredApprovingReviews as number | null,
-    }))
+    const data: any = await graphqlPartial(VIEWER_QUERY, {})
+    const login = data?.viewer?.login
+    if (login) cachedViewerLogin = login
+    return login ?? null
   } catch {
-    return []
+    return null
   }
 }
 
@@ -165,9 +86,12 @@ export async function currentBranchPR(repo: Repo | null, cwd: string = process.c
   if (!repo) return null
   const branch = currentBranch(cwd)
   if (!branch) return null
-  const q = `is:pr is:open repo:${repo.owner}/${repo.repo} head:${branch} sort:updated-desc`
-  const data: any = await graphqlPartial(PR_LOOKUP_QUERY, { q })
-  const nodes: any[] = data?.search?.nodes ?? []
+  const data: any = await graphqlPartial(PR_LOOKUP_QUERY, {
+    owner: repo.owner,
+    name: repo.repo,
+    head: branch,
+  })
+  const nodes: any[] = data?.repository?.pullRequests?.nodes ?? []
   const pr = nodes.filter(Boolean)[0]
   return pr ? mapPullFromSearch(pr) : null
 }

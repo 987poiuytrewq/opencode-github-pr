@@ -9,21 +9,15 @@ export type PR = {
   title: string
   url: string
   isDraft: boolean
-  author: { login: string } | null
-  headRefName: string
   baseRefName: string
-  reviewDecision: string | null
   mergeable: string
-  mergeStateStatus: string | null
-  createdAt: string
-  updatedAt: string
-  // Fields are optional because the two mappers populate different subsets:
-  // the GraphQL search mapper only sets `state`, while the REST mapper sets
-  // `name`/`conclusion`/`status`. classifyCI reads them defensively.
-  statusCheckRollup: Array<{ name?: string; conclusion?: string | null; status?: string; state?: string }> | null
+  statusCheckRollup: { state: string } | null
   reviewRequests: Array<{ login: string }> | null
-  latestReviews: Array<{ author: { login: string }; state: string; createdAt: string }> | null
-  assignees: Array<{ login: string }> | null
+  latestReviews: Array<{ author: { login: string }; state: string }> | null
+  // Private fields used for client-side author/assignee filtering.
+  // Not part of the public PR shape.
+  _authorLogin?: string
+  _assigneeLogins?: string[]
 }
 
 export type Repo = { owner: string; repo: string }
@@ -48,13 +42,9 @@ export type DashboardState = {
   repo: Repo | null
   prs: PR[]
   fetchedAt: number | null
-  threadCounts: Map<number, ReviewerThreadCounts>
-  branchRules: Map<string, number | null>
   filter: PRFilter
   error?: string
 }
-
-export type ReviewerThreadCounts = Map<string, { unresolved: number; resolved: number }>
 
 export type ReviewThread = {
   isResolved: boolean

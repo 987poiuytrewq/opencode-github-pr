@@ -1,22 +1,25 @@
-// PR status evaluation: CI classification, review rollup, ready-to-merge.
+// PR status evaluation: CI classification and review rollup.
 // Pure functions over the PR type. Age formatting lives in ./format.
 
 import type { PR } from "./types"
 
+// Row color: draft → grey, merge conflict → red, ready to merge → green,
+// otherwise → "default" (white/text).
+export function classifyRowState(pr: PR): "draft" | "blocked" | "ready" | "default" {
+  if (pr.isDraft) return "draft"
+  if (pr.mergeable === "CONFLICTING") return "blocked"
+  const ci = classifyCI(pr)
+  const r = reviewSummary(pr)
+  if (ci === "pass" && r.changes === 0) return "ready"
+  return "default"
+}
+
 export function classifyCI(pr: PR): "pass" | "fail" | "pending" | "none" {
-  const checks = pr.statusCheckRollup ?? []
-  if (checks.length === 0) return "none"
-  let anyPending = false
-  let anyFail = false
-  for (const c of checks) {
-    const v = c.conclusion ?? c.status ?? c.state ?? ""
-    if (v === "SUCCESS") continue
-    if (v === "FAILURE" || v === "ERROR" || v === "TIMED_OUT") anyFail = true
-    else anyPending = true
-  }
-  if (anyFail) return "fail"
-  if (anyPending) return "pending"
-  return "pass"
+  const state = pr.statusCheckRollup?.state
+  if (state === "SUCCESS") return "pass"
+  if (state === "FAILURE" || state === "ERROR") return "fail"
+  if (state === "PENDING" || state === "EXPECTED") return "pending"
+  return "none"
 }
 
 export function reviewSummary(pr: PR): {
@@ -50,26 +53,4 @@ export function reviewSummary(pr: PR): {
     pendingLogins,
     commentedLogins: Array.from(commented),
   }
-}
-
-export function missingReviewerCount(pr: PR, required: number | null | undefined): number {
-  if (required == null || required <= 0) return 0
-  const r = reviewSummary(pr)
-  return Math.max(0, required - r.approved - r.pending)
-}
-
-export function isReadyToMerge(pr: PR, required: number | null | undefined): boolean {
-  if (pr.isDraft) return false
-  if (pr.mergeStateStatus === "CONFLICTING" || pr.mergeable === "CONFLICTING") return false
-  if (pr.mergeStateStatus && pr.mergeStateStatus !== "CLEAN" && pr.mergeStateStatus !== "UNSTABLE") {
-    if (pr.mergeStateStatus === "BLOCKED" || pr.mergeStateStatus === "BEHIND" || pr.mergeStateStatus === "DIRTY") return false
-  }
-  const ci = classifyCI(pr)
-  if (ci === "fail" || ci === "pending") return false
-  const r = reviewSummary(pr)
-  if (r.changes > 0) return false
-  if (required != null && required > 0) {
-    if (r.approved < required) return false
-  }
-  return true
 }

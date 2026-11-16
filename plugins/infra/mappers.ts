@@ -4,23 +4,17 @@
 
 import type { PR } from "../domain/types"
 
-// Maps a GraphQL `search.nodes` PullRequest object to PR. Used by
-// fetchDashboardData and currentBranchPR.
+// Maps a GraphQL PullRequest node to PR.  Author/assignee are attached
+// as private fields for client-side filtering by fetchDashboardData.
 export function mapPullFromSearch(p: any): PR {
   return {
     number: p.number,
     title: p.title,
     url: p.url,
     isDraft: p.isDraft ?? false,
-    author: p.author ? { login: p.author.login } : null,
-    headRefName: p.headRefName,
     baseRefName: p.baseRefName,
-    reviewDecision: p.reviewDecision ?? null,
     mergeable: (p.mergeable ?? "UNKNOWN").toUpperCase(),
-    mergeStateStatus: (p.mergeStateStatus ?? null)?.toUpperCase() ?? null,
-    createdAt: p.createdAt,
-    updatedAt: p.updatedAt,
-    statusCheckRollup: p.statusCheckRollup ? [{ state: p.statusCheckRollup.state }] : null,
+    statusCheckRollup: p.statusCheckRollup ?? null,
     reviewRequests: (p.reviewRequests?.nodes ?? [])
       .map((n: any) => n.requestedReviewer?.login)
       .filter(Boolean)
@@ -28,35 +22,27 @@ export function mapPullFromSearch(p: any): PR {
     latestReviews: (p.latestReviews?.nodes ?? []).map((r: any) => ({
       author: { login: r.author?.login ?? "" },
       state: r.state,
-      createdAt: r.createdAt ?? "",
     })),
-    assignees: (p.assignees?.nodes ?? []).map((a: any) => ({ login: a.login })),
+    _authorLogin: p.author?.login ?? "",
+    _assigneeLogins: (p.assignees?.nodes ?? []).map((a: any) => a.login),
   }
 }
 
-// Maps a REST `pulls.get` response data object to PR. Used by fetchOnePR
-// to refresh a single PR after a reviewer is added.
+// Maps a REST `pulls.get` response data object to PR.  REST doesn't
+// provide statusCheckRollup, so the field is null.
 export function mapPullFromREST(p: any): PR {
   return {
     number: p.number,
     title: p.title,
     url: p.html_url,
     isDraft: p.draft ?? false,
-    author: p.user ? { login: p.user.login } : null,
-    headRefName: p.head.ref,
     baseRefName: p.base.ref,
-    reviewDecision: p.review_decision ?? null,
     mergeable: p.mergeable ? "MERGEABLE" : p.mergeable === false ? "CONFLICTING" : "UNKNOWN",
-    mergeStateStatus: p.mergeable_state ?? null,
-    createdAt: p.created_at,
-    updatedAt: p.updated_at,
-    statusCheckRollup: p.status_check_rollup ?? null,
+    statusCheckRollup: null,
     reviewRequests: (p.requested_reviewers ?? []).map((r: any) => ({ login: r.login })),
     latestReviews: (p.latest_reviews ?? []).map((r: any) => ({
       author: { login: r.user?.login ?? "" },
       state: r.state,
-      createdAt: r.submitted_at ?? "",
     })),
-    assignees: (p.assignees ?? []).map((a: any) => ({ login: a.login })),
   }
 }

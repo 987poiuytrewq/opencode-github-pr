@@ -4,106 +4,80 @@
 // (scope requirements, field selection) without scrolling through the
 // orchestration code. Each query is consumed by exactly one loader.
 
-export const DASHBOARD_QUERY = `query Dashboard($q: String!) {
-  search(query: $q, type: ISSUE, first: 50) {
-    nodes {
-      ... on PullRequest {
-        number
-        title
-        url
-        isDraft
-        author { login }
-        headRefName
-        baseRefName
-        reviewDecision
-        mergeable
-        mergeStateStatus
-        statusCheckRollup { state }
-        createdAt
-        updatedAt
-        reviewRequests(first: 10) {
-          nodes {
-            requestedReviewer {
-              ... on User { login }
-            }
-          }
-        }
-        latestReviews(first: 10) {
-          nodes {
-            author { login }
-            state
-            createdAt
-          }
-        }
-        assignees(first: 10) {
-          nodes { login }
-        }
-        reviewThreads(first: 100) {
-          nodes {
-            isResolved
-            comments(first: 20) {
-              nodes {
-                author { login }
-              }
-            }
-          }
-        }
-      }
-    }
-  }
-}`
-
-export const PR_LOOKUP_QUERY = `query Lookup($q: String!) {
-  search(query: $q, type: ISSUE, first: 50) {
-    nodes {
-      ... on PullRequest {
-        number
-        title
-        url
-        isDraft
-        author { login }
-        headRefName
-        baseRefName
-        reviewDecision
-        mergeable
-        mergeStateStatus
-        statusCheckRollup { state }
-        createdAt
-        updatedAt
-        reviewRequests(first: 10) {
-          nodes {
-            requestedReviewer {
-              ... on User { login }
-            }
-          }
-        }
-        latestReviews(first: 10) {
-          nodes {
-            author { login }
-            state
-            createdAt
-          }
-        }
-        assignees(first: 10) {
-          nodes { login }
-        }
-      }
-    }
-  }
-}`
-
-// Branch protection rules in a single call — replaces N per-branch REST
-// calls.  Wrapped in try/catch by the caller since it requires admin
-// access to the repository.
-export const BRANCH_RULES_QUERY = `query BranchRules($owner: String!, $name: String!) {
+// PR list for the dashboard.  Uses repository.pullRequests instead of
+// the search API because the search API requires additional scopes
+// (Checks: Read / Commit Statuses: Read) to read statusCheckRollup.
+// The direct connection works with basic repo scope.  Author/assignee
+// filtering is done client-side in fetchDashboardData.
+export const DASHBOARD_QUERY = `query Dashboard($owner: String!, $name: String!) {
   repository(owner: $owner, name: $name) {
-    branchProtectionRules(first: 100) {
+    pullRequests(first: 50, states: OPEN, orderBy: {field: UPDATED_AT, direction: DESC}) {
       nodes {
-        pattern
-        requiredApprovingReviews
+        number
+        title
+        url
+        isDraft
+        baseRefName
+        mergeable
+        author { login }
+        assignees(first: 10) { nodes { login } }
+        statusCheckRollup {
+          state
+        }
+        reviewRequests(first: 5) {
+          nodes {
+            requestedReviewer {
+              ... on User { login }
+            }
+          }
+        }
+        latestReviews(first: 5) {
+          nodes {
+            author { login }
+            state
+          }
+        }
       }
     }
   }
+}`
+
+// Single-PR lookup by branch.  Uses repository.pullRequests with headRefName filter.
+export const PR_LOOKUP_QUERY = `query Lookup($owner: String!, $name: String!, $head: String) {
+  repository(owner: $owner, name: $name) {
+    pullRequests(first: 1, states: OPEN, headRefName: $head) {
+      nodes {
+        number
+        title
+        url
+        isDraft
+        baseRefName
+        mergeable
+        statusCheckRollup {
+          state
+        }
+        reviewRequests(first: 5) {
+          nodes {
+            requestedReviewer {
+              ... on User { login }
+            }
+          }
+        }
+        latestReviews(first: 5) {
+          nodes {
+            author { login }
+            state
+          }
+        }
+      }
+    }
+  }
+}`
+
+// Get the authenticated viewer's login.  Used for client-side author/assignee
+// filtering after switching away from the search API.
+export const VIEWER_QUERY = `query Viewer {
+  viewer { login }
 }`
 
 export const REVIEWER_THREADS_QUERY = `query Q($owner: String!, $name: String!, $number: Int!) {
