@@ -4,16 +4,14 @@
 
 import { getOctokit } from "./octokit"
 import { currentBranch } from "./git"
-import { PRFilter, type Repo, type ReviewThread, type PR } from "../domain/types"
-import { mapPullFromSearch, mapPullFromREST } from "./mappers"
+import { type Repo, type ReviewThread, type PR } from "../domain/types"
+import { mapPullFromGraphQL, mapPullFromREST } from "./mappers"
 import {
-  DASHBOARD_QUERY,
-  PR_LOOKUP_QUERY,
+  CURRENT_BRANCH_PRS_QUERY,
   REVIEWER_THREADS_QUERY,
-  VIEWER_QUERY,
 } from "./queries"
 
-export type { PRFilter, Repo, PR }
+export type { Repo, PR }
 
 // Wraps octokit.graphql to return partial data when some fields error.
 // GitHub's GraphQL API returns both `data` and `errors` when specific
@@ -25,45 +23,6 @@ async function graphqlPartial(query: string, vars: Record<string, unknown>): Pro
   } catch (e: any) {
     if (e?.data) return e.data
     throw e
-  }
-}
-
-export async function fetchDashboardData(
-  filter: PRFilter,
-  repo: Repo | null,
-  viewerLogin?: string | null,
-): Promise<PR[]> {
-  if (!repo) return []
-  const data: any = await graphqlPartial(DASHBOARD_QUERY, {
-    owner: repo.owner,
-    name: repo.repo,
-  })
-  const nodes: any[] = data?.repository?.pullRequests?.nodes ?? []
-  const prs = nodes.filter(Boolean).map(mapPullFromSearch)
-  if (!viewerLogin) return prs
-  // Client-side filter: the search API supported author:/assignee: qualifiers
-  // but required extra scope to read statusCheckRollup.  We switched to the
-  // direct connection for CI status, so filtering moves here.
-  const lower = viewerLogin.toLowerCase()
-  if (filter === PRFilter.Author) {
-    return prs.filter((p) => p._authorLogin?.toLowerCase() === lower)
-  }
-  return prs.filter((p) =>
-    p._assigneeLogins?.some((l: string) => l.toLowerCase() === lower),
-  )
-}
-
-let cachedViewerLogin: string | null = null
-
-export async function fetchViewerLogin(): Promise<string | null> {
-  if (cachedViewerLogin) return cachedViewerLogin
-  try {
-    const data: any = await graphqlPartial(VIEWER_QUERY, {})
-    const login = data?.viewer?.login
-    if (login) cachedViewerLogin = login
-    return login ?? null
-  } catch {
-    return null
   }
 }
 
@@ -82,18 +41,22 @@ export async function addPullRequestReviewer(
   })
 }
 
-export async function currentBranchPR(repo: Repo | null, cwd: string = process.cwd()): Promise<PR | null> {
-  if (!repo) return null
+export async function currentBranchPRs(repo: Repo | null, cwd: string = process.cwd()): Promise<PR[]> {
+  if (!repo) return []
   const branch = currentBranch(cwd)
-  if (!branch) return null
-  const data: any = await graphqlPartial(PR_LOOKUP_QUERY, {
+  if (!branch) return []
+  const data: any = await graphqlPartial(CURRENT_BRANCH_PRS_QUERY, {
     owner: repo.owner,
     name: repo.repo,
     head: branch,
   })
   const nodes: any[] = data?.repository?.pullRequests?.nodes ?? []
-  const pr = nodes.filter(Boolean)[0]
-  return pr ? mapPullFromSearch(pr) : null
+  return nodes.filter(Boolean).map(mapPullFromGraphQL)
+}
+
+export async function currentBranchPR(repo: Repo | null, cwd: string = process.cwd()): Promise<PR | null> {
+  const prs = await currentBranchPRs(repo, cwd)
+  return prs.find((pr) => !pr.isMerged) ?? null
 }
 
 export async function fetchOnePR(repo: Repo, pullNumber: number): Promise<PR> {

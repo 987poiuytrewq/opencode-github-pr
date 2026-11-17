@@ -20,10 +20,6 @@ describe("DashboardView reactivity", () => {
           selectedIdx={0}
           setSelectedIdx={() => {}}
           onOpen={() => {}}
-          onAddReviewer={() => {}}
-          onReviewerComments={() => {}}
-          filter={state().filter}
-          onCycleFilter={() => {}}
           expanded={true}
           onToggleExpand={() => {}}
         />
@@ -41,6 +37,7 @@ describe("DashboardView reactivity", () => {
     const after = r.captureCharFrame()
 
     expect(after).not.toContain("Loading")
-    expect(after).toContain("✓")
+    expect(after).toContain("+42")
+    expect(after).toContain("●")
   })
 })

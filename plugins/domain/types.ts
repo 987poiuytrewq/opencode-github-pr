@@ -9,15 +9,14 @@ export type PR = {
   title: string
   url: string
   isDraft: boolean
+  isMerged: boolean
+  additions: number
+  deletions: number
   baseRefName: string
   mergeable: string
   statusCheckRollup: { state: string } | null
   reviewRequests: Array<{ login: string }> | null
   latestReviews: Array<{ author: { login: string }; state: string }> | null
-  // Private fields used for client-side author/assignee filtering.
-  // Not part of the public PR shape.
-  _authorLogin?: string
-  _assigneeLogins?: string[]
 }
 
 export type Repo = { owner: string; repo: string }
@@ -29,20 +28,11 @@ export enum DashboardStatus {
   Error = "error",
 }
 
-export enum PRFilter {
-  Author = "author",
-  Assignee = "assignee",
-}
-
-// Canonical filter cycle order, used by the dashboard header button.
-export const FILTERS: PRFilter[] = [PRFilter.Author, PRFilter.Assignee]
-
 export type DashboardState = {
   status: DashboardStatus
   repo: Repo | null
   prs: PR[]
   fetchedAt: number | null
-  filter: PRFilter
   error?: string
 }
 
@@ -66,5 +56,4 @@ export interface DashboardContext {
   setSelectedIdx: (n: number) => void
   expanded: () => boolean
   toggleExpanded: () => void
-  cycleFilter: () => void
 }

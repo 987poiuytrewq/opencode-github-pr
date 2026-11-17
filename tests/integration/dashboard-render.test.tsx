@@ -3,11 +3,11 @@ import { describe, expect, test } from "bun:test"
 import { testRender } from "@opentui/solid"
 import type { DashboardState } from "../../plugins/domain/types"
 import { DashboardView } from "../../plugins/app/DashboardView"
+import { makeTUIPR } from "../helpers/tui-fixtures"
 import { createMockTuiApi } from "../helpers/tui-api-mock"
 import { loadingState, okState, noRepoState, errorState } from "../helpers/state-fixtures"
 
 async function renderState(state: DashboardState, expanded = true, handlers: Partial<{
-  onCycleFilter: () => void
   onToggleExpand: () => void
   onOpen: (n: number) => void
 }> = {}) {
@@ -21,10 +21,6 @@ async function renderState(state: DashboardState, expanded = true, handlers: Par
         selectedIdx={0}
         setSelectedIdx={() => {}}
         onOpen={handlers.onOpen ?? (() => {})}
-        onAddReviewer={() => {}}
-        onReviewerComments={() => {}}
-        filter={state.filter}
-        onCycleFilter={handlers.onCycleFilter ?? (() => {})}
         expanded={expanded}
         onToggleExpand={handlers.onToggleExpand ?? (() => {})}
       />
@@ -69,37 +65,33 @@ describe("DashboardView render", () => {
     await r.flush()
     expect(r.captureCharFrame()).toMatchSnapshot()
   })
+
+  test("merged PR uses the merged icon and displays change totals", async () => {
+    const r = await renderState(okState({
+      prs: [makeTUIPR({
+        number: 42,
+        title: "Merged feature",
+        isMerged: true,
+        additions: 17,
+        deletions: 4,
+      })],
+    }))
+    await r.flush()
+    const frame = r.captureCharFrame()
+    expect(frame).toContain(" Merged feature")
+    expect(frame).toContain("#42 +17 -4")
+    expect(frame).toContain("●")
+  })
 })
 
 describe("DashboardView mouse interaction", () => {
-  test("clicking the filter cycles the filter", async () => {
-    let cycleCalls = 0
-    let toggleCalls = 0
-    const r = await renderState(okState(), true, {
-      onCycleFilter: () => { cycleCalls++ },
-      onToggleExpand: () => { toggleCalls++ },
-    })
-    await r.flush()
-    const frame = r.captureCharFrame()
-    // Find where "author:@me" appears in the frame (should be on the right)
-    const lines = frame.split("\n")
-    const headerLine = lines[1]
-    const filterIdx = headerLine.indexOf("author:@me")
-    expect(filterIdx).toBeGreaterThan(20) // confirm it's on the right side
-    const clickCol = filterIdx + 3 // click in the middle of "author:@me"
-    await r.mockMouse.click(clickCol, 1)
-    await r.flush()
-    expect(cycleCalls).toBe(1)
-    expect(toggleCalls).toBe(0)
-  })
-
   test("clicking the header toggles expand", async () => {
     let toggles = 0
     const r = await renderState(okState(), true, {
       onToggleExpand: () => { toggles++ },
     })
     await r.flush()
-    // "▼ PRs" is at the left of row 1. Click on "PRs".
+    // The collapse marker and "Changes" label are at the left of row 1.
     await r.mockMouse.click(4, 1)
     await r.flush()
     expect(toggles).toBe(1)

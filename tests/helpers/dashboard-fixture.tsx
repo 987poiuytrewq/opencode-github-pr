@@ -1,7 +1,7 @@
 /** @jsxImportSource @opentui/solid */
 import { createSignal } from "solid-js"
 import type { Context as TuiPluginContext } from "@opencode/plugin/tui/context"
-import { DashboardStatus, PRFilter, type DashboardState } from "../../plugins/domain/types"
+import { DashboardStatus, type DashboardState } from "../../plugins/domain/types"
 import { useDashboard } from "../../plugins/app/usePRData"
 
 // Creates a dashboard with reactive signals. Must live in a .tsx file so
@@ -13,7 +13,6 @@ export function createDashboard(api: TuiPluginContext) {
     repo: null,
     prs: [],
     fetchedAt: null,
-    filter: PRFilter.Author,
   })
   const dash = useDashboard(api, state, setState)
   dash.refresh()

@@ -10,14 +10,12 @@ import {
 } from "../helpers/octokit-mock"
 import {
   currentBranchPR,
-  fetchDashboardData,
+  currentBranchPRs,
   fetchOrgMembers,
   fetchOnePR,
   fetchReviewerThreads,
 } from "../../plugins/infra/loader"
 import { makeFakeRepo } from "../helpers/graphql-mock"
-
-import { PRFilter } from "../../plugins/domain/types"
 
 installOctokitMock()
 
@@ -43,6 +41,9 @@ describe("currentBranchPR", () => {
               title: "PR 7",
               url: "https://github.com/foo/bar/pull/7",
               isDraft: false,
+              state: "OPEN",
+              additions: 12,
+              deletions: 3,
               baseRefName: "main",
               mergeable: "MERGEABLE",
               statusCheckRollup: { state: "SUCCESS" },
@@ -56,6 +57,9 @@ describe("currentBranchPR", () => {
     })
     const pr = await currentBranchPR({ owner: "foo", repo: "bar" }, dir)
     expect(lastQuery).toContain("headRefName: $head")
+    expect(lastQuery).toContain("states: [OPEN, MERGED]")
+    expect(lastQuery).toContain("additions")
+    expect(lastQuery).toContain("deletions")
     expect(pr?.number).toBe(7)
     rmSync(dir, { recursive: true, force: true })
   })
@@ -84,74 +88,31 @@ describe("currentBranchPR", () => {
     expect(pr).toBeNull()
     rmSync(dir, { recursive: true, force: true })
   })
-})
 
-describe("fetchDashboardData", () => {
-  function makeSearchPR(opts: { number: number }): any {
-    return {
-      number: opts.number,
-      title: `PR ${opts.number}`,
-      url: `https://github.com/foo/bar/pull/${opts.number}`,
-      isDraft: false,
-      baseRefName: "main",
-      mergeable: "MERGEABLE",
-      statusCheckRollup: { state: "SUCCESS" },
-      author: { login: "octocat" },
-      assignees: { nodes: [] },
-      reviewRequests: { nodes: [] },
-      latestReviews: { nodes: [] },
-    }
-  }
-
-  test("returns PR array from repository pull request query", async () => {
-    let lastQuery = ""
+  test("returns open and merged PRs for the current branch", async () => {
+    const dir = makeFakeRepo("foo", "bar")
     let lastParams: any
     mockOctokitDefault((op, params) => {
       if (op === "graphql") {
-        lastQuery = params.query ?? ""
-        lastParams = params.params
-        return { repository: { pullRequests: { nodes: [makeSearchPR({ number: 10 })] } } }
+        lastParams = params?.params
+        return {
+          repository: {
+            pullRequests: { nodes: [
+              { number: 8, title: "Open", state: "OPEN", additions: 4, deletions: 1 },
+              { number: 7, title: "Merged", state: "MERGED", additions: 10, deletions: 2 },
+            ] },
+          },
+        }
       }
       return null
     })
-    const prs = await fetchDashboardData(PRFilter.Author, { owner: "foo", repo: "bar" }, "octocat")
-    expect(lastQuery).toContain("repository(owner: $owner, name: $name)")
-    expect(lastQuery).toContain("pullRequests(")
-    expect(lastParams).toEqual({ owner: "foo", name: "bar" })
-    expect(prs).toHaveLength(1)
-    expect(prs[0].number).toBe(10)
-  })
-
-  test("filters by author and assignee using the viewer login", async () => {
-    mockOctokitDefault((op) => {
-      if (op === "graphql") return {
-        repository: { pullRequests: { nodes: [
-          { ...makeSearchPR({ number: 10 }), author: { login: "octocat" }, assignees: { nodes: [] } },
-          { ...makeSearchPR({ number: 11 }), author: { login: "someone" }, assignees: { nodes: [{ login: "OctoCat" }] } },
-        ] } },
-      }
-      return null
-    })
-    const repo = { owner: "foo", repo: "bar" }
-    expect((await fetchDashboardData(PRFilter.Author, repo, "octocat")).map((pr) => pr.number)).toEqual([10])
-    expect((await fetchDashboardData(PRFilter.Assignee, repo, "octocat")).map((pr) => pr.number)).toEqual([11])
-  })
-
-  test("returns empty array when repo is null", async () => {
-    const prs = await fetchDashboardData(PRFilter.Author, null)
-    expect(prs).toEqual([])
-  })
-
-  test("returns partial data when GraphQL errors include accessible data", async () => {
-    mockOctokitDefault(() => {
-      const err = new Error("Resource not accessible") as any
-      err.data = { repository: { pullRequests: { nodes: [makeSearchPR({ number: 1 })] } } }
-      err.errors = [{ type: "FORBIDDEN", message: "Resource not accessible" }]
-      throw err
-    })
-    const prs = await fetchDashboardData(PRFilter.Author, { owner: "foo", repo: "bar" }, null)
-    expect(prs).toHaveLength(1)
-    expect(prs[0].number).toBe(1)
+    const prs = await currentBranchPRs({ owner: "foo", repo: "bar" }, dir)
+    expect(lastParams).toEqual({ owner: "foo", name: "bar", head: "main" })
+    expect(prs.map((pr) => [pr.number, pr.isMerged, pr.additions, pr.deletions])).toEqual([
+      [8, false, 4, 1],
+      [7, true, 10, 2],
+    ])
+    rmSync(dir, { recursive: true, force: true })
   })
 })
 
@@ -279,6 +240,9 @@ describe("fetchOnePR", () => {
       base: { ref: "main" },
       review_decision: "APPROVED",
       mergeable: true,
+      merged: false,
+      additions: 9,
+      deletions: 2,
       mergeable_state: "clean",
       created_at: "2024-01-01T00:00:00Z",
       updated_at: "2024-01-02T00:00:00Z",
@@ -299,6 +263,9 @@ describe("fetchOnePR", () => {
     expect(pr.url).toBe("https://github.com/foo/bar/pull/42")
     expect(pr.baseRefName).toBe("main")
     expect(pr.mergeable).toBe("MERGEABLE")
+    expect(pr.isMerged).toBe(false)
+    expect(pr.additions).toBe(9)
+    expect(pr.deletions).toBe(2)
     expect(pr.reviewRequests).toEqual([{ login: "bob" }])
   })
 

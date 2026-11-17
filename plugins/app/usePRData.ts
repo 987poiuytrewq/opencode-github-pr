@@ -10,13 +10,11 @@
 import type { Context as TuiPluginContext } from "@opencode/plugin/tui/context"
 import {
   DashboardStatus,
-  PRFilter,
-  FILTERS,
   type DashboardState,
   type Repo,
 } from "../domain/types"
 import { detectRepo } from "../infra/git"
-import { fetchDashboardData, fetchOnePR, fetchViewerLogin } from "../infra/loader"
+import { currentBranchPRs, fetchOnePR } from "../infra/loader"
 import { prListErrorMessage, parseRateLimitError } from "../domain/messages"
 
 export function useDashboard(
@@ -26,17 +24,7 @@ export function useDashboard(
 ): {
   refresh: () => Promise<void>
   refreshOne: (n: number) => Promise<void>
-  cycleFilter: () => void
 } {
-  const cycleFilter = () => {
-    setState((s) => {
-      const idx = FILTERS.indexOf(s.filter)
-      const next = FILTERS[(idx + 1) % FILTERS.length]
-      return { ...s, filter: next, status: DashboardStatus.Loading }
-    })
-    refresh()
-  }
-
   // Resolve the working directory explicitly when the TUI exposes it, so
   // repo detection doesn't depend on where opencode happens to launch.
   // Falls back to process.cwd() for tests that chdir() into a temp repo.
@@ -65,7 +53,6 @@ export function useDashboard(
   const refresh = async () => {
     if (inFlight) return inFlight
     const prev = state()
-    const filter = prev.filter
     const token = ++refreshToken
     const release = () => {
       if (inFlight && currentRefreshToken === token) inFlight = null
@@ -73,7 +60,8 @@ export function useDashboard(
     const promise = (async () => {
       const isStale = () => token !== refreshToken
       try {
-        const repo = detectRepo(await cwd())
+        const directory = await cwd()
+        const repo = detectRepo(directory)
         const isFirstLoad = prev.fetchedAt === null
         const isDirChange =
           !!prev.repo && !!repo && (prev.repo.owner !== repo.owner || prev.repo.repo !== repo.repo)
@@ -96,10 +84,7 @@ export function useDashboard(
           return
         }
         const TIMEOUT_MS = 15_000
-        const prs = await timeoutRace(TIMEOUT_MS, async () => {
-          const viewerLogin = await fetchViewerLogin()
-          return fetchDashboardData(filter, repo, viewerLogin)
-        })
+        const prs = await timeoutRace(TIMEOUT_MS, () => currentBranchPRs(repo, directory))
         if (isStale()) return
         setState((s) => ({
           ...s,
@@ -146,7 +131,7 @@ export function useDashboard(
     } catch {}
   }
 
-  return { refresh, refreshOne, cycleFilter }
+  return { refresh, refreshOne }
 }
 
 function timeoutRace<T>(ms: number, fn: () => Promise<T>): Promise<T> {

@@ -57,13 +57,13 @@ describe.skipIf(!isE2E())("E2E: sidebar content area", () => {
     expect(foundNonSpace).toBe(true)
   }, 30_000)
 
-  test("sidebar contains PRs text", async () => {
+  test("sidebar contains Changes heading", async () => {
     const screen = await session.capturePanePlain()
-    expect(screen).toContain("PRs")
+    expect(screen).toContain("Changes")
   }, 30_000)
 
-  test("sidebar contains filter label", async () => {
+  test("sidebar does not contain a filter label", async () => {
     const screen = await session.capturePanePlain()
-    expect(screen).toContain("author:@me")
+    expect(screen).not.toContain("author:@me")
   }, 30_000)
 })
