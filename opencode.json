@@ -1,4 +1,4 @@
 {
   "$schema": "https://opencode.ai/config.json",
-  "plugins": ["."]
+  "plugins": ["{env:OPENCODE_GITHUB_PR_WORKTREE}"]
 }

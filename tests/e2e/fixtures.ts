@@ -87,6 +87,7 @@ export async function startOpenCodeE2ESession(
   const serverPassword = "e2e-local-only"
   const serverEnv = {
     ...process.env,
+    OPENCODE_GITHUB_PR_WORKTREE: repo.dir,
     OPENCODE_DISABLE_PROJECT_CONFIG: "1",
     OPENCODE_DISABLE_UPDATE: "1",
     OPENCODE_CONFIG: join(repo.dir, "opencode.json"),
@@ -129,6 +130,7 @@ export async function startOpenCodeE2ESession(
       rows: 40,
       cwd: repo.dir,
       env: {
+        OPENCODE_GITHUB_PR_WORKTREE: repo.dir,
         OPENCODE_PASSWORD: serverPassword,
         OPENCODE_SERVER_PASSWORD: serverPassword,
         TERM: "xterm-256color",
