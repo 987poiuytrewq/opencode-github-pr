@@ -49,8 +49,14 @@ environment available to OpenCode. The plugin reads the active session's reposit
 ## Test
 
 ```bash
-bun test
-bun test tests/unit
-bun test tests/integration
-bun run typecheck
+make install
+make typecheck
+make test-unit
+make test-integration
+make test-e2e
+make test
 ```
+
+The E2E target requires `tmux` and the OpenCode CLI (`2.0.20` by default); override the CLI path with
+`make test-e2e OPENCODE_BIN=/path/to/opencode`. GitHub Actions installs these with `make ci-tools` and runs the full suite
+with `make ci` on every pull request.

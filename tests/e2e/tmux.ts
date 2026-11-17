@@ -143,6 +143,8 @@ export function isE2E(): boolean {
   return process.env.E2E === "1" || process.env.E2E === "true"
 }
 
+export const OPENCODE_BIN = process.env.OPENCODE_BIN ?? "opencode"
+
 export function e2eDescribe(name: string, fn: () => void): void {
   const { describe, test } = require("bun:test")
   if (isE2E()) {
