@@ -1,4 +1,4 @@
-import { mkdtempSync, mkdirSync, writeFileSync, rmSync, existsSync } from "node:fs"
+import { mkdtempSync, mkdirSync, writeFileSync, symlinkSync, rmSync, existsSync } from "node:fs"
 import { join, resolve } from "node:path"
 import { tmpdir } from "node:os"
 import { createServer } from "node:net"
@@ -43,7 +43,17 @@ export async function makeTempRepo(opts: {
   const dir = mkdtempSync(join(tempRoot, "opencode-e2e-"))
   await runGit(dir, ["init", "--initial-branch=main"])
   await runGit(dir, ["remote", "add", "origin", remoteUrl])
-  writeFileSync(join(dir, "opencode.json"), JSON.stringify({ plugins: [repoRoot] }))
+  writeFileSync(join(dir, "package.json"), JSON.stringify({
+    name: "opencode-github-pr-e2e",
+    private: true,
+    type: "module",
+    exports: {
+      ".": "./plugins/pr-dashboard.ts",
+      "./tui": "./plugins/pr-dashboard.tui.tsx",
+    },
+  }))
+  symlinkSync(join(repoRoot, "plugins"), join(dir, "plugins"), "dir")
+  symlinkSync(join(repoRoot, "node_modules"), join(dir, "node_modules"), "dir")
   if (opts.initialCommit !== false) {
     writeFileSync(join(dir, "README.md"), "# test repo\n")
     await runGit(dir, ["add", "."])

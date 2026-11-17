@@ -17,6 +17,7 @@ describe.skipIf(!isE2E())("E2E smoke: opencode launches in tmux", () => {
         TERM: "xterm-256color",
         NO_COLOR: "1",
         OPENCODE_DISABLE_UPDATE: "1",
+        OPENCODE_DISABLE_PROJECT_CONFIG: "1",
       },
       command: [OPENCODE_BIN, "--standalone"],
     })
