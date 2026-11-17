@@ -73,15 +73,6 @@ export async function startOpenCodeE2ESession(
   repo: TempRepo,
   name: string,
 ): Promise<OpenCodeE2ESession> {
-  const configDir = mkdtempSync(join(tmpdir(), "opencode-e2e-config-"))
-  const configPath = join(configDir, "opencode.json")
-  writeFileSync(
-    configPath,
-    JSON.stringify({
-      "$schema": "https://opencode.ai/config.json",
-      plugins: [{ package: `file://${repo.dir}` }],
-    }),
-  )
   const portProbe = createServer()
   await new Promise<void>((resolve, reject) => {
     portProbe.once("error", reject)
@@ -96,10 +87,9 @@ export async function startOpenCodeE2ESession(
   const serverPassword = "e2e-local-only"
   const serverEnv = {
     ...process.env,
-    OPENCODE_GITHUB_PR_WORKTREE: repo.dir,
     OPENCODE_DISABLE_PROJECT_CONFIG: "1",
     OPENCODE_DISABLE_UPDATE: "1",
-    OPENCODE_CONFIG: configPath,
+    OPENCODE_CONFIG: join(repo.dir, "opencode.json"),
     OPENCODE_PASSWORD: serverPassword,
     OPENCODE_SERVER_PASSWORD: serverPassword,
   }
@@ -139,8 +129,6 @@ export async function startOpenCodeE2ESession(
       rows: 40,
       cwd: repo.dir,
       env: {
-        OPENCODE_GITHUB_PR_WORKTREE: repo.dir,
-        OPENCODE_CONFIG: configPath,
         OPENCODE_PASSWORD: serverPassword,
         OPENCODE_SERVER_PASSWORD: serverPassword,
         TERM: "xterm-256color",
@@ -165,13 +153,11 @@ export async function startOpenCodeE2ESession(
         } catch {}
         server.kill()
         await server.exited
-        rmSync(configDir, { recursive: true, force: true })
       },
     }
   } catch (error) {
     server.kill()
     await server.exited
-    rmSync(configDir, { recursive: true, force: true })
     throw error
   }
 }

@@ -48,6 +48,11 @@ opencode:
 	@token="$${GH_TOKEN:-$${GITHUB_TOKEN:-$${GITHUB_PERSONAL_ACCESS_TOKEN}}}"; \
 	if [ -z "$$token" ]; then token="$$(gh auth token)"; fi; \
 	project="$$(pwd -P)"; \
+	config_dir="$$(mktemp -d)"; \
+	trap 'rm -rf "$$config_dir"' EXIT; \
+	config="$$config_dir/opencode.json"; \
+	PROJECT_DIR="$$project" CONFIG_PATH="$$config" $(BUN) -e 'await Bun.write(process.env.CONFIG_PATH, JSON.stringify({ plugins: [process.env.PROJECT_DIR] }))'; \
 	GH_TOKEN="$$token" \
-	OPENCODE_GITHUB_PR_WORKTREE="$$project" \
+	OPENCODE_CONFIG_PROJECT_DISABLE=1 \
+	OPENCODE_CONFIG="$$config" \
 	opencode --standalone "$$project"
