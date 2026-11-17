@@ -1,4 +1,4 @@
-.PHONY: opencode install typecheck test test-unit test-integration test-e2e test-watch ci ci-tools
+.PHONY: opencode install typecheck test test-unit test-integration test-e2e test-watch ci ci-tools ci-debug
 
 BUN ?= bun
 OPENCODE_BIN ?= opencode
@@ -33,6 +33,12 @@ ci-tools:
 	sudo apt-get update
 	sudo apt-get install --yes tmux
 	npm install --global @opencode/cli@$(OPENCODE_VERSION)
+
+ci-debug:
+	@log="$$HOME/.local/share/opencode/log/opencode.log"; \
+	if [ -f "$$log" ]; then \
+		grep -Ei 'failed to load plugin|plugin.*failed|failed.*plugin|plugin.*error|error.*plugin' "$$log" | tail -100 || true; \
+	else echo "OpenCode log not found: $$log"; fi
 
 # Use a private server so the GitHub token is available to both plugin parts.
 opencode:

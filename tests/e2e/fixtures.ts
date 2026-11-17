@@ -85,7 +85,7 @@ export async function startOpenCodeE2ESession(
     OPENCODE_PASSWORD: serverPassword,
     OPENCODE_SERVER_PASSWORD: serverPassword,
   }
-  const server = spawn([OPENCODE_BIN, "serve", "--hostname", "127.0.0.1", "--port", String(port)], {
+  const server = spawn([OPENCODE_BIN, "serve", "--log-level", "debug", "--hostname", "127.0.0.1", "--port", String(port)], {
     cwd: repo.dir,
     env: serverEnv,
     stdout: "ignore",
