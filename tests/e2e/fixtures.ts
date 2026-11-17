@@ -88,9 +88,7 @@ export async function startOpenCodeE2ESession(
   const serverEnv = {
     ...process.env,
     OPENCODE_GITHUB_PR_WORKTREE: repo.dir,
-    OPENCODE_DISABLE_PROJECT_CONFIG: "1",
     OPENCODE_DISABLE_UPDATE: "1",
-    OPENCODE_CONFIG: join(repo.dir, "opencode.json"),
     OPENCODE_PASSWORD: serverPassword,
     OPENCODE_SERVER_PASSWORD: serverPassword,
   }
