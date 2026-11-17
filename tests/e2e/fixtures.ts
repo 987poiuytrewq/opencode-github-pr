@@ -79,7 +79,7 @@ export async function startOpenCodeE2ESession(
     configPath,
     JSON.stringify({
       "$schema": "https://opencode.ai/config.json",
-      plugins: [repo.dir],
+      plugins: [{ package: `file://${repo.dir}` }],
     }),
   )
   const portProbe = createServer()
