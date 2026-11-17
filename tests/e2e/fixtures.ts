@@ -146,6 +146,7 @@ export async function startOpenCodeE2ESession(
       command: [OPENCODE_BIN, "--server", serverUrl, "--session", sessionID],
     })
     await session.waitForText("opencode", { timeoutMs: 30_000 })
+    await session.waitForText("Changes", { timeoutMs: 30_000 })
 
     return {
       session,
