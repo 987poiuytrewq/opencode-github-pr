@@ -28,9 +28,8 @@ describe("V2 TUI plugin setup", () => {
   test("registers a sidebar slot", async () => {
     const { api, registry } = createMockTuiApi()
     const cleanup = await plugin.setup(api)
-    expect(registry.slots).toHaveLength(1)
-    expect(registry.slots[0].append).toBe("sidebar.content")
-    expect(registry.slots[0].render).toBeFunction()
+    expect(registry.slots.map((slot) => slot.append)).toContain("sidebar.content")
+    expect(registry.slots.find((slot) => slot.append === "sidebar.content").render).toBeFunction()
     cleanup?.()
     expect(registry.slots).toHaveLength(0)
   })
@@ -38,6 +37,9 @@ describe("V2 TUI plugin setup", () => {
   test("registers palette and slash commands", async () => {
     const { api, registry } = createMockTuiApi()
     const cleanup = await plugin.setup(api)
+    expect(registry.keymaps).toHaveLength(0)
+    const appSlot = registry.slots.find((slot) => slot.append === "app")
+    appSlot.render({})
     expect(registry.keymaps).toHaveLength(1)
     const commands = registry.keymaps[0].commands
     const ids = commands.map((item: any) => item.id)

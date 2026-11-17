@@ -40,8 +40,22 @@ export function useDashboard(
   // Resolve the working directory explicitly when the TUI exposes it, so
   // repo detection doesn't depend on where opencode happens to launch.
   // Falls back to process.cwd() for tests that chdir() into a temp repo.
-  const cwd = (): string =>
-    api.location?.directory ?? api.data.location.default().directory ?? process.cwd()
+  const cwd = async (): Promise<string> => {
+    const route = api.ui.router.current()
+    if (route.type === "session") {
+      let session = api.data.session.get(route.sessionID)
+      if (!session) {
+        try {
+          session = await api.client.session.get({ sessionID: route.sessionID })
+        } catch {
+          // Fall back to the current TUI location if the session is unavailable.
+        }
+      }
+      const directory = session?.location.directory
+      if (directory) return directory
+    }
+    return api.location?.directory ?? api.data.location.default().directory ?? process.cwd()
+  }
 
   let inFlight: Promise<void> | null = null
   let refreshToken = 0
@@ -59,7 +73,7 @@ export function useDashboard(
     const promise = (async () => {
       const isStale = () => token !== refreshToken
       try {
-        const repo = detectRepo(cwd())
+        const repo = detectRepo(await cwd())
         const isFirstLoad = prev.fetchedAt === null
         const isDirChange =
           !!prev.repo && !!repo && (prev.repo.owner !== repo.owner || prev.repo.repo !== repo.repo)
