@@ -1,4 +1,4 @@
-import { PRFilter, DashboardStatus, type DashboardState } from "../../plugins/domain/types"
+import { DashboardStatus, type DashboardState } from "../../plugins/domain/types"
 import { sampleTUIPRs } from "./tui-fixtures"
 
 export function loadingState(overrides: Partial<DashboardState> = {}): DashboardState {
@@ -7,7 +7,6 @@ export function loadingState(overrides: Partial<DashboardState> = {}): Dashboard
     repo: { owner: "foo", repo: "bar" },
     prs: [],
     fetchedAt: null,
-    filter: PRFilter.Author,
     ...overrides,
   }
 }
@@ -18,7 +17,6 @@ export function okState(overrides: Partial<DashboardState> = {}): DashboardState
     repo: { owner: "foo", repo: "bar" },
     prs: sampleTUIPRs,
     fetchedAt: Date.now(),
-    filter: PRFilter.Author,
     ...overrides,
   }
 }
@@ -29,7 +27,6 @@ export function noRepoState(overrides: Partial<DashboardState> = {}): DashboardS
     repo: null,
     prs: [],
     fetchedAt: Date.now(),
-    filter: PRFilter.Author,
     ...overrides,
   }
 }
@@ -40,7 +37,6 @@ export function errorState(overrides: Partial<DashboardState> = {}): DashboardSt
     repo: { owner: "foo", repo: "bar" },
     prs: [],
     fetchedAt: Date.now(),
-    filter: PRFilter.Author,
     error: "Could not authenticate. Run `gh auth status` to confirm.",
     ...overrides,
   }

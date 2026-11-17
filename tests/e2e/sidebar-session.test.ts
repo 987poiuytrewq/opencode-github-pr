@@ -19,13 +19,13 @@ describe.skipIf(!isE2E())("E2E: sidebar renders with active session", () => {
     repo?.cleanup()
   })
 
-  test("PRs header appears after session is created", async () => {
+  test("Changes heading appears after session is created", async () => {
     const screen = await session.capturePanePlain()
-    expect(screen).toContain("PRs")
+    expect(screen).toContain("Changes")
   }, 60_000)
 
-  test("filter label appears after session is created", async () => {
+  test("filter label is not shown after session is created", async () => {
     const screen = await session.capturePanePlain()
-    expect(screen).toContain("author:@me")
+    expect(screen).not.toContain("author:@me")
   }, 30_000)
 })

@@ -37,7 +37,7 @@ export const errorMessages = {
   unknown: "unknown",
 
   // dashboard view banners / empty states
-  noOpenPRs: "No open PRs",
+  noBranchPRs: "No PRs for this branch",
 }
 
 // Map a thrown error to the right prListing message. Detects HTTP status
@@ -118,4 +118,3 @@ export function parseRateLimitError(e: any): RateLimitInfo {
   }
   return { isRateLimit: true, message: detail, resetAt: resetAt ?? 0 }
 }
-

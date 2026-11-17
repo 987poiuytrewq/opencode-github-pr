@@ -2,7 +2,7 @@
 
 exports[`DashboardView render loading state 1`] = `
 "                                                  
-▼ PRs Loading                           author:@me
+▼ Changes Loading                                 
                                                   
                                                   
                                                   
@@ -26,18 +26,18 @@ exports[`DashboardView render loading state 1`] = `
 
 exports[`DashboardView render ok state with PRs 1`] = `
 "                                                  
-▼ PRs 0✓ 4•                             author:@me
-  #10 Add login flow                              
-  bob✓                                            
+▼ Changes                                         
+ Add login flow                                  
+  #10 +42 -8                                    ● 
                                                   
-  #11 Fix race condition                          
-  carol±                                          
+ Fix race condition                              
+  #11 +42 -8                                    ● 
                                                   
-  #12 WIP: refactor                               
-    add reviewers                                 
+ WIP: refactor                                   
+  #12 +42 -8                                    ● 
                                                   
-  #13 Update docs                                 
-    add reviewers                                 
+ Update docs                                     
+  #13 +42 -8                                    ● 
                                                   
                                                   
                                                   
@@ -50,7 +50,7 @@ exports[`DashboardView render ok state with PRs 1`] = `
 
 exports[`DashboardView render no-repo state 1`] = `
 "                                                  
-▼ PRs Not a git repo                              
+▼ Changes Not a git repo                          
                                                   
  Not a git repo                                   
                                                   
@@ -74,7 +74,7 @@ exports[`DashboardView render no-repo state 1`] = `
 
 exports[`DashboardView render error state 1`] = `
 "                                                  
-▼ PRs Error                             author:@me
+▼ Changes Error                                   
                                                   
  Could not authenticate. Run \`gh auth status\` to  
  confirm.                                         
@@ -98,7 +98,7 @@ exports[`DashboardView render error state 1`] = `
 
 exports[`DashboardView render collapsed state 1`] = `
 "                                                  
-▶ PRs 0✓ 4•                             author:@me
+▶ Changes                                         
                                                   
                                                   
                                                   
@@ -122,9 +122,9 @@ exports[`DashboardView render collapsed state 1`] = `
 
 exports[`DashboardView render ok state with empty PRs 1`] = `
 "                                                  
-▼ PRs 0✓ 0•                             author:@me
+▼ Changes                                         
                                                   
- No open PRs                                      
+ No PRs for this branch                           
                                                   
                                                   
                                                   

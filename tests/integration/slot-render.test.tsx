@@ -18,7 +18,7 @@ describe("slot render: sidebar_content produces visible output", () => {
     clearOctokitMocks()
   })
 
-  test("slot renders PRs header with data", async () => {
+  test("slot renders Changes header with current branch data", async () => {
     const cwd = makeFakeRepo()
     const origCwd = process.cwd()
     process.chdir(cwd)
@@ -26,7 +26,6 @@ describe("slot render: sidebar_content produces visible output", () => {
       mockOctokitDefault((op, params) => {
         if (op === "graphql") {
           const query: string = params?.query ?? ""
-          if (query.includes("query Viewer")) return { viewer: { login: "octocat" } }
           if (query.includes("pullRequests(")) return makeSearchResponse(2)
           return makeThreadCountResponse().data
         }
@@ -51,14 +50,14 @@ describe("slot render: sidebar_content produces visible output", () => {
 
       await r.flush()
       const frame = r.captureCharFrame()
-      expect(frame).toContain("PRs")
+      expect(frame).toContain("Changes")
       cleanup?.()
     } finally {
       process.chdir(origCwd)
     }
   })
 
-  test("slot renders PRs header even with NoRepo", async () => {
+  test("slot renders Changes header even with NoRepo", async () => {
     const { api, registry } = createMockTuiApi()
     const cleanup = await plugin.setup(api)
 
@@ -72,11 +71,11 @@ describe("slot render: sidebar_content produces visible output", () => {
     )
     await r.flush()
     const frame = r.captureCharFrame()
-    expect(frame).toContain("PRs")
+    expect(frame).toContain("Changes")
     cleanup?.()
   })
 
-  test("slot renders filter label", async () => {
+  test("slot does not render a filter label", async () => {
     const cwd = makeFakeRepo()
     const origCwd = process.cwd()
     process.chdir(cwd)
@@ -84,7 +83,6 @@ describe("slot render: sidebar_content produces visible output", () => {
       mockOctokitDefault((op, params) => {
         if (op === "graphql") {
           const query: string = params?.query ?? ""
-          if (query.includes("query Viewer")) return { viewer: { login: "octocat" } }
           if (query.includes("pullRequests(")) return makeSearchResponse(1)
           return makeThreadCountResponse().data
         }
@@ -104,7 +102,7 @@ describe("slot render: sidebar_content produces visible output", () => {
       )
       await r.flush()
       const frame = r.captureCharFrame()
-      expect(frame).toContain("author:@me")
+      expect(frame).not.toContain("author:@me")
       cleanup?.()
     } finally {
       process.chdir(origCwd)

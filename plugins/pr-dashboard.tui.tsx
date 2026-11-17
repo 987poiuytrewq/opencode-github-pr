@@ -2,7 +2,7 @@
 import { createSignal } from "solid-js"
 import { Plugin } from "@opencode/plugin/tui"
 import type { Context as TuiPluginContext } from "@opencode/plugin/tui/context"
-import { DashboardStatus, PRFilter, type DashboardContext, type DashboardState } from "./domain/types"
+import { DashboardStatus, type DashboardContext, type DashboardState } from "./domain/types"
 import { DashboardView } from "./app/DashboardView"
 import { useDashboard } from "./app/usePRData"
 import { createActions } from "./app/actions"
@@ -23,7 +23,6 @@ function setup(api: TuiPluginContext) {
     repo: null,
     prs: [],
     fetchedAt: null,
-    filter: PRFilter.Author,
   })
   const [selectedIdx, setSelectedIdx] = createSignal(0)
   const [expanded, setExpanded] = createSignal(true)
@@ -38,7 +37,6 @@ function setup(api: TuiPluginContext) {
     setSelectedIdx,
     expanded,
     toggleExpanded,
-    cycleFilter: dash.cycleFilter,
   }
   const actions = createActions(api, dashboard)
 
@@ -54,12 +52,8 @@ function setup(api: TuiPluginContext) {
         selectedIdx={selectedIdx()}
         setSelectedIdx={setSelectedIdx}
         onOpen={actions.openPR}
-        onAddReviewer={(n) => actions.promptReviewer(n, "add")}
-        onReviewerComments={(n, login) => actions.showReviewerComments(n, login)}
         expanded={expanded()}
         onToggleExpand={toggleExpanded}
-        filter={state().filter}
-        onCycleFilter={dash.cycleFilter}
       />
     ),
   })

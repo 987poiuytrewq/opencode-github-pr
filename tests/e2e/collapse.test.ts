@@ -19,10 +19,10 @@ describe.skipIf(!isE2E())("E2E: PR dashboard collapse", () => {
     repo?.cleanup()
   })
 
-  test("PRs section shows ▼ initially", async () => {
+  test("Changes section shows ▼ initially", async () => {
     const screen = await session.capturePanePlain()
     expect(screen).toContain("▼")
-    expect(screen).toContain("PRs")
+    expect(screen).toContain("Changes")
   }, 30_000)
 
   test("clicking ▼ collapses to ▶ and hides PR list", async () => {
@@ -31,7 +31,7 @@ describe.skipIf(!isE2E())("E2E: PR dashboard collapse", () => {
     let col = -1, row = -1
     for (let i = 0; i < lines.length; i++) {
       const idx = lines[i].indexOf("▼")
-      if (idx >= 0 && lines[i].includes("PRs")) {
+      if (idx >= 0 && lines[i].includes("Changes")) {
         col = idx
         row = i
         break
@@ -42,7 +42,7 @@ describe.skipIf(!isE2E())("E2E: PR dashboard collapse", () => {
     await Bun.sleep(1500)
     const after = await session.capturePanePlain()
     expect(after).toContain("▶")
-    expect(after).not.toContain("No open PRs")
+    expect(after).not.toContain("No PRs for this branch")
   }, 30_000)
 
   test("clicking ▶ expands back to ▼", async () => {
@@ -51,7 +51,7 @@ describe.skipIf(!isE2E())("E2E: PR dashboard collapse", () => {
     let col = -1, row = -1
     for (let i = 0; i < lines.length; i++) {
       const idx = lines[i].indexOf("▶")
-      if (idx >= 0 && lines[i].includes("PRs")) {
+      if (idx >= 0 && lines[i].includes("Changes")) {
         col = idx
         row = i
         break
@@ -64,8 +64,8 @@ describe.skipIf(!isE2E())("E2E: PR dashboard collapse", () => {
     expect(after).toContain("▼")
   }, 30_000)
 
-  test("filter label shows author:@me", async () => {
+  test("filter label is not shown", async () => {
     const screen = await session.capturePanePlain()
-    expect(screen).toContain("author:@me")
+    expect(screen).not.toContain("author:@me")
   }, 30_000)
 })

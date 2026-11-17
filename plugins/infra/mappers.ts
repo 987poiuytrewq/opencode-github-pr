@@ -1,17 +1,19 @@
-// PR shape mappers: convert raw Octokit responses (GraphQL search nodes and
-// REST pull objects) into the shared PR domain type. Both mappers live
+// PR shape mappers: convert raw GitHub GraphQL and REST pull objects into
+// the shared PR domain type. Both mappers live
 // here so that changes to PR only need to be reflected in one place.
 
 import type { PR } from "../domain/types"
 
-// Maps a GraphQL PullRequest node to PR.  Author/assignee are attached
-// as private fields for client-side filtering by fetchDashboardData.
-export function mapPullFromSearch(p: any): PR {
+// Maps a GraphQL PullRequest node to PR.
+export function mapPullFromGraphQL(p: any): PR {
   return {
     number: p.number,
     title: p.title,
     url: p.url,
     isDraft: p.isDraft ?? false,
+    isMerged: p.state === "MERGED" || p.merged === true,
+    additions: p.additions ?? 0,
+    deletions: p.deletions ?? 0,
     baseRefName: p.baseRefName,
     mergeable: (p.mergeable ?? "UNKNOWN").toUpperCase(),
     statusCheckRollup: p.statusCheckRollup ?? null,
@@ -23,8 +25,6 @@ export function mapPullFromSearch(p: any): PR {
       author: { login: r.author?.login ?? "" },
       state: r.state,
     })),
-    _authorLogin: p.author?.login ?? "",
-    _assigneeLogins: (p.assignees?.nodes ?? []).map((a: any) => a.login),
   }
 }
 
@@ -36,6 +36,9 @@ export function mapPullFromREST(p: any): PR {
     title: p.title,
     url: p.html_url,
     isDraft: p.draft ?? false,
+    isMerged: p.merged ?? false,
+    additions: p.additions ?? 0,
+    deletions: p.deletions ?? 0,
     baseRefName: p.base.ref,
     mergeable: p.mergeable ? "MERGEABLE" : p.mergeable === false ? "CONFLICTING" : "UNKNOWN",
     statusCheckRollup: null,
