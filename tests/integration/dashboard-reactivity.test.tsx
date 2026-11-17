@@ -14,7 +14,7 @@ describe("DashboardView reactivity", () => {
     const r = await testRender(
       () => (
         <DashboardView
-          api={api}
+          theme={api.theme}
           state={state()}
           onRefresh={() => {}}
           selectedIdx={0}

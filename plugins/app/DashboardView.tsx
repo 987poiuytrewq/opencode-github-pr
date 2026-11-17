@@ -1,6 +1,6 @@
 /** @jsxImportSource @opentui/solid */
 import { createMemo, For, Show } from "solid-js"
-import type { TuiPluginApi } from "@opencode-ai/plugin/tui"
+import type { ResolvedTheme } from "@opencode/theme/tui"
 import { DashboardStatus, type PRFilter, type DashboardState } from "../domain/types"
 import { skin } from "./theme"
 import { classifyRowState } from "../domain/pr-status"
@@ -8,7 +8,7 @@ import { errorMessages } from "../domain/messages"
 import { PRRow } from "./PRRow"
 
 export function DashboardView(props: {
-  api: TuiPluginApi
+  theme: ResolvedTheme
   state: DashboardState
   onRefresh: () => void
   selectedIdx: number
@@ -21,7 +21,7 @@ export function DashboardView(props: {
   expanded: boolean
   onToggleExpand: () => void
 }) {
-  const sk = skin(props.api)
+  const sk = skin(props.theme)
   const visible = createMemo(() => props.state.prs.slice(0, 30))
   const counts = createMemo(() => {
     let ready = 0
@@ -73,19 +73,19 @@ export function DashboardView(props: {
       </box>
 
       <Show when={props.state.status === DashboardStatus.NoRepo}>
-        <box flexDirection="column" paddingLeft={1} paddingTop={1} paddingRight={1} selectable={false}>
+        <box flexDirection="column" paddingLeft={1} paddingTop={1} paddingRight={1}>
           <text fg={sk.muted} selectable={false}>{errorMessages.noRepo}</text>
         </box>
       </Show>
 
       <Show when={props.state.status === DashboardStatus.Error}>
-        <box flexDirection="column" paddingLeft={1} paddingTop={1} paddingRight={1} gap={1} selectable={false}>
+        <box flexDirection="column" paddingLeft={1} paddingTop={1} paddingRight={1} gap={1}>
           <text fg={sk.error} selectable={false}>{props.state.error ?? errorMessages.unknown}</text>
         </box>
       </Show>
 
       <Show when={props.expanded && props.state.status === DashboardStatus.Ok && props.state.prs.length === 0}>
-        <box flexDirection="column" paddingLeft={1} paddingTop={1} paddingRight={1} selectable={false}>
+        <box flexDirection="column" paddingLeft={1} paddingTop={1} paddingRight={1}>
           <text fg={sk.muted} selectable={false}>{errorMessages.noOpenPRs}</text>
         </box>
       </Show>

@@ -68,10 +68,9 @@ export function PRRow(props: {
       paddingRight={1}
       paddingTop={0}
       paddingBottom={0}
-      selectable={false}
       onMouseUp={() => props.onClick()}
     >
-      <box flexDirection="row" gap={1} selectable={false}>
+      <box flexDirection="row" gap={1}>
         <CIIndicator
           ci={classifyCI(props.pr)}
           pass={props.pass}
@@ -84,7 +83,7 @@ export function PRRow(props: {
         </text>
         <text fg={titleColor} selectable={false}>{title}</text>
       </box>
-      <box flexDirection="row" flexWrap="no-wrap" gap={0} paddingLeft={2} selectable={false}>
+      <box flexDirection="row" flexWrap="no-wrap" gap={0} paddingLeft={2}>
         <Show when={reviewers().length > 0} fallback={<text selectable={false}> </text>}>
           <For each={reviewers()}>
             {(rv, i) => (
@@ -102,7 +101,6 @@ export function PRRow(props: {
                   </text>
                 }>
                   <box
-                    selectable={false}
                     onMouseUp={(e: any) => {
                       e?.stopPropagation?.()
                       props.onReviewerComments(rv.login)
@@ -119,7 +117,6 @@ export function PRRow(props: {
         </Show>
         <Show when={showAdd}>
           <box
-            selectable={false}
             onMouseUp={(e: any) => {
               e?.stopPropagation?.()
               props.onReviewer()

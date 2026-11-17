@@ -34,13 +34,13 @@ export function createOctokit(opts: OctokitOpts = {}): Octokit {
     fetch: opts.fetch,
     request: { timeout: 15_000 },
     throttle: opts.throttle === false ? { enabled: false } : {
-      onRateLimit: (retryAfter, options, octokit, retryCount) => {
+      onRateLimit: (retryAfter: number, options: any, octokit: any, retryCount: number) => {
         octokit.log.warn(
           `[pr-dashboard] rate limit hit on ${options.method} ${options.url}; retry ${retryCount} after ${retryAfter}s`,
         )
         return retryCount < 2
       },
-      onSecondaryRateLimit: (retryAfter, options, octokit) => {
+      onSecondaryRateLimit: (retryAfter: number, options: any, octokit: any) => {
         octokit.log.warn(
           `[pr-dashboard] secondary rate limit on ${options.method} ${options.url}; would wait ${retryAfter}s, aborting`,
         )
@@ -48,7 +48,7 @@ export function createOctokit(opts: OctokitOpts = {}): Octokit {
       },
     },
     retry: opts.retry === false ? { enabled: false } : {
-      doNotRetry: ["400", "401", "403", "404", "422"],
+      doNotRetry: [400, 401, 403, 404, 422],
     },
   })
 }

@@ -1,5 +1,7 @@
-// Theme helpers for the TUI sidebar: convert opencode theme color objects to
-// hex strings, and provide a static fallback palette for tests / headless use.
+// Convert OpenCode V2 semantic theme tokens into the palette used by the PR
+// dashboard components.
+
+import type { ResolvedTheme } from "@opencode/theme/tui"
 
 export const DEFAULT_SKIN = {
   panel: "#161616",
@@ -39,19 +41,18 @@ export function toHex(c: { toInts(): [number, number, number, number] }): string
   )
 }
 
-export function skin(api: { theme: { current: any } }): Skin {
-  const t = api.theme.current
+export function skin(t: ResolvedTheme): Skin {
   return {
-    panel: toHex(t.backgroundPanel),
-    panelAlt: toHex(t.backgroundElement),
-    border: toHex(t.border),
-    borderActive: toHex(t.borderActive),
-    text: toHex(t.text),
-    muted: toHex(t.textMuted),
-    accent: toHex(t.primary),
-    success: toHex(t.success),
-    warning: toHex(t.warning),
-    error: toHex(t.error),
-    draft: toHex(t.textMuted),
+    panel: toHex(t.background.base),
+    panelAlt: toHex(t.background.raised.base),
+    border: toHex(t.border.base),
+    borderActive: toHex(t.text.action.primary.base),
+    text: toHex(t.text.base),
+    muted: toHex(t.text.muted),
+    accent: toHex(t.text.action.primary.base),
+    success: toHex(t.text.feedback.success.base),
+    warning: toHex(t.text.feedback.warning.base),
+    error: toHex(t.text.feedback.error.base),
+    draft: toHex(t.text.muted),
   }
 }

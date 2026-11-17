@@ -5,7 +5,7 @@ import { createMockTuiApi } from "../helpers/tui-api-mock"
 installOctokitMock()
 
 const plugin_mod = await import("../../plugins/pr-dashboard.tui")
-const plugin = plugin_mod.default as { id: string; tui: any }
+const plugin = plugin_mod.default
 
 beforeEach(() => {
   clearOctokitMocks()
@@ -16,54 +16,55 @@ afterEach(() => {
   clearOctokitMocks()
 })
 
-describe("plugin init", () => {
-  test("tui() does not throw", async () => {
+describe("V2 TUI plugin setup", () => {
+  test("has a stable plugin id and sets up without throwing", async () => {
+    expect(plugin.id).toBe("opencode-github-pr.tui")
     const { api } = createMockTuiApi()
-    await expect(plugin.tui(api, {} as any)).resolves.toBeUndefined()
+    const cleanup = await plugin.setup(api)
+    expect(cleanup).toBeFunction()
+    cleanup?.()
   })
 
-  test("registers sidebar_content slot", async () => {
+  test("registers a sidebar slot", async () => {
     const { api, registry } = createMockTuiApi()
-    await plugin.tui(api, {} as any)
-    expect(registry.slots.length).toBe(1)
-    expect(registry.slots[0].order).toBe(250)
-    expect(registry.slots[0].slots.sidebar_content).toBeDefined()
+    const cleanup = await plugin.setup(api)
+    expect(registry.slots).toHaveLength(1)
+    expect(registry.slots[0].append).toBe("sidebar.content")
+    expect(registry.slots[0].render).toBeFunction()
+    cleanup?.()
+    expect(registry.slots).toHaveLength(0)
   })
 
-  test("registers keymap layer with all commands", async () => {
+  test("registers palette and slash commands", async () => {
     const { api, registry } = createMockTuiApi()
-    await plugin.tui(api, {} as any)
-    expect(registry.keymaps.length).toBe(1)
-    const names = registry.keymaps[0].commands.map((c: any) => c.name)
-    expect(names).toContain("pr_dashboard.refresh")
-    expect(names).toContain("pr_dashboard.open")
-    expect(names).toContain("pr_dashboard.add_reviewer")
-    expect(names).toContain("pr_dashboard.rerequest_review")
-    expect(names).toContain("pr_dashboard.add_current_branch")
+    const cleanup = await plugin.setup(api)
+    expect(registry.keymaps).toHaveLength(1)
+    const commands = registry.keymaps[0].commands
+    const ids = commands.map((item: any) => item.id)
+    expect(ids).toContain("opencode-github-pr.refresh")
+    expect(ids).toContain("opencode-github-pr.open")
+    expect(ids).toContain("opencode-github-pr.add-reviewer")
+    expect(ids).toContain("opencode-github-pr.rerequest-review")
+    expect(ids).toContain("opencode-github-pr.add-current-branch-reviewer")
+    expect(commands.find((item: any) => item.id === "opencode-github-pr.refresh").slash.name).toBe("pr-refresh")
+    cleanup?.()
   })
 
-  test("slash commands have correct slashName", async () => {
+  test("subscribes to session idle and cleans up its subscription", async () => {
     const { api, registry } = createMockTuiApi()
-    await plugin.tui(api, {} as any)
-    const cmds = registry.keymaps[0].commands
-    const refresh = cmds.find((c: any) => c.name === "pr_dashboard.refresh")
-    expect(refresh.slashName).toBe("pr-refresh")
-    const open = cmds.find((c: any) => c.name === "pr_dashboard.open")
-    expect(open.slashName).toBe("pr-open")
-  })
-
-  test("registers session.idle event", async () => {
-    const { api, registry } = createMockTuiApi()
-    await plugin.tui(api, {} as any)
-    expect(registry.events.length).toBe(1)
-    expect(registry.events[0].type).toBe("session.idle")
+    const cleanup = await plugin.setup(api)
+    expect(registry.events.map((event) => event.type)).toContain("session.idle")
+    cleanup?.()
+    expect(registry.events).toHaveLength(0)
   })
 
   test("returns early when disabled", async () => {
     const { api, registry } = createMockTuiApi()
-    await plugin.tui(api, { enabled: false } as any)
-    expect(registry.slots.length).toBe(0)
-    expect(registry.keymaps.length).toBe(0)
-    expect(registry.events.length).toBe(0)
+    ;(api as any).options = { enabled: false }
+    const cleanup = await plugin.setup(api)
+    expect(cleanup).toBeUndefined()
+    expect(registry.slots).toHaveLength(0)
+    expect(registry.keymaps).toHaveLength(0)
+    expect(registry.events).toHaveLength(0)
   })
 })

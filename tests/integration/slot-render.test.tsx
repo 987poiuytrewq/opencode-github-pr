@@ -7,7 +7,7 @@ import { createMockTuiApi } from "../helpers/tui-api-mock"
 import { DashboardStatus } from "../../plugins/domain/types"
 
 const plugin_mod = await import("../../plugins/pr-dashboard.tui")
-const plugin = plugin_mod.default as { id: string; tui: any }
+const plugin = plugin_mod.default
 
 describe("slot render: sidebar_content produces visible output", () => {
   beforeEach(() => {
@@ -34,9 +34,10 @@ describe("slot render: sidebar_content produces visible output", () => {
       })
 
       const { api, registry } = createMockTuiApi()
-      await plugin.tui(api, {})
+      const cleanup = await plugin.setup(api)
 
-      expect(registry.slots.length).toBe(1)
+      expect(registry.slots).toHaveLength(1)
+      expect(registry.slots[0].append).toBe("sidebar.content")
       const slotFn = registry.slots[0].slots.sidebar_content
       expect(typeof slotFn).toBe("function")
 
@@ -51,6 +52,7 @@ describe("slot render: sidebar_content produces visible output", () => {
       await r.flush()
       const frame = r.captureCharFrame()
       expect(frame).toContain("PRs")
+      cleanup?.()
     } finally {
       process.chdir(origCwd)
     }
@@ -58,7 +60,7 @@ describe("slot render: sidebar_content produces visible output", () => {
 
   test("slot renders PRs header even with NoRepo", async () => {
     const { api, registry } = createMockTuiApi()
-    await plugin.tui(api, {})
+    const cleanup = await plugin.setup(api)
 
     const slotFn = registry.slots[0].slots.sidebar_content
     const ctx = { theme: api.theme }
@@ -71,6 +73,7 @@ describe("slot render: sidebar_content produces visible output", () => {
     await r.flush()
     const frame = r.captureCharFrame()
     expect(frame).toContain("PRs")
+    cleanup?.()
   })
 
   test("slot renders filter label", async () => {
@@ -89,7 +92,7 @@ describe("slot render: sidebar_content produces visible output", () => {
       })
 
       const { api, registry } = createMockTuiApi()
-      await plugin.tui(api, {})
+      const cleanup = await plugin.setup(api)
 
       const slotFn = registry.slots[0].slots.sidebar_content
       const ctx = { theme: api.theme }
@@ -102,6 +105,7 @@ describe("slot render: sidebar_content produces visible output", () => {
       await r.flush()
       const frame = r.captureCharFrame()
       expect(frame).toContain("author:@me")
+      cleanup?.()
     } finally {
       process.chdir(origCwd)
     }

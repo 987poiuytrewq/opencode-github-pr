@@ -15,7 +15,7 @@ async function renderState(state: DashboardState, expanded = true, handlers: Par
   return testRender(
     () => (
       <DashboardView
-        api={api}
+        theme={api.theme}
         state={state}
         onRefresh={() => {}}
         selectedIdx={0}

@@ -31,7 +31,7 @@ async function graphqlPartial(query: string, vars: Record<string, unknown>): Pro
 export async function fetchDashboardData(
   filter: PRFilter,
   repo: Repo | null,
-  viewerLogin: string | null,
+  viewerLogin?: string | null,
 ): Promise<PR[]> {
   if (!repo) return []
   const data: any = await graphqlPartial(DASHBOARD_QUERY, {

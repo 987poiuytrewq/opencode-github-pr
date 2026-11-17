@@ -1,4 +1,6 @@
-import { tool, type Plugin } from "@opencode-ai/plugin"
+import { Plugin } from "@opencode/plugin"
+import type { Context as PluginContext } from "@opencode/plugin/promise/plugin"
+import type { ToolContext } from "@opencode/plugin/promise/tool"
 import { errorMessages } from "./domain/messages"
 import { addPullRequestReviewer } from "./infra/loader"
 import { detectRepo } from "./infra/git"
@@ -8,16 +10,13 @@ export function noRepoError(cwd: string): string {
   return `${errorMessages.noRepo} (${cwd})`
 }
 
-// Shared implementation for pr_add_reviewer and pr_rerequest_review.
-// Both tools call the same GitHub endpoint (requestReviewers is
-// idempotent); only the user-facing verb in the success message differs.
 async function requestReview(
   cwd: string,
   pr: number,
   reviewer: string,
   verb: "Requested" | "Re-requested",
 ): Promise<string> {
-  const repo: Repo = detectRepo(cwd)
+  const repo: Repo | null = detectRepo(cwd)
   if (!repo) return noRepoError(cwd)
   try {
     await addPullRequestReviewer(repo, pr, reviewer)
@@ -27,52 +26,65 @@ async function requestReview(
   }
 }
 
-export const PrDashboardPlugin: Plugin = async ({ directory }) => {
-  return {
-    tool: {
-      pr_add_reviewer: tool({
-        description:
-          "Add a reviewer (or team) to a GitHub pull request. Use when the user wants to request a review from someone. Uses the Octokit REST API; the user is the authenticated actor.",
-        args: {
-          pr: tool.schema.number().describe("Pull request number"),
-          reviewer: tool.schema
-            .string()
-            .describe(
-              "GitHub username (e.g. 'octocat') or team slug (e.g. 'org/team-name')",
-            ),
-        },
-        async execute(args, context) {
-          return requestReview(
-            context.directory ?? directory,
-            args.pr,
-            args.reviewer,
-            "Requested",
-          )
-        },
-      }),
-
-      pr_rerequest_review: tool({
-        description:
-          "Re-request a review from a user (or team) on a GitHub pull request. Use when a reviewer has already reviewed and the author wants a fresh look, or when a previous review request was dismissed. Uses the Octokit REST API; the user is the authenticated actor.",
-        args: {
-          pr: tool.schema.number().describe("Pull request number"),
-          reviewer: tool.schema
-            .string()
-            .describe(
-              "GitHub username (e.g. 'octocat') or team slug (e.g. 'org/team-name')",
-            ),
-        },
-        async execute(args, context) {
-          return requestReview(
-            context.directory ?? directory,
-            args.pr,
-            args.reviewer,
-            "Re-requested",
-          )
-        },
-      }),
-    },
+async function executeReview(
+  plugin: PluginContext,
+  toolContext: ToolContext,
+  input: unknown,
+  verb: "Requested" | "Re-requested",
+) {
+  const args = input as { pr: number; reviewer: string }
+  try {
+    const session = await plugin.session.get({ sessionID: toolContext.sessionID })
+    const directory = session.location.directory || plugin.location.directory
+    return { content: await requestReview(directory, args.pr, args.reviewer, verb) }
+  } catch (e) {
+    return { content: errorMessages.failed(e instanceof Error ? e.message : String(e)) }
   }
 }
+
+export const PrDashboardPlugin = Plugin.define({
+  id: "opencode-github-pr",
+  async setup(ctx) {
+    await ctx.tool.transform((editor) => {
+      editor.add({
+        name: "pr_add_reviewer",
+        description:
+          "Add a reviewer (or team) to a GitHub pull request. Use when the user wants to request a review from someone. Uses the Octokit REST API; the user is the authenticated actor.",
+        input: {
+          type: "object",
+          properties: {
+            pr: { type: "integer", description: "Pull request number" },
+            reviewer: {
+              type: "string",
+              description: "GitHub username (e.g. 'octocat') or team slug (e.g. 'org/team-name')",
+            },
+          },
+          required: ["pr", "reviewer"],
+          additionalProperties: false,
+        },
+        execute: (input, toolContext) => executeReview(ctx, toolContext, input, "Requested"),
+      })
+
+      editor.add({
+        name: "pr_rerequest_review",
+        description:
+          "Re-request a review from a user (or team) on a GitHub pull request. Use when a reviewer has already reviewed and the author wants a fresh look, or when a previous review request was dismissed. Uses the Octokit REST API; the user is the authenticated actor.",
+        input: {
+          type: "object",
+          properties: {
+            pr: { type: "integer", description: "Pull request number" },
+            reviewer: {
+              type: "string",
+              description: "GitHub username (e.g. 'octocat') or team slug (e.g. 'org/team-name')",
+            },
+          },
+          required: ["pr", "reviewer"],
+          additionalProperties: false,
+        },
+        execute: (input, toolContext) => executeReview(ctx, toolContext, input, "Re-requested"),
+      })
+    })
+  },
+})
 
 export default PrDashboardPlugin

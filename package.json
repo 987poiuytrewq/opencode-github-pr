@@ -1,23 +1,31 @@
 {
-  "name": "opencode-gh-pr",
+  "name": "opencode-github-pr",
   "private": true,
   "type": "module",
+  "exports": {
+    ".": "./plugins/pr-dashboard.ts",
+    "./tui": "./plugins/pr-dashboard.tui.tsx"
+  },
   "scripts": {
     "test": "bun test",
     "test:unit": "bun test tests/unit",
     "test:integration": "bun test tests/integration",
-    "test:watch": "bun test --watch"
+    "test:watch": "bun test --watch",
+    "typecheck": "tsc --noEmit"
   },
   "devDependencies": {
     "@types/bun": "latest",
-    "bun-types": "latest"
+    "bun-types": "latest",
+    "typescript": "^5.9.3"
   },
   "dependencies": {
     "@octokit/plugin-retry": "^8.1.0",
     "@octokit/plugin-throttling": "^11.0.3",
     "@octokit/rest": "^22.0.1",
-    "@opencode-ai/plugin": "^1.18.3",
-    "@opentui/solid": "^0.4.4",
+    "@opencode/plugin": "2.0.20",
+    "@opencode/theme": "2.0.20",
+    "@opentui/core": "0.6.6",
+    "@opentui/solid": "0.6.6",
     "solid-js": "^1.9.14"
   }
 }

@@ -1,35 +1,45 @@
-# opencode-gh-pr
+# opencode-github-pr
 
-GitHub PR dashboard plugins for opencode.
+OpenCode V2 plugin providing GitHub pull-request tools and a TUI sidebar dashboard.
 
-## Structure
+## Plugin parts
 
-- `plugins/pr-dashboard.ts` — server plugin (tools: `pr_dashboard`, `pr_add_reviewer`, `pr_rerequest_review`)
-- `plugins/pr-dashboard.tui.tsx` — TUI sidebar plugin (shows PR list in the session sidebar)
-- `plugins/bun-utils.ts` — thin re-export of `bun.spawn` so tests can mock it
-- `tests/` — unit and integration tests (159 tests, run with `bun test`)
+- `plugins/pr-dashboard.ts` — server part: `pr_add_reviewer` and `pr_rerequest_review` tools.
+- `plugins/pr-dashboard.tui.tsx` — TUI part: PR list, CI/review status, reviewer actions, slash commands, and refresh-on-idle.
+- `plugins/` — shared GitHub data loaders, domain logic, and Solid UI components.
+- `tests/` — unit, integration, and TUI end-to-end tests.
 
-## Install
+The package exports both parts via `package.json`; OpenCode V2 loads them together as one plugin.
 
-Symlink the files from this repo into `~/.config/opencode/plugins/`:
+## Install locally
 
-```bash
-cd ~/.config/opencode/plugins
-ln -s ~/projects/personal/opencode-gh-pr/plugins/pr-dashboard.ts .
-ln -s ~/projects/personal/opencode-gh-pr/plugins/pr-dashboard.tui.tsx .
-ln -s ~/projects/personal/opencode-gh-pr/plugins/bun-utils.ts .
+Add the repository directory to the `plugins` array in your V2 `opencode.json` or `opencode.jsonc`:
+
+```jsonc
+{
+  "$schema": "https://opencode.ai/config.json",
+  "plugins": [
+    {
+      "package": "/absolute/path/to/opencode-github-pr/archive"
+    }
+  ]
+}
 ```
 
-The plugins are loaded by opencode via `~/.config/opencode/opencode.json` and
-`~/.config/opencode/tui.jsonc` which reference `./plugins/pr-dashboard.ts` and
-`./plugins/pr-dashboard.tui.tsx`. With the symlinks in place, the live
-config points to the files in this git repo, so any change you make and
-commit here is immediately reflected in opencode after a restart.
+For this checkout, the plugin directory is `~/projects/personal/opencode-github-pr/archive`. Because the package includes
+a server part and a TUI part, it belongs in `opencode.json`; do not duplicate it in `cli.json`. The CLI loads its TUI part
+from the server's active plugin list, including when connected to a remote server.
+
+## GitHub authentication
+
+The server and TUI parts use Octokit. Set `GITHUB_TOKEN`, `GH_TOKEN`, or `GITHUB_PERSONAL_ACCESS_TOKEN` in the
+environment available to OpenCode. The plugin reads the active session's repository from its GitHub `origin` remote.
 
 ## Test
 
 ```bash
-bun test                # all tests
-bun test tests/unit     # unit tests only
-bun test tests/integration  # integration tests only
+bun test
+bun test tests/unit
+bun test tests/integration
+bun run typecheck
 ```

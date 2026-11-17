@@ -7,7 +7,7 @@
 // which causes state updates to never propagate to the view.
 //
 // All signals are created in the entry .tsx file and passed in.
-import type { TuiPluginApi } from "@opencode-ai/plugin/tui"
+import type { Context as TuiPluginContext } from "@opencode/plugin/tui/context"
 import {
   DashboardStatus,
   PRFilter,
@@ -20,7 +20,7 @@ import { fetchDashboardData, fetchOnePR, fetchViewerLogin } from "../infra/loade
 import { prListErrorMessage, parseRateLimitError } from "../domain/messages"
 
 export function useDashboard(
-  api: TuiPluginApi,
+  api: TuiPluginContext,
   state: () => DashboardState,
   setState: (fn: (s: DashboardState) => DashboardState) => void,
 ): {
@@ -40,7 +40,8 @@ export function useDashboard(
   // Resolve the working directory explicitly when the TUI exposes it, so
   // repo detection doesn't depend on where opencode happens to launch.
   // Falls back to process.cwd() for tests that chdir() into a temp repo.
-  const cwd = (): string => (api as any).state?.path?.directory ?? process.cwd()
+  const cwd = (): string =>
+    api.location?.directory ?? api.data.location.default().directory ?? process.cwd()
 
   let inFlight: Promise<void> | null = null
   let refreshToken = 0
