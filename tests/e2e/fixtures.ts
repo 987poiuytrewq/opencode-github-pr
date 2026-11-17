@@ -1,5 +1,5 @@
-import { mkdtempSync, writeFileSync, rmSync, existsSync } from "node:fs"
-import { join } from "node:path"
+import { mkdtempSync, mkdirSync, writeFileSync, rmSync, existsSync } from "node:fs"
+import { join, resolve } from "node:path"
 import { tmpdir } from "node:os"
 import { spawn } from "bun"
 
@@ -30,9 +30,16 @@ export async function makeTempRepo(opts: {
   initialCommit?: boolean
 } = {}): Promise<TempRepo> {
   const remoteUrl = opts.remoteUrl ?? "https://github.com/octocat/Hello-World.git"
-  const dir = mkdtempSync(join(tmpdir(), "opencode-e2e-"))
+  const repoRoot = resolve(import.meta.dir, "../..")
+  const tempRoot = join(repoRoot, "node_modules", ".cache")
+  mkdirSync(tempRoot, { recursive: true })
+  const dir = mkdtempSync(join(tempRoot, "opencode-e2e-"))
   await runGit(dir, ["init", "--initial-branch=main"])
   await runGit(dir, ["remote", "add", "origin", remoteUrl])
+  writeFileSync(
+    join(dir, "opencode.json"),
+    JSON.stringify({ plugins: [repoRoot] }),
+  )
   if (opts.initialCommit !== false) {
     writeFileSync(join(dir, "README.md"), "# test repo\n")
     await runGit(dir, ["add", "."])

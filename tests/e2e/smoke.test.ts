@@ -1,8 +1,6 @@
 import { test, expect, describe, beforeAll, afterAll } from "bun:test"
-import { TmuxSession, isE2E } from "./tmux"
+import { TmuxSession, isE2E, OPENCODE_BIN } from "./tmux"
 import { makeTempRepo, type TempRepo } from "./fixtures"
-
-const OPENCODE = "/opt/homebrew/bin/opencode"
 
 describe.skipIf(!isE2E())("E2E smoke: opencode launches in tmux", () => {
   let session: TmuxSession
@@ -20,7 +18,7 @@ describe.skipIf(!isE2E())("E2E smoke: opencode launches in tmux", () => {
         NO_COLOR: "1",
         OPENCODE_DISABLE_UPDATE: "1",
       },
-      command: [OPENCODE],
+      command: [OPENCODE_BIN, "--standalone"],
     })
   }, 60_000)
 

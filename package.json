@@ -7,11 +7,12 @@
     "./tui": "./plugins/pr-dashboard.tui.tsx"
   },
   "scripts": {
-    "test": "bun test",
-    "test:unit": "bun test tests/unit",
-    "test:integration": "bun test tests/integration",
-    "test:watch": "bun test --watch",
-    "typecheck": "tsc --noEmit"
+    "test": "make test",
+    "test:unit": "make test-unit",
+    "test:integration": "make test-integration",
+    "test:e2e": "make test-e2e",
+    "test:watch": "make test-watch",
+    "typecheck": "make typecheck"
   },
   "devDependencies": {
     "@types/bun": "latest",

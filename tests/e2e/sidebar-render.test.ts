@@ -1,8 +1,6 @@
 import { describe, expect, test, beforeAll, afterAll } from "bun:test"
-import { TmuxSession, isE2E } from "./tmux"
+import { TmuxSession, isE2E, OPENCODE_BIN } from "./tmux"
 import { makeTempRepo, type TempRepo } from "./fixtures"
-
-const OPENCODE = "/opt/homebrew/bin/opencode"
 
 describe.skipIf(!isE2E())("E2E: PR dashboard sidebar renders", () => {
   let session: TmuxSession
@@ -20,7 +18,7 @@ describe.skipIf(!isE2E())("E2E: PR dashboard sidebar renders", () => {
         NO_COLOR: "1",
         OPENCODE_DISABLE_UPDATE: "1",
       },
-      command: [OPENCODE],
+      command: [OPENCODE_BIN, "--standalone"],
     })
     await session.waitForText("opencode", { timeoutMs: 30_000 })
     await session.sendKeys("hello")

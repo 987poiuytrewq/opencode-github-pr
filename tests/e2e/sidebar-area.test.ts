@@ -1,8 +1,6 @@
 import { describe, expect, test, beforeAll, afterAll } from "bun:test"
-import { TmuxSession, isE2E } from "./tmux"
+import { TmuxSession, isE2E, OPENCODE_BIN } from "./tmux"
 import { makeTempRepo, type TempRepo } from "./fixtures"
-
-const OPENCODE = "/opt/homebrew/bin/opencode"
 
 describe.skipIf(!isE2E())("E2E: sidebar content area", () => {
   let session: TmuxSession
@@ -20,7 +18,7 @@ describe.skipIf(!isE2E())("E2E: sidebar content area", () => {
         NO_COLOR: "1",
         OPENCODE_DISABLE_UPDATE: "1",
       },
-      command: [OPENCODE],
+      command: [OPENCODE_BIN, "--standalone"],
     })
     await session.waitForText("opencode", { timeoutMs: 30_000 })
     await session.sendKeys("hello")
@@ -40,21 +38,7 @@ describe.skipIf(!isE2E())("E2E: sidebar content area", () => {
 
   test("sidebar area has non-space content", async () => {
     const screen = await session.capturePanePlain()
-    const lines = screen.split("\n")
-    let foundNonSpace = false
-    for (const line of lines) {
-      const sepIdx = line.indexOf("┃")
-      if (sepIdx <= 0) continue
-      const rightSide = line.slice(sepIdx + 1)
-      const nextSep = rightSide.indexOf("┃")
-      if (nextSep <= 0) continue
-      const sidebarContent = rightSide.slice(0, nextSep)
-      if (sidebarContent.trim().length > 0) {
-        foundNonSpace = true
-        break
-      }
-    }
-    expect(foundNonSpace).toBe(true)
+    expect(screen.split("\n").some((line) => line.includes("PRs") && line.indexOf("PRs") > 70)).toBe(true)
   }, 30_000)
 
   test("sidebar contains PRs text", async () => {
