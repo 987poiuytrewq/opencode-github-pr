@@ -11,6 +11,17 @@ OpenCode V2 plugin providing GitHub pull-request tools and a TUI sidebar dashboa
 
 The package exports both parts via `package.json`; OpenCode V2 loads them together as one plugin.
 
+## Run a local OpenCode session
+
+From this checkout, run:
+
+```bash
+make opencode
+```
+
+This starts the interactive TUI with a standalone server so the plugin can read the GitHub token. It uses an existing
+`GH_TOKEN`, `GITHUB_TOKEN`, or `GITHUB_PERSONAL_ACCESS_TOKEN`; if none is set, it reads the token from `gh auth token`.
+
 ## Install locally
 
 Add the repository directory to the `plugins` array in your V2 `opencode.json` or `opencode.jsonc`:

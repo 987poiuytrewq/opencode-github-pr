@@ -1,8 +1,8 @@
 import { describe, expect, test } from "bun:test"
-import { mkdtempSync, rmSync } from "node:fs"
+import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs"
 import { tmpdir } from "node:os"
 import { join } from "node:path"
-import { parseGitHubRemote, detectRepo } from "../../plugins/infra/git"
+import { currentBranch, parseGitHubRemote, detectRepo } from "../../plugins/infra/git"
 import { makeFakeRepo } from "../helpers/graphql-mock"
 
 describe("parseGitHubRemote", () => {
@@ -39,6 +39,26 @@ describe("detectRepo", () => {
     const dir = makeFakeRepo("foo", "bar")
     expect(detectRepo(dir)).toEqual({ owner: "foo", repo: "bar" })
     rmSync(dir, { recursive: true, force: true })
+  })
+
+  test("reads shared config and HEAD from a linked worktree", () => {
+    const root = mkdtempSync(join(tmpdir(), "pr-dash-worktree-"))
+    const worktree = join(root, "checkout")
+    const commonGitDir = join(root, "repo.git")
+    const worktreeGitDir = join(commonGitDir, "worktrees", "checkout")
+    mkdirSync(worktree, { recursive: true })
+    mkdirSync(worktreeGitDir, { recursive: true })
+    writeFileSync(join(worktree, ".git"), `gitdir: ${worktreeGitDir}\n`)
+    writeFileSync(join(worktreeGitDir, "commondir"), "../..\n")
+    writeFileSync(
+      join(commonGitDir, "config"),
+      `[remote "origin"]\n\turl = git@github.com:foo/bar.git\n`,
+    )
+    writeFileSync(join(worktreeGitDir, "HEAD"), "ref: refs/heads/e2e-plugin-install\n")
+
+    expect(detectRepo(worktree)).toEqual({ owner: "foo", repo: "bar" })
+    expect(currentBranch(worktree)).toBe("e2e-plugin-install")
+    rmSync(root, { recursive: true, force: true })
   })
 
   test("returns null when no .git/config exists", () => {

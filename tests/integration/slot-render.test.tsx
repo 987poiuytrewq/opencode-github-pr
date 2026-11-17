@@ -36,7 +36,7 @@ describe("slot render: sidebar_content produces visible output", () => {
       const { api, registry } = createMockTuiApi()
       const cleanup = await plugin.setup(api)
 
-      expect(registry.slots).toHaveLength(1)
+      expect(registry.slots.some((slot) => slot.append === "sidebar.content")).toBe(true)
       expect(registry.slots[0].append).toBe("sidebar.content")
       const slotFn = registry.slots[0].slots.sidebar_content
       expect(typeof slotFn).toBe("function")

@@ -66,7 +66,13 @@ export function createMockTuiApi(): { api: TuiPluginContext; registry: MockTuiAp
       location: { default: () => ({ directory: process.cwd() }) },
     },
     client: {
-      session: { synthetic: async () => ({}) },
+      session: {
+        get: async (input: { sessionID: string }) => ({
+          id: input.sessionID,
+          location: { directory: process.cwd() },
+        }),
+        synthetic: async () => ({}),
+      },
     },
     attention: { notify: async () => ({ ok: true, notification: false, sound: false }) },
     markdown: { registerCodeBlockRenderer: () => () => {} },

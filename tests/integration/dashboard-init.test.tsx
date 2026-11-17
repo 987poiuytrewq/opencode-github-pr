@@ -43,6 +43,14 @@ describe("useDashboard initialization", () => {
       })
 
       const { api } = createMockTuiApi()
+      // A TUI can have a plugin location different from the active session's
+      // project, and its session cache may not be warm during plugin setup.
+      ;(api as any).location = { directory: origCwd }
+      ;(api as any).data.session.get = () => undefined
+      ;(api as any).client.session.get = async (input: { sessionID: string }) => ({
+        id: input.sessionID,
+        location: { directory: cwd },
+      })
       const { state } = createDashboard(api)
 
       const r = await testRender(
