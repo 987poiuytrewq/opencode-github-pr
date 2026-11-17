@@ -1,4 +1,4 @@
-import { mkdtempSync, mkdirSync, writeFileSync, symlinkSync, rmSync, existsSync } from "node:fs"
+import { mkdtempSync, mkdirSync, writeFileSync, rmSync, existsSync } from "node:fs"
 import { join, resolve } from "node:path"
 import { tmpdir } from "node:os"
 import { createServer } from "node:net"
@@ -43,17 +43,6 @@ export async function makeTempRepo(opts: {
   const dir = mkdtempSync(join(tempRoot, "opencode-e2e-"))
   await runGit(dir, ["init", "--initial-branch=main"])
   await runGit(dir, ["remote", "add", "origin", remoteUrl])
-  writeFileSync(join(dir, "package.json"), JSON.stringify({
-    name: "opencode-github-pr-e2e",
-    private: true,
-    type: "module",
-    exports: {
-      ".": "./plugins/pr-dashboard.ts",
-      "./tui": "./plugins/pr-dashboard.tui.tsx",
-    },
-  }))
-  symlinkSync(join(repoRoot, "plugins"), join(dir, "plugins"), "dir")
-  symlinkSync(join(repoRoot, "node_modules"), join(dir, "node_modules"), "dir")
   if (opts.initialCommit !== false) {
     writeFileSync(join(dir, "README.md"), "# test repo\n")
     await runGit(dir, ["add", "."])
@@ -70,6 +59,13 @@ export async function makeTempRepo(opts: {
     cleanup: () => {
       if (existsSync(dir)) rmSync(dir, { recursive: true, force: true })
     },
+  }
+}
+
+export function checkoutRepo(): TempRepo {
+  return {
+    dir: resolve(import.meta.dir, "../.."),
+    cleanup: () => {},
   }
 }
 
@@ -92,11 +88,13 @@ export async function startOpenCodeE2ESession(
   const serverEnv = {
     ...process.env,
     OPENCODE_DISABLE_UPDATE: "1",
+    OPENCODE_DISABLE_PROJECT_CONFIG: "1",
+    OPENCODE_CONFIG: join(repo.dir, "opencode.json"),
     OPENCODE_PASSWORD: serverPassword,
     OPENCODE_SERVER_PASSWORD: serverPassword,
   }
   const server = spawn([OPENCODE_BIN, "serve", "--log-level", "debug", "--hostname", "127.0.0.1", "--port", String(port)], {
-    cwd: repo.dir,
+    cwd: resolve(import.meta.dir, "../.."),
     env: serverEnv,
     stdout: "ignore",
     stderr: "ignore",
@@ -145,6 +143,14 @@ export async function startOpenCodeE2ESession(
       session,
       cleanup: async () => {
         await session.kill()
+        try {
+          await fetch(`${serverUrl}/api/session/${sessionID}`, {
+            method: "DELETE",
+            headers: {
+              authorization: `Basic ${Buffer.from(`opencode:${serverPassword}`).toString("base64")}`,
+            },
+          })
+        } catch {}
         server.kill()
         await server.exited
       },

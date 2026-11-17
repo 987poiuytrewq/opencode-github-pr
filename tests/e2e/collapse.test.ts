@@ -1,6 +1,6 @@
 import { describe, expect, test, beforeAll, afterAll } from "bun:test"
 import { TmuxSession, isE2E } from "./tmux"
-import { makeTempRepo, startOpenCodeE2ESession, type TempRepo } from "./fixtures"
+import { checkoutRepo, startOpenCodeE2ESession, type TempRepo } from "./fixtures"
 
 describe.skipIf(!isE2E())("E2E: PR dashboard collapse", () => {
   let session: TmuxSession
@@ -8,7 +8,7 @@ describe.skipIf(!isE2E())("E2E: PR dashboard collapse", () => {
   let stopSession: () => Promise<void>
 
   beforeAll(async () => {
-    repo = await makeTempRepo()
+    repo = checkoutRepo()
     const launched = await startOpenCodeE2ESession(repo, `e2e-collapse-${Date.now()}`)
     session = launched.session
     stopSession = launched.cleanup
