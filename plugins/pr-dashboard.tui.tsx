@@ -13,14 +13,13 @@ import { filterPRs, nextPRScope, nextPRStatusFilter } from "./domain/pr-filters"
 import { DashboardView } from "./app/DashboardView"
 import { useDashboard } from "./app/usePRData"
 import { createActions } from "./app/actions"
-import { demoDashboardState } from "../demo/fixtures"
 
 const command = {
   refresh: "opencode-github-pr.refresh",
   open: "opencode-github-pr.open",
 }
 
-function setup(api: TuiPluginContext) {
+async function setup(api: TuiPluginContext) {
   if (api.options.enabled === false) return
 
   const [state, setState] = createSignal<DashboardState>({
@@ -33,7 +32,10 @@ function setup(api: TuiPluginContext) {
     listingTruncated: false,
   })
   const demoMode = process.env.OPENCODE_GITHUB_PR_DEMO === "1"
-  if (demoMode) setState(demoDashboardState())
+  if (demoMode) {
+    const { demoDashboardState } = await import("../demo/fixtures")
+    setState(demoDashboardState())
+  }
   const [selectedIdx, setSelectedIdx] = createSignal(0)
   const [scope, setScope] = createSignal<PRScope>("author")
   const [statusFilter, setStatusFilter] = createSignal<PRStatusFilter>("open")
