@@ -62,7 +62,6 @@ export function PRRow(props: {
   return (
     <box
       flexDirection="column"
-      gap={1}
       paddingLeft={0}
       paddingRight={0}
       onMouseUp={() => props.onClick()}

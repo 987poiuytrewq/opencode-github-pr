@@ -27,21 +27,21 @@ Pull Requests Loading
 exports[`DashboardView render ok state with PRs 1`] = `
 "
 Pull Requests
- Add login flow
 
+ Add login flow
   #10 +42 -8                                    ●
 
  Fix race condition
-
   #11 +42 -8                                    ●
 
  WIP: refactor
-
   #12 +42 -8                                     ●
 
  Update docs
-
   #13 +42 -8                                     ●
+
+
+
 
 
 
