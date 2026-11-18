@@ -1,14 +1,13 @@
 /** @jsxImportSource @opentui/solid */
 import { describe, expect, test } from "bun:test"
 import { testRender } from "@opentui/solid"
-import type { DashboardState, PRScope, PRStatusFilter } from "../../plugins/domain/types"
+import type { DashboardState, PRScope, PRStatusFilter, PRLinkTarget } from "../../plugins/domain/types"
 import { DashboardView } from "../../plugins/app/DashboardView"
 import { makeTUIPR } from "../helpers/tui-fixtures"
 import { createMockTuiApi } from "../helpers/tui-api-mock"
 import { loadingState, okState, noRepoState, errorState } from "../helpers/state-fixtures"
-
 async function renderState(state: DashboardState, handlers: Partial<{
-  onOpen: (n: number) => void
+  onOpen: (n: number, target?: PRLinkTarget) => void
   onCycleScope: () => void
   onCycleStatus: () => void
   scope: PRScope
@@ -178,6 +177,21 @@ describe("DashboardView render", () => {
     expect(lines[heading + 4]).toBe("")
     expect(lines[heading + 5]).toContain("Second PR")
   })
+
+  test("renders review and comment status badges", async () => {
+    const r = await renderState(okState({
+      prs: [makeTUIPR({
+        number: 42,
+        latestReviews: [{ author: { login: "alice" }, state: "APPROVED" }],
+        reviewThreads: [{ isResolved: false }, { isResolved: true }],
+      })],
+    }))
+    await r.flush()
+    const frame = r.captureCharFrame()
+    expect(frame).toContain("")
+    expect(frame).toContain("󰅺1")
+    expect(frame).toContain("1")
+  })
 })
 
 describe("DashboardView mouse interaction", () => {
@@ -241,5 +255,93 @@ describe("DashboardView mouse interaction", () => {
     await r.flush()
     expect(filterSpan(" branch")?.fg).toEqual(scopeDefault?.fg)
     expect(filterSpan(" open")?.fg).not.toEqual(statusDefault?.fg)
+  })
+
+  test("clicking the PR number opens the overview without triggering the row click twice", async () => {
+    const opened: Array<{ number: number; target?: PRLinkTarget }> = []
+    const r = await renderState(okState(), {
+      onOpen: (number, target) => { opened.push({ number, target }) },
+    })
+    await r.flush()
+    const line = r.captureCharFrame().split("\n").findIndex((row) => row.includes("#10"))
+    expect(line).toBeGreaterThanOrEqual(0)
+    const x = r.captureCharFrame().split("\n")[line].indexOf("#10")
+    await r.mockMouse.click(x, line)
+    await r.flush()
+    expect(opened).toEqual([{ number: 10, target: "overview" }])
+  })
+
+  test("status badges open their target pages without triggering the row click", async () => {
+    const opened: Array<{ number: number; target?: PRLinkTarget }> = []
+    const r = await renderState(okState({
+      prs: [makeTUIPR({
+        number: 42,
+        statusCheckRollup: { state: "SUCCESS" },
+        latestReviews: [{ author: { login: "alice" }, state: "APPROVED" }],
+        reviewThreads: [{ isResolved: false }],
+      })],
+    }), {
+      onOpen: (number, target) => { opened.push({ number, target }) },
+    })
+    await r.flush()
+
+    const clickLabel = async (label: string) => {
+      const lines = r.captureCharFrame().split("\n")
+      const y = lines.findIndex((row) => row.includes(label))
+      expect(y).toBeGreaterThanOrEqual(0)
+      const x = Array.from(lines[y].slice(0, lines[y].indexOf(label))).length
+      await r.mockMouse.click(x, y)
+      await r.flush()
+    }
+
+    await clickLabel("●")
+    expect(opened).toEqual([{ number: 42, target: "checks" }])
+    await clickLabel("")
+    expect(opened.at(-1)).toEqual({ number: 42, target: "overview" })
+    await clickLabel("󰅺1")
+    expect(opened.at(-1)).toEqual({ number: 42, target: "files" })
+    await clickLabel("+42")
+    expect(opened.at(-1)).toEqual({ number: 42, target: "files" })
+  })
+
+  test("paginates PRs five at a time and stops at the first and last page", async () => {
+    const prs = Array.from({ length: 12 }, (_, i) =>
+      makeTUIPR({ number: 10 + i, title: `PR ${10 + i}` }),
+    )
+    const r = await renderState(okState({ prs }), { scope: "all", statusFilter: "all" })
+    await r.flush()
+
+    const clickArrow = async (pageLabel: string, arrow: string) => {
+      const frame = r.captureCharFrame()
+      const lines = frame.split("\n")
+      const y = lines.findIndex((line) => line.includes(pageLabel))
+      expect(y).toBeGreaterThanOrEqual(0)
+      const x = lines[y].indexOf(arrow)
+      expect(x).toBeGreaterThanOrEqual(0)
+      await r.mockMouse.click(x, y)
+      await r.flush()
+    }
+
+    let frame = r.captureCharFrame()
+    expect(frame).toContain("1 of 3")
+    expect(frame).toContain(" PR 10")
+    expect(frame).toContain(" PR 14")
+    expect(frame).not.toContain(" PR 15")
+
+    await clickArrow("1 of 3", "")
+    expect(r.captureCharFrame()).toContain("1 of 3")
+
+    await clickArrow("1 of 3", "")
+    frame = r.captureCharFrame()
+    expect(frame).toContain("2 of 3")
+    expect(frame).toContain(" PR 15")
+    expect(frame).not.toContain(" PR 14")
+
+    await clickArrow("2 of 3", "")
+    expect(r.captureCharFrame()).toContain("3 of 3")
+    await clickArrow("3 of 3", "")
+    expect(r.captureCharFrame()).toContain("3 of 3")
+    await clickArrow("3 of 3", "")
+    expect(r.captureCharFrame()).toContain("2 of 3")
   })
 })
