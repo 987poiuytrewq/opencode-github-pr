@@ -1,12 +1,16 @@
 // Pure formatting helpers used by the TUI sidebar: title truncation and
 // relative age rendering.
 
-const TITLE_BUDGET = 30
-
-export function truncateTitle(title: string, numWidth: number): string {
-  const budget = Math.max(8, TITLE_BUDGET - numWidth)
+export function truncateTitle(title: string, maxWidth: number): string {
+  const budget = Math.max(1, Math.floor(maxWidth))
   if (title.length <= budget) return title
-  return title.slice(0, budget - 1) + "…"
+
+  const prefix = title.slice(0, budget - 1)
+  const wordBoundary = prefix.lastIndexOf(" ")
+  const truncated = wordBoundary > 0
+    ? prefix.slice(0, wordBoundary).trimEnd()
+    : prefix.trimEnd()
+  return `${truncated}…`
 }
 
 export function formatAge(iso: string): string {

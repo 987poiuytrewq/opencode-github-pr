@@ -76,8 +76,41 @@ describe("DashboardView render", () => {
     expect(frame).toContain(" Merged feature")
     expect(frame).toContain("#42 +17 -4")
     expect(frame).toContain("●")
-    expect(frame).toContain("󰅺0")
-    expect(frame).toContain("0")
+    expect(frame).not.toContain("󰅺0")
+    expect(frame).not.toContain("0")
+  })
+
+  test("hides zero comment counts and only shows non-zero comment statuses", async () => {
+    const r = await renderState(okState({
+      prs: [makeTUIPR({
+        reviewThreads: [{ isResolved: false }],
+      })],
+    }))
+    await r.flush()
+    const frame = captureFrame(r)
+    expect(frame).toContain("󰅺1")
+    expect(frame).not.toContain("0")
+  })
+
+  test("allows longer titles and truncates at a word boundary", async () => {
+    const r = await renderState(okState({
+      prs: [makeTUIPR({
+        title: "This is a very long PR title that should only truncate at a word boundary",
+        checkStatuses: ["SUCCESS"],
+      })],
+    }))
+    await r.flush()
+    expect(captureFrame(r)).toContain("This is a very long PR title that should only…")
+  })
+
+  test("right-aligns status indicators to the edge of the sidebar", async () => {
+    const r = await renderState(okState({
+      prs: [makeTUIPR({ checkStatuses: ["SUCCESS"] })],
+    }))
+    await r.flush()
+    const statusLine = r.captureCharFrame().split("\n").find((line) => line.includes("●"))
+    expect(statusLine).toBeDefined()
+    expect(statusLine?.trimEnd().length).toBe(50)
   })
 
   test("status groups render comments, reviews, then mixed checks with single spaces", async () => {
