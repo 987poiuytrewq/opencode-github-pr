@@ -61,8 +61,9 @@ from the server's active plugin list, including when connected to a remote serve
 
 ## GitHub authentication
 
-The server and TUI parts use Octokit. Set `GITHUB_TOKEN`, `GH_TOKEN`, or `GITHUB_PERSONAL_ACCESS_TOKEN` in the
-environment available to OpenCode. The plugin reads the active session's repository from its GitHub `origin` remote.
+The server and TUI parts use Octokit. They check `GITHUB_TOKEN`, `GH_TOKEN`, or `GITHUB_PERSONAL_ACCESS_TOKEN` in the
+environment available to OpenCode, then fall back to `gh auth token`. The plugin reads the active session's repository
+from its GitHub `origin` remote.
 
 ## Test
 

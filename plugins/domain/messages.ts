@@ -15,7 +15,7 @@ import type { PRListErrorKind } from "./types"
 export const errorMessages = {
   // auth
   noAuthToken:
-    "Not authenticated, set GITHUB_TOKEN.",
+    "Not authenticated; set a GitHub token or run `gh auth login`.",
 
   // repo / session context
   noRepo: "Not a git repo",

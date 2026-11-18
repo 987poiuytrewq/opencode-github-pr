@@ -1,5 +1,5 @@
 // Octokit client factory for the PR dashboard.
-// Auth: reads GITHUB_TOKEN / GH_TOKEN from the environment.
+// Auth: reads a GitHub token from the environment, then falls back to `gh auth token`.
 //
 // Plugins: throttling (respects X-RateLimit-Reset / Retry-After / secondary
 // rate limits) and retry (handles 5xx and 429 with exponential backoff +
@@ -10,15 +10,34 @@ import type { Octokit as CoreOctokit } from "@octokit/core"
 import type { EndpointDefaults } from "@octokit/types"
 import { throttling } from "@octokit/plugin-throttling"
 import { retry } from "@octokit/plugin-retry"
+import { execFileSync } from "node:child_process"
 import { errorMessages } from "../domain/messages"
 const OctokitWithPlugins = Octokit.plugin(throttling, retry)
 
-export function getAuthToken(): string {
+function readGhAuthToken(): string | undefined {
+  try {
+    const token = execFileSync("gh", ["auth", "token"], {
+      encoding: "utf8",
+      stdio: ["ignore", "pipe", "ignore"],
+      timeout: 5_000,
+    }).trim()
+    return token || undefined
+  } catch {
+    return undefined
+  }
+}
+
+export function getAuthToken(
+  env: Record<string, string | undefined> = process.env,
+  ghAuthToken: () => string | undefined = readGhAuthToken,
+): string {
   const token =
-    process.env.GITHUB_TOKEN ??
-    process.env.GH_TOKEN ??
-    process.env.GITHUB_PERSONAL_ACCESS_TOKEN
+    env.GITHUB_TOKEN ||
+    env.GH_TOKEN ||
+    env.GITHUB_PERSONAL_ACCESS_TOKEN
   if (token) return token
+  const ghToken = ghAuthToken()
+  if (ghToken) return ghToken
   throw new Error(errorMessages.noAuthToken)
 }
 
