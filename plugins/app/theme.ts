@@ -15,7 +15,6 @@ export const DEFAULT_SKIN = {
   warning: "#d8a657",
   error: "#d86565",
   draft: "#888888",
-  merged: "#a371f7",
 }
 
 export type Skin = {
@@ -56,6 +55,6 @@ export function skin(t: ResolvedTheme): Skin {
     warning: toHex(t.text.feedback.warning.base),
     error: toHex(t.text.feedback.error.base),
     draft: toHex(t.text.muted),
-    merged: DEFAULT_SKIN.merged,
+    merged: toHex(t.text.action.primary.base),
   }
 }
