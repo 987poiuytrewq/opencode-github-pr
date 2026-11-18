@@ -12,7 +12,8 @@
     "test:integration": "make test-integration",
     "test:e2e": "make test-e2e",
     "test:watch": "make test-watch",
-    "typecheck": "make typecheck"
+    "typecheck": "make typecheck",
+    "format:check": "make format-check"
   },
   "devDependencies": {
     "@types/bun": "latest",

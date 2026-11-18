@@ -57,17 +57,9 @@ export type DashboardState = {
   currentBranch: string | null
   viewerLogin: string | null
   fetchedAt: number | null
+  listingTruncated: boolean
   error?: string
   errorKind?: PRListErrorKind
-}
-
-export type ReviewThread = {
-  isResolved: boolean
-  author: string
-  body: string
-  createdAt: string
-  path: string
-  line: number | null
 }
 
 // The public surface of useDashboard() — the signal/accessor pairs and

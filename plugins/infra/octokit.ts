@@ -6,6 +6,8 @@
 // jitter). doNotRetry covers 4xx that won't recover on their own.
 
 import { Octokit } from "@octokit/rest"
+import type { Octokit as CoreOctokit } from "@octokit/core"
+import type { EndpointDefaults } from "@octokit/types"
 import { throttling } from "@octokit/plugin-throttling"
 import { retry } from "@octokit/plugin-retry"
 import { errorMessages } from "../domain/messages"
@@ -34,13 +36,22 @@ export function createOctokit(opts: OctokitOpts = {}): Octokit {
     fetch: opts.fetch,
     request: { timeout: 15_000 },
     throttle: opts.throttle === false ? { enabled: false } : {
-      onRateLimit: (retryAfter: number, options: any, octokit: any, retryCount: number) => {
+      onRateLimit: (
+        retryAfter: number,
+        options: Required<EndpointDefaults>,
+        octokit: CoreOctokit,
+        retryCount: number,
+      ) => {
         octokit.log.warn(
           `[pr-dashboard] rate limit hit on ${options.method} ${options.url}; retry ${retryCount} after ${retryAfter}s`,
         )
         return retryCount < 2
       },
-      onSecondaryRateLimit: (retryAfter: number, options: any, octokit: any) => {
+      onSecondaryRateLimit: (
+        retryAfter: number,
+        options: Required<EndpointDefaults>,
+        octokit: CoreOctokit,
+      ) => {
         octokit.log.warn(
           `[pr-dashboard] secondary rate limit on ${options.method} ${options.url}; would wait ${retryAfter}s, aborting`,
         )

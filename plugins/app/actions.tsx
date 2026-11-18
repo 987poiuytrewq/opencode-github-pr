@@ -6,17 +6,13 @@ import {
   addPullRequestReviewer,
   currentBranchPR,
   fetchOrgMembers,
-  fetchReviewerThreads,
-  fetchOnePR,
 } from "../infra/loader"
-import { formatReviewerThreads } from "../domain/reviewers"
 import { prTargetUrl } from "../domain/pr-links"
 import type { DashboardContext, PRLinkTarget } from "../domain/types"
 
 export interface PrActions {
   openPR: (n: number, target?: PRLinkTarget) => Promise<void>
   promptReviewer: (n: number, kind: "add" | "rerequest") => Promise<void>
-  showReviewerComments: (n: number, login: string) => Promise<void>
   addReviewerToCurrentBranchPR: () => Promise<void>
 }
 
@@ -51,7 +47,8 @@ export function createActions(api: TuiPluginContext, ctx: DashboardContext): PrA
         ? `Suggested from ${repo?.owner}: ${members.slice(0, 25).map((member) => `@${member}`).join(" ")}${members.length > 25 ? ` … and ${members.length - 25} more` : ""}`
         : "Type any username, team (org/team), or paste a GitHub handle.",
     })
-    const reviewer = value?.trim().replace(/^@/, "")
+    const rawReviewer = value?.trim()
+    const reviewer = rawReviewer?.includes("/") ? rawReviewer : rawReviewer?.replace(/^@/, "")
     if (!reviewer) return
 
     const cur = ctx.state().repo
@@ -63,56 +60,15 @@ export function createActions(api: TuiPluginContext, ctx: DashboardContext): PrA
       await addPullRequestReviewer(cur, n, reviewer)
       api.ui.toast.show({
         variant: "success",
-        message: `${kind === "add" ? "Requested" : "Re-requested"} @${reviewer} on #${n}`,
+        message: `${kind === "add" ? "Requested" : "Re-requested"} review from @${reviewer} on #${n}`,
         duration: 2000,
       })
       await ctx.refreshOne(n)
-    } catch (e: any) {
+    } catch (e: unknown) {
       api.ui.toast.show({
         variant: "error",
-        message: errorMessages.failed(e?.message ?? errorMessages.unknown),
+        message: errorMessages.failed(e instanceof Error ? e.message : errorMessages.unknown),
         duration: 4000,
-      })
-    }
-  }
-
-  const showReviewerComments = async (n: number, login: string): Promise<void> => {
-    const repo = ctx.state().repo
-    if (!repo) return
-    const route = api.ui.router.current()
-    if (route.type !== "session") {
-      api.ui.toast.show({ variant: "error", message: errorMessages.noActiveSession, duration: 2000 })
-      return
-    }
-    const session = api.data.session.get(route.sessionID)
-    if (!session) {
-      api.ui.toast.show({ variant: "error", message: errorMessages.noActiveSession, duration: 2000 })
-      return
-    }
-
-    api.ui.toast.show({ variant: "info", message: `Loading threads from @${login}…`, duration: 1200 })
-    let body: string
-    try {
-      const threads = await fetchReviewerThreads(repo.owner, repo.repo, n, login)
-      body = formatReviewerThreads(threads, login, n)
-    } catch (e: any) {
-      body = `_${e?.message ?? "Failed to fetch threads"}_`
-    }
-    try {
-      await api.client.session.synthetic({
-        sessionID: session.id,
-        text: `\n${body}\n`,
-      })
-      api.ui.toast.show({
-        variant: "success",
-        message: `Posted @${login}'s comments to chat`,
-        duration: 1500,
-      })
-    } catch (e: any) {
-      api.ui.toast.show({
-        variant: "error",
-        message: errorMessages.failed(e?.message ?? errorMessages.unknown),
-        duration: 3000,
       })
     }
   }
@@ -131,8 +87,5 @@ export function createActions(api: TuiPluginContext, ctx: DashboardContext): PrA
     await promptReviewer(pr.number, "add")
   }
 
-  return { openPR, promptReviewer, showReviewerComments, addReviewerToCurrentBranchPR }
+  return { openPR, promptReviewer, addReviewerToCurrentBranchPR }
 }
-
-// Keep fetchOnePR re-exported so tests can stub it via setOctokit.
-export { fetchOnePR }

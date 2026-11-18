@@ -3,7 +3,7 @@ import { join, resolve } from "node:path"
 import { tmpdir } from "node:os"
 import { createServer } from "node:net"
 import { spawn } from "bun"
-import { TmuxSession, OPENCODE_BIN } from "./tmux"
+import { TmuxSession, hasPullRequestsHeading, OPENCODE_BIN } from "./tmux"
 
 export interface TempRepo {
   dir: string
@@ -36,7 +36,9 @@ export async function makeTempRepo(opts: {
   remoteUrl?: string
   initialCommit?: boolean
 } = {}): Promise<TempRepo> {
-  const remoteUrl = opts.remoteUrl ?? "https://github.com/octocat/Hello-World.git"
+  // An unsupported remote keeps the dashboard's repository detection on the
+  // local no-GitHub path. E2E tests exercise the TUI without contacting GitHub.
+  const remoteUrl = opts.remoteUrl ?? "https://example.invalid/octocat/Hello-World.git"
   const repoRoot = resolve(import.meta.dir, "../..")
   const tempRoot = join(repoRoot, "node_modules", ".cache")
   mkdirSync(tempRoot, { recursive: true })
@@ -62,13 +64,6 @@ export async function makeTempRepo(opts: {
   }
 }
 
-export function checkoutRepo(): TempRepo {
-  return {
-    dir: resolve(import.meta.dir, "../.."),
-    cleanup: () => {},
-  }
-}
-
 export async function startOpenCodeE2ESession(
   repo: TempRepo,
   name: string,
@@ -85,8 +80,19 @@ export async function startOpenCodeE2ESession(
 
   const serverUrl = `http://127.0.0.1:${port}`
   const serverPassword = "e2e-local-only"
+  const e2eHome = mkdtempSync(join(tmpdir(), "opencode-e2e-home-"))
+  const e2eEnvironment = {
+    // Do not pass a developer's credentials into test processes. If the
+    // GitHub API boundary is crossed unexpectedly, auth fails closed.
+    GITHUB_TOKEN: "",
+    GH_TOKEN: "",
+    GITHUB_PERSONAL_ACCESS_TOKEN: "",
+    HOME: e2eHome,
+    XDG_CONFIG_HOME: join(e2eHome, ".config"),
+  }
   const serverEnv = {
     ...process.env,
+    ...e2eEnvironment,
     OPENCODE_DISABLE_UPDATE: "1",
     OPENCODE_PASSWORD: serverPassword,
     OPENCODE_SERVER_PASSWORD: serverPassword,
@@ -98,6 +104,18 @@ export async function startOpenCodeE2ESession(
     stderr: "ignore",
   })
   let sessionID: string | undefined
+  let session: TmuxSession | undefined
+  const deleteServerSession = async () => {
+    if (!sessionID) return
+    try {
+      await fetch(`${serverUrl}/api/session/${sessionID}`, {
+        method: "DELETE",
+        headers: {
+          authorization: `Basic ${Buffer.from(`opencode:${serverPassword}`).toString("base64")}`,
+        },
+      })
+    } catch {}
+  }
 
   try {
     const deadline = Date.now() + 30_000
@@ -121,42 +139,47 @@ export async function startOpenCodeE2ESession(
     }
     if (!sessionID) throw new Error("OpenCode API did not create an E2E session")
 
-    const session = await TmuxSession.create({
+    const createdSession = await TmuxSession.create({
       name,
       cols: 140,
       rows: 40,
-      cwd: repo.dir,
+      cwd: resolve(import.meta.dir, "../.."),
       env: {
         OPENCODE_PASSWORD: serverPassword,
         OPENCODE_SERVER_PASSWORD: serverPassword,
         TERM: "xterm-256color",
         NO_COLOR: "1",
         OPENCODE_DISABLE_UPDATE: "1",
+        ...e2eEnvironment,
       },
       command: [OPENCODE_BIN, "--server", serverUrl, "--session", sessionID],
     })
-    await session.waitForText("opencode", { timeoutMs: 30_000 })
-    await session.waitForText("Pull Requests", { timeoutMs: 30_000 })
+    session = createdSession
+    await createdSession.waitForText("opencode", { timeoutMs: 30_000 })
+    await createdSession.waitFor(
+      hasPullRequestsHeading,
+      { timeoutMs: 30_000, label: "Pull Requests heading" },
+    )
+    await createdSession.waitForText("No GitHub repo", { timeoutMs: 30_000 })
 
     return {
-      session,
+      session: createdSession,
       cleanup: async () => {
-        await session.kill()
-        try {
-          await fetch(`${serverUrl}/api/session/${sessionID}`, {
-            method: "DELETE",
-            headers: {
-              authorization: `Basic ${Buffer.from(`opencode:${serverPassword}`).toString("base64")}`,
-            },
-          })
-        } catch {}
+        await createdSession.kill()
+        await deleteServerSession()
         server.kill()
         await server.exited
+        rmSync(e2eHome, { recursive: true, force: true })
       },
     }
   } catch (error) {
-    server.kill()
-    await server.exited
+    await session?.kill()
+    await deleteServerSession()
+    try {
+      server.kill()
+      await server.exited
+    } catch {}
+    rmSync(e2eHome, { recursive: true, force: true })
     throw error
   }
 }

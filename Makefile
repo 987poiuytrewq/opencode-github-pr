@@ -1,4 +1,4 @@
-.PHONY: opencode install typecheck test test-unit test-integration test-e2e test-watch ci ci-tools ci-debug
+.PHONY: opencode install format-check typecheck test test-unit test-integration test-e2e test-watch ci ci-tools ci-debug
 
 BUN ?= bun
 OPENCODE_BIN ?= opencode
@@ -6,6 +6,10 @@ OPENCODE_VERSION ?= 2.0.20
 
 install:
 	$(BUN) install --frozen-lockfile
+
+format-check:
+	$(BUN) fmt --check package.json .github/workflows/ci.yml tests/integration/github-loader.test.ts
+	$(BUN) -e 'const readme = await Bun.file("README.md").text(); const match = readme.match(/```json\s*\n([\s\S]*?)\n```/); if (!match) throw new Error("README strict JSON example not found"); JSON.parse(match[1])'
 
 typecheck:
 	$(BUN) ./node_modules/typescript/bin/tsc --noEmit
@@ -24,7 +28,7 @@ test-e2e:
 test-watch:
 	$(BUN) test --watch
 
-test: typecheck test-unit test-integration test-e2e
+test: format-check typecheck test-unit test-integration test-e2e
 
 ci: install test
 

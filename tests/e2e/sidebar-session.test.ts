@@ -1,6 +1,6 @@
 import { describe, expect, test, beforeAll, afterAll } from "bun:test"
-import { TmuxSession, isE2E } from "./tmux"
-import { checkoutRepo, startOpenCodeE2ESession, type TempRepo } from "./fixtures"
+import { TmuxSession, isE2E, hasPullRequestsHeading } from "./tmux"
+import { makeTempRepo, startOpenCodeE2ESession, type TempRepo } from "./fixtures"
 
 describe.skipIf(!isE2E())("E2E: sidebar renders with active session", () => {
   let session: TmuxSession
@@ -8,7 +8,7 @@ describe.skipIf(!isE2E())("E2E: sidebar renders with active session", () => {
   let stopSession: () => Promise<void>
 
   beforeAll(async () => {
-    repo = checkoutRepo()
+    repo = await makeTempRepo()
     const launched = await startOpenCodeE2ESession(repo, `e2e-sess-${Date.now()}`)
     session = launched.session
     stopSession = launched.cleanup
@@ -21,7 +21,9 @@ describe.skipIf(!isE2E())("E2E: sidebar renders with active session", () => {
 
   test("Pull Requests heading appears after session is created", async () => {
     const screen = await session.capturePanePlain()
-    expect(screen).toContain("Pull Requests")
+    expect(hasPullRequestsHeading(screen)).toBe(true)
+    expect(screen).toContain("No GitHub repo")
+    expect(screen).not.toContain("Not authorised")
   }, 60_000)
 
   test("filter label is not shown after session is created", async () => {

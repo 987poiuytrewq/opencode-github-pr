@@ -50,6 +50,7 @@ describe("PrDashboardPlugin V2 server part", () => {
     expect(Object.keys(tools).sort()).toEqual(["pr_add_reviewer", "pr_rerequest_review"])
     expect(tools.pr_add_reviewer.input.required).toEqual(["pr", "reviewer"])
     expect(tools.pr_rerequest_review.input.properties.reviewer.type).toBe("string")
+    expect(tools.pr_add_reviewer.input.properties.pr.minimum).toBe(1)
   })
 
   describe("pr_add_reviewer tool", () => {
@@ -86,6 +87,61 @@ describe("PrDashboardPlugin V2 server part", () => {
       const out = await tools.pr_add_reviewer.execute({ pr: 42, reviewer: "alice" }, toolContext)
       expect(out.content).toContain("Failed:")
       expect(out.content).toContain("permission denied")
+      rmSync(dir, { recursive: true, force: true })
+    })
+
+    test("routes a same-organization team to team_reviewers", async () => {
+      const dir = makeFakeRepo("acme", "widgets")
+      let captured: any = null
+      mockOctokitOp("pulls.requestReviewers", (params: any) => {
+        captured = params
+        return { data: {} }
+      })
+      const { context, tools, toolContext } = buildContext(dir)
+      await PrDashboardPlugin.setup(context)
+      const out = await tools.pr_add_reviewer.execute(
+        { pr: 42, reviewer: "acme/platform-team" },
+        toolContext,
+      )
+
+      expect(captured).toMatchObject({
+        owner: "acme",
+        repo: "widgets",
+        pull_number: 42,
+        team_reviewers: ["platform-team"],
+      })
+      expect(captured.reviewers).toBeUndefined()
+      expect(out.content).toContain("acme/platform-team")
+      rmSync(dir, { recursive: true, force: true })
+    })
+
+    test("rejects invalid PR numbers and team paths before calling GitHub", async () => {
+      const dir = makeFakeRepo("acme", "widgets")
+      let calls = 0
+      mockOctokitOp("pulls.requestReviewers", () => {
+        calls++
+        return { data: {} }
+      })
+      const { context, tools, toolContext } = buildContext(dir)
+      await PrDashboardPlugin.setup(context)
+
+      const invalidPR = await tools.pr_add_reviewer.execute(
+        { pr: 0, reviewer: "octocat" },
+        toolContext,
+      )
+      const wrongOrg = await tools.pr_add_reviewer.execute(
+        { pr: 42, reviewer: "other-org/platform" },
+        toolContext,
+      )
+      const malformed = await tools.pr_add_reviewer.execute(
+        { pr: 42, reviewer: "acme/platform/extra" },
+        toolContext,
+      )
+
+      expect(invalidPR.content).toContain("positive pull request number")
+      expect(wrongOrg.content).toContain("Invalid reviewer")
+      expect(malformed.content).toContain("Invalid reviewer")
+      expect(calls).toBe(0)
       rmSync(dir, { recursive: true, force: true })
     })
   })

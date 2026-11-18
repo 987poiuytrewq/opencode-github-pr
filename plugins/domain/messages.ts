@@ -19,7 +19,6 @@ export const errorMessages = {
 
   // repo / session context
   noRepo: "Not a git repo",
-  noActiveSession: "No active session",
 
   // server-side tool errors
   prListing: {
@@ -42,14 +41,18 @@ export const errorMessages = {
   noMatchingPRs: "No matching PRs",
 }
 
-// Classify errors from HTTP status, aborts/timeouts, network codes, and
-// gh CLI stderr text (when no status is available).
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === "object" && value !== null
+}
+
+// Classify errors from GitHub HTTP status, aborts/timeouts, network codes,
+// and request messages when no status is available.
 export function prListErrorKind(e: unknown): PRListErrorKind {
   if (!e) return "unknown"
-  const any = e as any
-  const status = any?.status as number | undefined
-  const name = any?.name as string | undefined
-  const code = any?.code as string | undefined
+  const details = isRecord(e) ? e : {}
+  const status = typeof details.status === "number" ? details.status : undefined
+  const name = typeof details.name === "string" ? details.name : undefined
+  const code = typeof details.code === "string" ? details.code : undefined
   const message = e instanceof Error ? e.message : String(e)
   const lower = message.toLowerCase()
 
@@ -76,9 +79,10 @@ export function prListErrorKind(e: unknown): PRListErrorKind {
   }
   if (status && status >= 500) return "server"
 
-  // gh CLI stderr fallback (no status, just text)
+  // GitHub request message fallback (no status, just text)
   if (/rate limit/i.test(lower)) return "rate-limit"
   if (/not found|\b404\b/.test(lower)) return "not-found"
+  if (/unauthor|\b401\b/.test(lower)) return "authentication"
   if (/forbidden|\b403\b/.test(lower)) return "forbidden"
   if (/network|econn|enotfound|etimedout|eai_again/.test(lower)) {
     return "network"
@@ -91,13 +95,14 @@ export function prListErrorKind(e: unknown): PRListErrorKind {
 // Map a thrown error to the existing user-facing detail string.
 export function prListErrorMessage(e: unknown): string {
   if (!e) return errorMessages.prListing.unknown("unknown")
-  const any = e as any
+  const details = isRecord(e) ? e : {}
   const message = e instanceof Error ? e.message : String(e)
-  const code = any?.code as string | undefined
+  const status = typeof details.status === "number" ? details.status : undefined
+  const code = typeof details.code === "string" ? details.code : undefined
 
   switch (prListErrorKind(e)) {
     case "authentication":
-      return any?.status === 401 || /unauthor/i.test(message)
+      return status === 401 || /unauthor/i.test(message)
         ? errorMessages.prListing.unauthorized
         : errorMessages.noAuthToken
     case "forbidden":
@@ -127,9 +132,10 @@ export type RateLimitInfo =
 // reset time from the x-ratelimit-reset header. Used by useDashboard to
 // preserve the existing PR list when the error is a rate limit (the PRs
 // are still valid; only the fetch failed).
-export function parseRateLimitError(e: any): RateLimitInfo {
-  const msg: string = e?.message ?? ""
-  const status: number | undefined = e?.status
+export function parseRateLimitError(e: unknown): RateLimitInfo {
+  const details = isRecord(e) ? e : {}
+  const msg = typeof details.message === "string" ? details.message : ""
+  const status = typeof details.status === "number" ? details.status : undefined
   const isRateLimit =
     status === 429 ||
     (status === 403 && /rate limit/i.test(msg)) ||
@@ -137,7 +143,12 @@ export function parseRateLimitError(e: any): RateLimitInfo {
     /api rate limit/i.test(msg)
   if (!isRateLimit) return { isRateLimit: false, message: null, resetAt: null }
 
-  const headers = e?.response?.headers ?? e?.headers ?? {}
+  const response = isRecord(details.response) ? details.response : {}
+  const headers = isRecord(response.headers)
+    ? response.headers
+    : isRecord(details.headers)
+      ? details.headers
+      : {}
   const rawReset = headers["x-ratelimit-reset"] ?? headers["X-RateLimit-Reset"]
   const resetAt = rawReset ? parseInt(String(rawReset), 10) * 1000 : null
   const resetText = resetAt ? new Date(resetAt).toLocaleTimeString() : "unknown time"

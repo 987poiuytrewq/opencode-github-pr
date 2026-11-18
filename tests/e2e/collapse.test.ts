@@ -1,6 +1,6 @@
 import { describe, expect, test, beforeAll, afterAll } from "bun:test"
-import { TmuxSession, isE2E } from "./tmux"
-import { checkoutRepo, startOpenCodeE2ESession, type TempRepo } from "./fixtures"
+import { TmuxSession, isE2E, hasPullRequestsHeading } from "./tmux"
+import { makeTempRepo, startOpenCodeE2ESession, type TempRepo } from "./fixtures"
 
 describe.skipIf(!isE2E())("E2E: PR dashboard header", () => {
   let session: TmuxSession
@@ -8,7 +8,7 @@ describe.skipIf(!isE2E())("E2E: PR dashboard header", () => {
   let stopSession: () => Promise<void>
 
   beforeAll(async () => {
-    repo = checkoutRepo()
+    repo = await makeTempRepo()
     const launched = await startOpenCodeE2ESession(repo, `e2e-header-${Date.now()}`)
     session = launched.session
     stopSession = launched.cleanup
@@ -21,17 +21,18 @@ describe.skipIf(!isE2E())("E2E: PR dashboard header", () => {
 
   test("Pull Requests heading has no collapse affordance", async () => {
     const screen = await session.capturePanePlain()
-    expect(screen).toContain("Pull Requests")
+    expect(hasPullRequestsHeading(screen)).toBe(true)
     expect(screen).not.toContain("▼")
     expect(screen).not.toContain("▶")
   }, 30_000)
 
-  test("clicking the heading does not hide the PR list", async () => {
+  test("clicking the heading does not hide the dashboard", async () => {
     const screen = await session.capturePanePlain()
+    expect(screen).toContain("No GitHub repo")
     const lines = screen.split("\n")
     let col = -1, row = -1
     for (let i = 0; i < lines.length; i++) {
-      const idx = lines[i].indexOf("Pull Requests")
+      const idx = lines[i].indexOf("Pull")
       if (idx >= 0) {
         col = idx
         row = i
@@ -40,9 +41,9 @@ describe.skipIf(!isE2E())("E2E: PR dashboard header", () => {
     }
     expect(col).toBeGreaterThan(-1)
     await session.click(col, row)
-    await Bun.sleep(1500)
     const after = await session.capturePanePlain()
-    expect(after).toContain("Pull Requests")
+    expect(hasPullRequestsHeading(after)).toBe(true)
+    expect(after).toContain("No GitHub repo")
     expect(after).not.toContain("▼")
     expect(after).not.toContain("▶")
   }, 30_000)

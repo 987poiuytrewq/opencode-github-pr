@@ -19,8 +19,6 @@ async function renderState(state: DashboardState, handlers: Partial<{
       <DashboardView
         theme={api.theme}
         state={state}
-        onRefresh={() => {}}
-        selectedIdx={0}
         setSelectedIdx={() => {}}
         onOpen={handlers.onOpen ?? (() => {})}
         scope={handlers.scope ?? "branch"}
@@ -84,6 +82,12 @@ describe("DashboardView render", () => {
     const r = await renderState(okState({ prs: [] }))
     await r.flush()
     expect(captureFrame(r)).toMatchSnapshot()
+  })
+
+  test("shows when the PR listing was truncated", async () => {
+    const r = await renderState(okState({ listingTruncated: true }))
+    await r.flush()
+    expect(captureFrame(r)).toContain("Showing first 300 PRs; more are available")
   })
 
   test("merged PR uses the merged icon and displays change totals", async () => {

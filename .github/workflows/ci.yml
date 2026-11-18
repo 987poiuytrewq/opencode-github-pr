@@ -23,7 +23,7 @@ jobs:
       - name: Install E2E system tools
         run: make ci-tools
 
-      - name: Run full test suite
+      - name: Run formatting and full test suite
         run: make ci
 
       - name: Show OpenCode plugin diagnostics

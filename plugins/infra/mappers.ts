@@ -4,66 +4,114 @@
 
 import type { PR } from "../domain/types"
 
+type RecordValue = Record<string, unknown>
+
+function record(value: unknown): RecordValue {
+  return typeof value === "object" && value !== null ? value as RecordValue : {}
+}
+
+function string(value: unknown, fallback = ""): string {
+  return typeof value === "string" ? value : fallback
+}
+
+function number(value: unknown, fallback = 0): number {
+  return typeof value === "number" && Number.isFinite(value) ? value : fallback
+}
+
+function array(value: unknown): unknown[] {
+  return Array.isArray(value) ? value : []
+}
+
 // Maps a GraphQL PullRequest node to PR.
-export function mapPullFromGraphQL(p: any): PR {
+export function mapPullFromGraphQL(value: unknown): PR {
+  const p = record(value)
+  const author = record(p.author)
+  const assignees = record(p.assignees)
+  const rollup = p.statusCheckRollup == null ? null : record(p.statusCheckRollup)
+  const contexts = rollup ? record(rollup.contexts) : {}
+  const reviewThreads = record(p.reviewThreads)
+  const reviewRequests = record(p.reviewRequests)
+  const latestReviews = record(p.latestReviews)
   return {
-    number: p.number,
-    title: p.title,
-    url: p.url,
-    isDraft: p.isDraft ?? false,
+    number: number(p.number),
+    title: string(p.title),
+    url: string(p.url),
+    isDraft: p.isDraft === true,
     isMerged: p.state === "MERGED" || p.merged === true,
     isClosed: p.state === "CLOSED" || p.state === "MERGED" || p.merged === true,
-    headRefName: p.headRefName ?? "",
-    authorLogin: p.author?.login ?? "",
-    assigneeLogins: (p.assignees?.nodes ?? []).map((assignee: any) => assignee.login).filter(Boolean),
-    additions: p.additions ?? 0,
-    deletions: p.deletions ?? 0,
-    baseRefName: p.baseRefName,
-    mergeable: (p.mergeable ?? "UNKNOWN").toUpperCase(),
-    statusCheckRollup: p.statusCheckRollup ?? null,
-    checkStatuses: Array.isArray(p.statusCheckRollup?.contexts?.nodes)
-      ? p.statusCheckRollup.contexts.nodes
-          .map((c: any) => c.__typename === "CheckRun" ? c.conclusion ?? c.status : c.state)
+    headRefName: string(p.headRefName),
+    authorLogin: string(author.login),
+    assigneeLogins: array(assignees.nodes)
+      .map((assignee) => string(record(assignee).login))
+      .filter(Boolean),
+    additions: number(p.additions),
+    deletions: number(p.deletions),
+    baseRefName: string(p.baseRefName),
+    mergeable: string(p.mergeable, "UNKNOWN").toUpperCase(),
+    statusCheckRollup: rollup ? { state: string(rollup.state, "UNKNOWN") } : null,
+    checkStatuses: Array.isArray(contexts.nodes)
+      ? contexts.nodes
+          .map((value) => {
+            const context = record(value)
+            return context.__typename === "CheckRun"
+              ? string(context.conclusion) || string(context.status)
+              : string(context.state)
+          })
           .filter(Boolean)
       : null,
-    reviewThreads: Array.isArray(p.reviewThreads?.nodes)
-      ? p.reviewThreads.nodes.map((t: any) => ({ isResolved: Boolean(t.isResolved) }))
+    reviewThreads: Array.isArray(reviewThreads.nodes)
+      ? reviewThreads.nodes.map((thread) => ({ isResolved: record(thread).isResolved === true }))
       : null,
-    reviewRequests: (p.reviewRequests?.nodes ?? [])
-      .map((n: any) => n.requestedReviewer?.login)
+    reviewRequests: array(reviewRequests.nodes)
+      .map((node) => string(record(record(node).requestedReviewer).login))
       .filter(Boolean)
-      .map((login: string) => ({ login })),
-    latestReviews: (p.latestReviews?.nodes ?? []).map((r: any) => ({
-      author: { login: r.author?.login ?? "" },
-      state: r.state,
-    })),
+      .map((login) => ({ login })),
+    latestReviews: array(latestReviews.nodes).map((value) => {
+      const review = record(value)
+      return {
+        author: { login: string(record(review.author).login) },
+        state: string(review.state),
+      }
+    }),
   }
 }
 
 // Maps a REST `pulls.get` response data object to PR.  REST doesn't
 // provide statusCheckRollup, so the field is null.
-export function mapPullFromREST(p: any): PR {
+export function mapPullFromREST(value: unknown): PR {
+  const p = record(value)
+  const head = record(p.head)
+  const base = record(p.base)
+  const user = record(p.user)
   return {
-    number: p.number,
-    title: p.title,
-    url: p.html_url,
-    isDraft: p.draft ?? false,
-    isMerged: p.merged ?? false,
+    number: number(p.number),
+    title: string(p.title),
+    url: string(p.html_url),
+    isDraft: p.draft === true,
+    isMerged: p.merged === true,
     isClosed: p.state === "closed" || p.merged === true,
-    headRefName: p.head?.ref ?? "",
-    authorLogin: p.user?.login ?? "",
-    assigneeLogins: (p.assignees ?? []).map((assignee: any) => assignee.login).filter(Boolean),
-    additions: p.additions ?? 0,
-    deletions: p.deletions ?? 0,
-    baseRefName: p.base.ref,
-    mergeable: p.mergeable ? "MERGEABLE" : p.mergeable === false ? "CONFLICTING" : "UNKNOWN",
+    headRefName: string(head.ref),
+    authorLogin: string(user.login),
+    assigneeLogins: array(p.assignees)
+      .map((assignee) => string(record(assignee).login))
+      .filter(Boolean),
+    additions: number(p.additions),
+    deletions: number(p.deletions),
+    baseRefName: string(base.ref),
+    mergeable: p.mergeable === true ? "MERGEABLE" : p.mergeable === false ? "CONFLICTING" : "UNKNOWN",
     statusCheckRollup: null,
     checkStatuses: null,
     reviewThreads: null,
-    reviewRequests: (p.requested_reviewers ?? []).map((r: any) => ({ login: r.login })),
-    latestReviews: (p.latest_reviews ?? []).map((r: any) => ({
-      author: { login: r.user?.login ?? "" },
-      state: r.state,
-    })),
+    reviewRequests: array(p.requested_reviewers)
+      .map((reviewer) => string(record(reviewer).login))
+      .filter(Boolean)
+      .map((login) => ({ login })),
+    latestReviews: array(p.latest_reviews).map((value) => {
+      const review = record(value)
+      return {
+        author: { login: string(record(review.user).login) },
+        state: string(review.state),
+      }
+    }),
   }
 }
