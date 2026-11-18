@@ -80,19 +80,15 @@ export async function startOpenCodeE2ESession(
 
   const serverUrl = `http://127.0.0.1:${port}`
   const serverPassword = "e2e-local-only"
-  const configDir = mkdtempSync(join(tmpdir(), "opencode-e2e-config-"))
-  const configPath = join(configDir, "opencode.json")
-  writeFileSync(configPath, JSON.stringify({
-    plugins: [resolve(import.meta.dir, "../..")],
-  }))
+  const e2eHome = mkdtempSync(join(tmpdir(), "opencode-e2e-home-"))
   const e2eEnvironment = {
     // Do not pass a developer's credentials into test processes. If the
     // GitHub API boundary is crossed unexpectedly, auth fails closed.
     GITHUB_TOKEN: "",
     GH_TOKEN: "",
     GITHUB_PERSONAL_ACCESS_TOKEN: "",
-    OPENCODE_CONFIG: configPath,
-    OPENCODE_CONFIG_PROJECT_DISABLE: "1",
+    HOME: e2eHome,
+    XDG_CONFIG_HOME: join(e2eHome, ".config"),
   }
   const serverEnv = {
     ...process.env,
@@ -147,7 +143,7 @@ export async function startOpenCodeE2ESession(
       name,
       cols: 140,
       rows: 40,
-      cwd: repo.dir,
+      cwd: resolve(import.meta.dir, "../.."),
       env: {
         OPENCODE_PASSWORD: serverPassword,
         OPENCODE_SERVER_PASSWORD: serverPassword,
@@ -173,7 +169,7 @@ export async function startOpenCodeE2ESession(
         await deleteServerSession()
         server.kill()
         await server.exited
-        rmSync(configDir, { recursive: true, force: true })
+        rmSync(e2eHome, { recursive: true, force: true })
       },
     }
   } catch (error) {
@@ -183,7 +179,7 @@ export async function startOpenCodeE2ESession(
       server.kill()
       await server.exited
     } catch {}
-    rmSync(configDir, { recursive: true, force: true })
+    rmSync(e2eHome, { recursive: true, force: true })
     throw error
   }
 }
