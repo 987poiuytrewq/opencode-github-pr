@@ -58,6 +58,40 @@ function ClickableText(props: {
   )
 }
 
+function ClickableComment(props: {
+  icon: string
+  count: number
+  color: string
+  onClick: (target: PRLinkTarget) => void
+}) {
+  const [hovered, setHovered] = createSignal(false)
+  return (
+    <box
+      flexDirection="row"
+      gap={1}
+      onMouseOver={(event) => {
+        event.stopPropagation()
+        setHovered(true)
+      }}
+      onMouseOut={(event) => {
+        event.stopPropagation()
+        setHovered(false)
+      }}
+      onMouseUp={(event) => {
+        event.stopPropagation()
+        props.onClick("files")
+      }}
+    >
+      <text fg={props.color} selectable={false}>
+        {hovered() ? <u>{props.icon}</u> : props.icon}
+      </text>
+      <text fg={props.color} selectable={false}>
+        {hovered() ? <u>{props.count}</u> : props.count}
+      </text>
+    </box>
+  )
+}
+
 export function PRRow(props: {
   pr: PR
   titleWidth: number
@@ -134,10 +168,10 @@ export function PRRow(props: {
         <Show when={commentStatuses.length > 0}>
           <For each={commentStatuses}>
             {(comment) => (
-              <ClickableText
-                label={`${comment.icon}${comment.count}`}
+              <ClickableComment
+                icon={comment.icon}
+                count={comment.count}
                 color={props.muted}
-                target="files"
                 onClick={props.onClick}
               />
             )}

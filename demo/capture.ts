@@ -3,6 +3,7 @@ import {
   existsSync,
   mkdirSync,
   mkdtempSync,
+  readFileSync,
   rmSync,
   writeFileSync,
 } from "node:fs";
@@ -14,6 +15,8 @@ const COLUMNS = 140;
 const ROWS = 44;
 const START_TIMEOUT_MS = 45_000;
 const UI_TIMEOUT_MS = 12_000;
+const GIF_EXIT_TRIM_SECONDS = 0.6;
+const GIF_IDLE_LIMIT_SECONDS = 1;
 const repoRoot = resolve(import.meta.dir, "..");
 
 type CommandResult = { stdout: string; stderr: string };
@@ -48,6 +51,26 @@ async function run(
 
 function shellQuote(value: string): string {
   return `'${value.replaceAll("'", "'\\''")}'`;
+}
+
+function gifEndTimeBeforeTerminalExit(recordingPath: string): number {
+  let elapsed = 0;
+  let exitTime: number | null = null;
+  let output = "";
+  const events = readFileSync(recordingPath, "utf8")
+    .trimEnd()
+    .split("\n")
+    .slice(1);
+
+  for (const line of events) {
+    const event = JSON.parse(line) as [number, string, string];
+    elapsed += Math.min(event[0], GIF_IDLE_LIMIT_SECONDS);
+    if (event[1] !== "o") continue;
+    output += event[2];
+    if (output.includes("\u001b[?1049l")) exitTime = elapsed;
+  }
+
+  return Math.max(0, (exitTime ?? elapsed) - GIF_EXIT_TRIM_SECONDS);
 }
 
 function parseArgs(args: string[]): {
@@ -500,6 +523,7 @@ async function main(): Promise<void> {
       fail(`asciinema did not create the recording: ${options.output}`);
 
     if (options.makeGif && agg) {
+      const endTime = gifEndTimeBeforeTerminalExit(options.output);
       await run(agg, [
         options.output,
         gifPath,
@@ -507,7 +531,12 @@ async function main(): Promise<void> {
         String(COLUMNS),
         "--rows",
         String(ROWS),
+        "--idle-time-limit",
+        String(GIF_IDLE_LIMIT_SECONDS),
+        "--select",
+        `0..${endTime.toFixed(2)}s`,
       ]);
+      console.log(`Trimmed GIF before terminal exit at ${endTime.toFixed(2)}s`);
       console.log(`GIF saved to ${gifPath}`);
     }
     console.log(`Recording saved to ${options.output}`);

@@ -117,7 +117,8 @@ describe("DashboardView render", () => {
     }))
     await r.flush()
     const frame = captureFrame(r)
-    expect(frame).toContain("󰅺1")
+    expect(frame).toContain("󰅺 1")
+    expect(frame).not.toContain("󰅺1")
     expect(frame).not.toContain("")
   })
 
@@ -179,7 +180,7 @@ describe("DashboardView render", () => {
     }))
     await r.flush()
     const frame = captureFrame(r)
-    expect(frame).toContain("󰅺1 1 1 ●3 ●1")
+    expect(frame).toContain("󰅺 1 1 1 ●3 ●1")
     expect(frame).not.toContain("")
   })
 
@@ -212,7 +213,7 @@ describe("DashboardView render", () => {
     await r.flush()
     const frame = r.captureCharFrame()
     expect(frame).toContain("")
-    expect(frame).toContain("󰅺1")
+    expect(frame).toContain("󰅺 1")
     expect(frame).not.toContain("")
   })
 
@@ -334,7 +335,7 @@ describe("DashboardView mouse interaction", () => {
     expect(opened).toEqual([{ number: 42, target: "checks" }])
     await clickLabel("")
     expect(opened.at(-1)).toEqual({ number: 42, target: "overview" })
-    await clickLabel("󰅺1")
+    await clickLabel("󰅺")
     expect(opened.at(-1)).toEqual({ number: 42, target: "files" })
     await clickLabel("+42")
     expect(opened.at(-1)).toEqual({ number: 42, target: "files" })
