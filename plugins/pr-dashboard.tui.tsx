@@ -13,6 +13,7 @@ import { filterPRs, nextPRScope, nextPRStatusFilter } from "./domain/pr-filters"
 import { DashboardView } from "./app/DashboardView"
 import { useDashboard } from "./app/usePRData"
 import { createActions } from "./app/actions"
+import { dashboardOptions } from "./app/config"
 
 const command = {
   refresh: "opencode-github-pr.refresh",
@@ -20,7 +21,8 @@ const command = {
 }
 
 async function setup(api: TuiPluginContext) {
-  if (api.options.enabled === false) return
+  const options = dashboardOptions(api.options)
+  if (!options.enabled) return
 
   const [state, setState] = createSignal<DashboardState>({
     status: DashboardStatus.Loading,
@@ -37,8 +39,8 @@ async function setup(api: TuiPluginContext) {
     setState(demoDashboardState())
   }
   const [selectedIdx, setSelectedIdx] = createSignal(0)
-  const [scope, setScope] = createSignal<PRScope>("author")
-  const [statusFilter, setStatusFilter] = createSignal<PRStatusFilter>("open")
+  const [scope, setScope] = createSignal<PRScope>(options.defaultScope)
+  const [statusFilter, setStatusFilter] = createSignal<PRStatusFilter>(options.defaultStatusFilter)
   const visiblePRs = () =>
     filterPRs(state().prs, scope(), statusFilter(), state().currentBranch, state().viewerLogin)
   const cycleScope = () => {
@@ -52,7 +54,7 @@ async function setup(api: TuiPluginContext) {
 
   const dash = demoMode
     ? { refresh: async () => {}, refreshOne: async () => {} }
-    : useDashboard(api, state, setState)
+    : useDashboard(api, state, setState, options.requestTimeoutMs, options.maxPRPages)
   const dashboard: DashboardContext = {
     state,
     refresh: dash.refresh,
@@ -76,6 +78,10 @@ async function setup(api: TuiPluginContext) {
         statusFilter={statusFilter()}
         onCycleScope={cycleScope}
         onCycleStatus={cycleStatus}
+        pageSize={options.pageSize}
+        maxPRPages={options.maxPRPages}
+        colors={options.colors}
+        icons={options.icons}
       />
     ),
   })
@@ -122,7 +128,7 @@ async function setup(api: TuiPluginContext) {
   })
   const interval = setInterval(() => {
     if (api.ui.router.current().type === "session") void dash.refresh()
-  }, 60_000)
+  }, options.refreshIntervalMs)
 
   return () => {
     clearInterval(interval)

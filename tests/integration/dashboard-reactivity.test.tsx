@@ -3,6 +3,7 @@ import { describe, expect, test } from "bun:test"
 import { testRender } from "@opentui/solid"
 import { createSignal } from "solid-js"
 import { DashboardView } from "../../plugins/app/DashboardView"
+import { dashboardOptions } from "../../plugins/app/config"
 import { okState, loadingState } from "../helpers/state-fixtures"
 import { createMockTuiApi } from "../helpers/tui-api-mock"
 
@@ -22,6 +23,10 @@ describe("DashboardView reactivity", () => {
           statusFilter="open"
           onCycleScope={() => {}}
           onCycleStatus={() => {}}
+          pageSize={dashboardOptions().pageSize}
+          maxPRPages={dashboardOptions().maxPRPages}
+          colors={dashboardOptions().colors}
+          icons={dashboardOptions().icons}
         />
       ),
       { width: 80, height: 30 },

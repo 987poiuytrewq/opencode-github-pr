@@ -12,11 +12,10 @@ import {
   type PRStatusFilter,
 } from "../domain/types"
 import { filterPRs } from "../domain/pr-filters"
-import { skin } from "./theme"
+import { skin, type Skin } from "./theme"
 import { errorMessages } from "../domain/messages"
 import { PRRow } from "./PRRow"
-
-const PAGE_SIZE = 5
+import type { DashboardIcons } from "./config"
 
 export function DashboardView(props: {
   theme: ResolvedTheme
@@ -27,8 +26,12 @@ export function DashboardView(props: {
   statusFilter: PRStatusFilter
   onCycleScope: () => void
   onCycleStatus: () => void
+  pageSize: number
+  maxPRPages: number
+  colors: Partial<Skin>
+  icons: DashboardIcons
 }) {
-  const sk = skin(props.theme)
+  const sk = skin(props.theme, props.colors)
   const [scopeHovered, setScopeHovered] = createSignal(false)
   const [statusHovered, setStatusHovered] = createSignal(false)
   const [page, setPage] = createSignal(0)
@@ -58,10 +61,10 @@ export function DashboardView(props: {
     props.state.currentBranch,
     props.state.viewerLogin,
   )
-  const pageCount = () => Math.max(1, Math.ceil(prs().length / PAGE_SIZE))
+  const pageCount = () => Math.max(1, Math.ceil(prs().length / props.pageSize))
   const currentPage = () => Math.min(page(), pageCount() - 1)
   const pagePRs = () =>
-    prs().slice(currentPage() * PAGE_SIZE, (currentPage() + 1) * PAGE_SIZE)
+    prs().slice(currentPage() * props.pageSize, (currentPage() + 1) * props.pageSize)
   const canGoPrevious = () => currentPage() > 0
   const canGoNext = () => currentPage() < pageCount() - 1
   const listIsAvailable = () =>
@@ -122,7 +125,15 @@ export function DashboardView(props: {
   }
 
   return (
-    <box ref={(element) => { view = element }} flexDirection="column" paddingTop={1} paddingBottom={1} gap={0} width="100%">
+    <box
+      ref={(element) => { view = element }}
+      flexDirection="column"
+      paddingTop={1}
+      paddingBottom={1}
+      gap={0}
+      width="100%"
+      backgroundColor={sk.panel}
+    >
       <box
         flexDirection="row"
         gap={1}
@@ -135,29 +146,29 @@ export function DashboardView(props: {
         <box flexGrow={1}></box>
         <box flexDirection="row" gap={2}>
           <text
-            fg={scopeHovered() ? sk.text : sk.muted}
+            fg={scopeHovered() ? sk.accent : sk.muted}
             selectable={false}
             onMouseOver={() => setScopeHovered(true)}
             onMouseOut={() => setScopeHovered(false)}
             onMouseUp={() => props.onCycleScope()}
           >
-            {` ${props.scope}`}
+            {`${props.icons.scope} ${props.scope}`}
           </text>
           <text
-            fg={statusHovered() ? sk.text : sk.muted}
+            fg={statusHovered() ? sk.accent : sk.muted}
             selectable={false}
             onMouseOver={() => setStatusHovered(true)}
             onMouseOut={() => setStatusHovered(false)}
             onMouseUp={() => props.onCycleStatus()}
           >
-            {` ${props.statusFilter}`}
+            {`${props.icons.status} ${props.statusFilter}`}
           </text>
         </box>
       </box>
 
       <Show when={props.state.status === DashboardStatus.Loading}>
         <box flexDirection="column" paddingLeft={1} paddingTop={1} paddingRight={1}>
-          <text fg={sk.muted} selectable={false}>󰔟 Loading PRs</text>
+          <text fg={sk.muted} selectable={false}>{props.icons.loading} Loading PRs</text>
           <text fg={sk.muted} selectable={false}>  Checking GitHub…</text>
         </box>
       </Show>
@@ -170,14 +181,14 @@ export function DashboardView(props: {
 
       <Show when={props.state.status === DashboardStatus.NoRepo}>
         <box flexDirection="column" paddingLeft={1} paddingTop={1} paddingRight={1}>
-          <text fg={sk.muted} selectable={false}> No GitHub repo</text>
+          <text fg={sk.muted} selectable={false}>{props.icons.info} No GitHub repo</text>
           <text fg={sk.muted} selectable={false}>  Add an origin remote or switch to the right project.</text>
         </box>
       </Show>
 
       <Show when={props.state.status === DashboardStatus.Error}>
         <box flexDirection="column" paddingLeft={1} paddingTop={1} paddingRight={1}>
-          <text fg={sk.error} selectable={false}> {errorPresentation().title}</text>
+          <text fg={sk.error} selectable={false}>{props.icons.error} {errorPresentation().title}</text>
           <text fg={sk.muted} selectable={false}>  {errorPresentation().description}</text>
         </box>
       </Show>
@@ -190,7 +201,7 @@ export function DashboardView(props: {
         }
       >
         <box flexDirection="column" paddingLeft={1} paddingTop={1} paddingRight={1}>
-          <text fg={sk.muted} selectable={false}> {errorMessages.noMatchingPRs}</text>
+          <text fg={sk.muted} selectable={false}>{props.icons.info} {errorMessages.noMatchingPRs}</text>
           <text fg={sk.muted} selectable={false}>  Try a different scope or status.</text>
         </box>
       </Show>
@@ -203,8 +214,9 @@ export function DashboardView(props: {
                 <PRRow
                   pr={pr}
                   titleWidth={titleWidth()}
+                  secondaryBackground={sk.panelAlt}
                   onClick={(target) => {
-                    props.setSelectedIdx(currentPage() * PAGE_SIZE + i())
+                    props.setSelectedIdx(currentPage() * props.pageSize + i())
                     props.onOpen(pr.number, target)
                   }}
                   text={sk.text}
@@ -212,7 +224,9 @@ export function DashboardView(props: {
                   pass={sk.success}
                   fail={sk.error}
                   warn={sk.warning}
+                  draft={sk.draft}
                   merged={sk.merged}
+                  icons={props.icons}
                 />
               )}
             </For>
@@ -224,25 +238,27 @@ export function DashboardView(props: {
               gap={1}
               paddingTop={1}
               width="100%"
+              border={["top"]}
+              borderColor={previousHovered() || nextHovered() ? sk.borderActive : sk.border}
             >
               <text
-                fg={canGoPrevious() && previousHovered() ? sk.text : sk.muted}
+                fg={canGoPrevious() && previousHovered() ? sk.accent : sk.muted}
                 selectable={false}
                 onMouseOver={() => canGoPrevious() && setPreviousHovered(true)}
                 onMouseOut={() => setPreviousHovered(false)}
                 onMouseUp={() => canGoPrevious() && setPage(currentPage() - 1)}
               >
-                
+                {props.icons.previousPage}
               </text>
               <text fg={sk.muted} selectable={false}>{`${currentPage() + 1} of ${pageCount()}`}</text>
               <text
-                fg={canGoNext() && nextHovered() ? sk.text : sk.muted}
+                fg={canGoNext() && nextHovered() ? sk.accent : sk.muted}
                 selectable={false}
                 onMouseOver={() => canGoNext() && setNextHovered(true)}
                 onMouseOut={() => setNextHovered(false)}
                 onMouseUp={() => canGoNext() && setPage(currentPage() + 1)}
               >
-                
+                {props.icons.nextPage}
               </text>
             </box>
           </Show>

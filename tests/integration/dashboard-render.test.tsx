@@ -3,6 +3,7 @@ import { describe, expect, test } from "bun:test"
 import { testRender } from "@opentui/solid"
 import type { DashboardState, PRScope, PRStatusFilter, PRLinkTarget } from "../../plugins/domain/types"
 import { DashboardView } from "../../plugins/app/DashboardView"
+import { dashboardOptions } from "../../plugins/app/config"
 import { makeTUIPR } from "../helpers/tui-fixtures"
 import { createMockTuiApi } from "../helpers/tui-api-mock"
 import { loadingState, okState, noRepoState, errorState } from "../helpers/state-fixtures"
@@ -12,8 +13,10 @@ async function renderState(state: DashboardState, handlers: Partial<{
   onCycleStatus: () => void
   scope: PRScope
   statusFilter: PRStatusFilter
+  options: Parameters<typeof dashboardOptions>[0]
 }> = {}, width = 50) {
   const { api } = createMockTuiApi()
+  const options = dashboardOptions(handlers.options)
   return testRender(
     () => (
       <DashboardView
@@ -25,6 +28,10 @@ async function renderState(state: DashboardState, handlers: Partial<{
         statusFilter={handlers.statusFilter ?? "open"}
         onCycleScope={handlers.onCycleScope ?? (() => {})}
         onCycleStatus={handlers.onCycleStatus ?? (() => {})}
+        pageSize={options.pageSize}
+        maxPRPages={options.maxPRPages}
+        colors={options.colors}
+        icons={options.icons}
       />
     ),
     { width, height: 20 },
@@ -155,6 +162,34 @@ describe("DashboardView render", () => {
     const statusLine = r.captureCharFrame().split("\n").find((line) => line.includes("●"))
     expect(statusLine).toBeDefined()
     expect(statusLine?.trimEnd().length).toBe(50)
+  })
+
+  test("applies configured icons, colors, and page size", async () => {
+    const r = await renderState(okState({
+      prs: [
+        makeTUIPR({ number: 1, title: "First" }),
+        makeTUIPR({ number: 2, title: "Second" }),
+        makeTUIPR({ number: 3, title: "Third" }),
+      ],
+    }), {
+      scope: "all",
+      statusFilter: "all",
+      options: {
+        pageSize: 2,
+        colors: { muted: "#123456" },
+        icons: { openPR: "P", scope: "S", status: "F", previousPage: "<", nextPage: ">" },
+      },
+    })
+    await r.flush()
+    const frame = captureFrame(r)
+    expect(frame).toContain("S all")
+    expect(frame).toContain("F all")
+    expect(frame).toContain("P First")
+    expect(frame).toContain("1 of 2")
+    expect(frame).not.toContain("P Third")
+    const mutedSpan = r.captureSpans().lines.flatMap((line) => line.spans)
+      .find((span) => span.text.includes("S all"))
+    expect(mutedSpan?.fg?.toInts()).toEqual([18, 52, 86, 255])
   })
 
   test("right-aligns the scope and status filters in the title bar", async () => {
