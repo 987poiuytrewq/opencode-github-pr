@@ -1,5 +1,6 @@
 /** @jsxImportSource @opentui/solid */
-import type { PR } from "../domain/types"
+import { createSignal, For, Show } from "solid-js"
+import type { PR, PRLinkTarget } from "../domain/types"
 import { truncateTitle } from "../domain/format"
 import {
   checkStatusGroups,
@@ -7,7 +8,6 @@ import {
   reviewStatusGroups,
   type StatusCategory,
 } from "../domain/pr-status"
-import { For, Show } from "solid-js"
 
 const OPEN_PR_ICON = ""
 const MERGED_PR_ICON = ""
@@ -30,10 +30,33 @@ function statusColor(status: StatusCategory, props: {
   }[status]
 }
 
+function ClickableText(props: {
+  label: string
+  color: string
+  target: PRLinkTarget
+  onClick: (target: PRLinkTarget) => void
+}) {
+  const [hovered, setHovered] = createSignal(false)
+  return (
+    <text
+      fg={props.color}
+      selectable={false}
+      onMouseOver={() => setHovered(true)}
+      onMouseOut={() => setHovered(false)}
+      onMouseUp={(event) => {
+        event.stopPropagation()
+        props.onClick(props.target)
+      }}
+    >
+      {hovered() ? <u>{props.label}</u> : props.label}
+    </text>
+  )
+}
+
 export function PRRow(props: {
   pr: PR
   titleWidth: number
-  onClick: () => void
+  onClick: (target: PRLinkTarget) => void
   text: string
   muted: string
   pass: string
@@ -41,6 +64,7 @@ export function PRRow(props: {
   warn: string
   merged: string
 }) {
+  const [titleHovered, setTitleHovered] = createSignal(false)
   const title = () => truncateTitle(props.pr.title, props.titleWidth)
   const icon = props.pr.isMerged ? MERGED_PR_ICON : OPEN_PR_ICON
   const iconColor = props.pr.isMerged
@@ -56,7 +80,9 @@ export function PRRow(props: {
   const commentStatuses = comments
     ? [
         ...(comments.open > 0 ? [{ icon: OPEN_COMMENT_ICON, count: comments.open }] : []),
-        ...(comments.resolved > 0 ? [{ icon: RESOLVED_COMMENT_ICON, count: comments.resolved }] : []),
+        ...(comments.resolved > 0
+          ? [{ icon: RESOLVED_COMMENT_ICON, count: comments.resolved }]
+          : []),
       ]
     : []
 
@@ -66,38 +92,72 @@ export function PRRow(props: {
       width="100%"
       paddingLeft={0}
       paddingRight={0}
-      onMouseUp={() => props.onClick()}
     >
-      <box flexDirection="row" gap={1} width="100%">
-        <text fg={iconColor} selectable={false}>{icon}</text>
+      <box
+        flexDirection="row"
+        gap={1}
+        width="100%"
+        onMouseOver={() => setTitleHovered(true)}
+        onMouseOut={() => setTitleHovered(false)}
+        onMouseUp={() => props.onClick("overview")}
+      >
+        <text fg={iconColor} selectable={false}>
+          {titleHovered() ? <u>{icon}</u> : icon}
+        </text>
         <text fg={props.text} selectable={false} height={1} wrapMode="none">
-          {title()}
+          {titleHovered() ? <u>{title()}</u> : title()}
         </text>
       </box>
-      <box flexDirection="row" gap={1} paddingLeft={2}>
-        <text fg={props.muted} selectable={false}>{`#${props.pr.number}`}</text>
-        <text fg={props.pass} selectable={false}>{`+${props.pr.additions}`}</text>
-        <text fg={props.fail} selectable={false}>{`-${props.pr.deletions}`}</text>
+      <box flexDirection="row" gap={1} paddingLeft={2} width="100%">
+        <ClickableText
+          label={`#${props.pr.number}`}
+          color={props.muted}
+          target="overview"
+          onClick={props.onClick}
+        />
+        <ClickableText
+          label={`+${props.pr.additions}`}
+          color={props.pass}
+          target="files"
+          onClick={props.onClick}
+        />
+        <ClickableText
+          label={`-${props.pr.deletions}`}
+          color={props.fail}
+          target="files"
+          onClick={props.onClick}
+        />
         <box flexGrow={1}></box>
         <Show when={commentStatuses.length > 0}>
           <For each={commentStatuses}>
             {(comment) => (
-              <text fg={props.muted} selectable={false}>{`${comment.icon}${comment.count}`}</text>
+              <ClickableText
+                label={`${comment.icon}${comment.count}`}
+                color={props.muted}
+                target="files"
+                onClick={props.onClick}
+              />
             )}
           </For>
         </Show>
         <For each={reviews}>
           {(group) => (
-            <text fg={statusColor(group.status, props)} selectable={false}>
-              {`${REVIEW_ICON}${reviews.length > 1 ? group.count : ""}`}
-            </text>
+            <ClickableText
+              label={`${REVIEW_ICON}${reviews.length > 1 ? group.count : ""}`}
+              color={statusColor(group.status, props)}
+              target="overview"
+              onClick={props.onClick}
+            />
           )}
         </For>
         <For each={checks}>
           {(group) => (
-            <text fg={statusColor(group.status, props)} selectable={false}>
-              {`●${checks.length > 1 ? group.count : ""}`}
-            </text>
+            <ClickableText
+              label={`●${checks.length > 1 ? group.count : ""}`}
+              color={statusColor(group.status, props)}
+              target="checks"
+              onClick={props.onClick}
+            />
           )}
         </For>
       </box>

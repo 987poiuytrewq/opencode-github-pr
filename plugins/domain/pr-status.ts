@@ -73,13 +73,12 @@ export function checkStatusGroups(pr: PR): StatusGroup[] {
 
 export function reviewStatusGroups(pr: PR): StatusGroup[] {
   const summary = reviewSummary(pr)
-  const counts = new Map<StatusCategory, number>([
+  return orderedGroups(new Map<StatusCategory, number>([
     ["pass", summary.approved],
     ["fail", summary.changes],
     ["pending", summary.pending],
     ["neutral", summary.commented],
-  ])
-  return orderedGroups(counts)
+  ]))
 }
 
 export function commentThreadCounts(pr: PR): { open: number; resolved: number } | null {
