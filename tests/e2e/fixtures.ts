@@ -74,11 +74,13 @@ export async function startOpenCodeE2ESession(
   name: string,
 ): Promise<OpenCodeE2ESession> {
   const configDir = mkdtempSync(join(tmpdir(), "opencode-e2e-config-"))
-  const cliConfigDir = join(configDir, "opencode")
-  mkdirSync(cliConfigDir, { recursive: true })
+  const configPath = join(configDir, "opencode.json")
   writeFileSync(
-    join(cliConfigDir, "cli.json"),
-    JSON.stringify({ plugins: [repo.dir] }),
+    configPath,
+    JSON.stringify({
+      "$schema": "https://opencode.ai/config.json",
+      plugins: [repo.dir],
+    }),
   )
   const portProbe = createServer()
   await new Promise<void>((resolve, reject) => {
@@ -94,9 +96,9 @@ export async function startOpenCodeE2ESession(
   const serverPassword = "e2e-local-only"
   const serverEnv = {
     ...process.env,
-    XDG_CONFIG_HOME: configDir,
     OPENCODE_DISABLE_PROJECT_CONFIG: "1",
     OPENCODE_DISABLE_UPDATE: "1",
+    OPENCODE_CONFIG: configPath,
     OPENCODE_PASSWORD: serverPassword,
     OPENCODE_SERVER_PASSWORD: serverPassword,
   }
@@ -136,7 +138,7 @@ export async function startOpenCodeE2ESession(
       rows: 40,
       cwd: repo.dir,
       env: {
-        XDG_CONFIG_HOME: configDir,
+        OPENCODE_CONFIG: configPath,
         OPENCODE_PASSWORD: serverPassword,
         OPENCODE_SERVER_PASSWORD: serverPassword,
         TERM: "xterm-256color",
