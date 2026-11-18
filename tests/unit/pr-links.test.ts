@@ -14,6 +14,10 @@ describe("prTargetUrl", () => {
     expect(prTargetUrl(url, "files")).toBe(`${url}/files`)
   })
 
+  test("opens the merge status sidebar", () => {
+    expect(prTargetUrl(url, "mergeStatus")).toBe(`${url}?panel=mergeStatus`)
+  })
+
   test("normalizes a trailing slash before appending a page", () => {
     expect(prTargetUrl(`${url}/`, "checks")).toBe(`${url}/checks`)
   })

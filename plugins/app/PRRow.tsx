@@ -41,8 +41,14 @@ function ClickableText(props: {
     <text
       fg={props.color}
       selectable={false}
-      onMouseOver={() => setHovered(true)}
-      onMouseOut={() => setHovered(false)}
+      onMouseOver={(event) => {
+        event.stopPropagation()
+        setHovered(true)
+      }}
+      onMouseOut={(event) => {
+        event.stopPropagation()
+        setHovered(false)
+      }}
       onMouseUp={(event) => {
         event.stopPropagation()
         props.onClick(props.target)
@@ -101,9 +107,12 @@ export function PRRow(props: {
         onMouseOut={() => setTitleHovered(false)}
         onMouseUp={() => props.onClick("overview")}
       >
-        <text fg={iconColor} selectable={false}>
-          {titleHovered() ? <u>{icon}</u> : icon}
-        </text>
+        <ClickableText
+          label={icon}
+          color={iconColor}
+          target="mergeStatus"
+          onClick={props.onClick}
+        />
         <text fg={props.text} selectable={false} height={1} wrapMode="none">
           {titleHovered() ? <u>{title()}</u> : title()}
         </text>
