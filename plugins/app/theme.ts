@@ -15,6 +15,7 @@ export const DEFAULT_SKIN = {
   warning: "#d8a657",
   error: "#d86565",
   draft: "#888888",
+  merged: "#a371f7",
 }
 
 export type Skin = {
@@ -42,7 +43,7 @@ export function toHex(c: { toInts(): [number, number, number, number] }): string
   )
 }
 
-export function skin(t: ResolvedTheme): Skin {
+export function skin(t: ResolvedTheme, overrides: Partial<Skin> = {}): Skin {
   return {
     panel: toHex(t.background.base),
     panelAlt: toHex(t.background.raised.base),
@@ -56,5 +57,6 @@ export function skin(t: ResolvedTheme): Skin {
     error: toHex(t.text.feedback.error.base),
     draft: toHex(t.text.muted),
     merged: toHex(t.text.action.primary.base),
+    ...overrides,
   }
 }

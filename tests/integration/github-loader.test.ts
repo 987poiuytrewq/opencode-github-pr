@@ -120,6 +120,29 @@ describe("repositoryPRs", () => {
     expect(result.listingTruncated).toBe(true);
   });
 
+  test("honors a customized repository page limit", async () => {
+    let calls = 0;
+    mockOctokitDefault((op) => {
+      if (op !== "graphql") return null;
+      calls++;
+      return {
+        viewer: { login: "octocat" },
+        repository: {
+          pullRequests: {
+            pageInfo: { hasNextPage: true, endCursor: `cursor-${calls}` },
+            nodes: [{ number: calls, title: `PR ${calls}`, state: "OPEN" }],
+          },
+        },
+      };
+    });
+
+    const result = await repositoryPRs({ owner: "foo", repo: "bar" }, 2);
+
+    expect(calls).toBe(2);
+    expect(result.fetchedPages).toBe(2);
+    expect(result.listingTruncated).toBe(true);
+  });
+
   test("rejects an invalid or repeated pagination cursor", async () => {
     let calls = 0;
     mockOctokitDefault((op) => {

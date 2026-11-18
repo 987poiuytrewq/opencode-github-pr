@@ -9,11 +9,6 @@ import {
   type StatusCategory,
 } from "../domain/pr-status"
 
-const OPEN_PR_ICON = ""
-const MERGED_PR_ICON = ""
-const REVIEW_ICON = ""
-const OPEN_COMMENT_ICON = "󰅺"
-
 function statusColor(status: StatusCategory, props: {
   pass: string
   fail: string
@@ -95,19 +90,30 @@ function ClickableComment(props: {
 export function PRRow(props: {
   pr: PR
   titleWidth: number
+  secondaryBackground: string
   onClick: (target: PRLinkTarget) => void
   text: string
   muted: string
   pass: string
   fail: string
   warn: string
+  draft: string
   merged: string
+  icons: {
+    openPR: string
+    mergedPR: string
+    review: string
+    openComment: string
+    check: string
+  }
 }) {
   const [titleHovered, setTitleHovered] = createSignal(false)
   const title = () => truncateTitle(props.pr.title, props.titleWidth)
-  const icon = props.pr.isMerged ? MERGED_PR_ICON : OPEN_PR_ICON
+  const icon = props.pr.isMerged ? props.icons.mergedPR : props.icons.openPR
   const iconColor = props.pr.isMerged
     ? props.merged
+    : props.pr.isDraft
+      ? props.draft
     : props.pr.mergeable === "MERGEABLE"
       ? props.pass
       : props.pr.mergeable === "CONFLICTING"
@@ -117,7 +123,7 @@ export function PRRow(props: {
   const reviews = reviewStatusGroups(props.pr)
   const comments = commentThreadCounts(props.pr)
   const commentStatuses = comments?.open
-    ? [{ icon: OPEN_COMMENT_ICON, count: comments.open }]
+    ? [{ icon: props.icons.openComment, count: comments.open }]
     : []
 
   return (
@@ -145,7 +151,7 @@ export function PRRow(props: {
           {titleHovered() ? <u>{title()}</u> : title()}
         </text>
       </box>
-      <box flexDirection="row" gap={1} paddingLeft={2} width="100%">
+      <box flexDirection="row" gap={1} paddingLeft={2} width="100%" backgroundColor={props.secondaryBackground}>
         <ClickableText
           label={`#${props.pr.number}`}
           color={props.muted}
@@ -180,7 +186,7 @@ export function PRRow(props: {
         <For each={reviews}>
           {(group) => (
             <ClickableText
-              label={`${REVIEW_ICON}${reviews.length > 1 ? group.count : ""}`}
+              label={`${props.icons.review}${reviews.length > 1 ? group.count : ""}`}
               color={statusColor(group.status, props)}
               target="overview"
               onClick={props.onClick}
@@ -190,7 +196,7 @@ export function PRRow(props: {
         <For each={checks}>
           {(group) => (
             <ClickableText
-              label={`●${checks.length > 1 ? group.count : ""}`}
+              label={`${props.icons.check}${checks.length > 1 ? group.count : ""}`}
               color={statusColor(group.status, props)}
               target="checks"
               onClick={props.onClick}

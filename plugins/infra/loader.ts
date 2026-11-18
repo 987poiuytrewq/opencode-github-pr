@@ -45,9 +45,13 @@ function readPullRequestPage(value: unknown): {
 // GitHub's GraphQL API returns both `data` and `errors` when specific
 // fields are inaccessible. Octokit throws on any errors, but the partial
 // data is still usable — errored fields are null in the response.
-async function graphqlPartial(query: string, vars: Record<string, unknown>): Promise<unknown> {
+async function graphqlPartial(
+  query: string,
+  vars: Record<string, unknown>,
+  requestTimeoutMs: number,
+): Promise<unknown> {
   try {
-    return await getOctokit().graphql(query, vars)
+    return await getOctokit(requestTimeoutMs).graphql(query, vars)
   } catch (e: unknown) {
     if (isRecord(e) && "data" in e && e.data) return e.data
     throw e
@@ -56,6 +60,8 @@ async function graphqlPartial(query: string, vars: Record<string, unknown>): Pro
 
 export async function repositoryPRs(
   repo: Repo | null,
+  maxPages = MAX_REPOSITORY_PR_PAGES,
+  requestTimeoutMs = 15_000,
 ): Promise<RepositoryPRsResult> {
   if (!repo) return { prs: [], viewerLogin: null, listingTruncated: false, fetchedPages: 0 }
   const nodes: unknown[] = []
@@ -70,7 +76,7 @@ export async function repositoryPRs(
       name: repo.repo,
       head: null,
       after,
-    })
+    }, requestTimeoutMs)
     const page = readPullRequestPage(data)
     nodes.push(...page.nodes)
     if (page.viewerLogin) viewerLogin = page.viewerLogin
@@ -86,7 +92,7 @@ export async function repositoryPRs(
     }
     seenCursors.add(nextCursor)
     after = nextCursor
-  } while (hasNextPage && fetchedPages < MAX_REPOSITORY_PR_PAGES)
+  } while (hasNextPage && fetchedPages < maxPages)
   return {
     prs: nodes.map(mapPullFromGraphQL),
     viewerLogin,

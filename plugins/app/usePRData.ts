@@ -16,11 +16,14 @@ import {
 import { currentBranch, detectRepo } from "../infra/git"
 import { repositoryPRs, fetchOnePR } from "../infra/loader"
 import { prListErrorKind, prListErrorMessage, parseRateLimitError } from "../domain/messages"
+import { DEFAULT_MAX_PR_PAGES, DEFAULT_REQUEST_TIMEOUT_MS } from "./config"
 
 export function useDashboard(
   api: TuiPluginContext,
   state: () => DashboardState,
   setState: (fn: (s: DashboardState) => DashboardState) => void,
+  requestTimeoutMs = DEFAULT_REQUEST_TIMEOUT_MS,
+  maxPRPages = DEFAULT_MAX_PR_PAGES,
 ): {
   refresh: () => Promise<void>
   refreshOne: (n: number) => Promise<void>
@@ -85,8 +88,9 @@ export function useDashboard(
           }))
           return
         }
-        const TIMEOUT_MS = 15_000
-        const result = await timeoutRace(TIMEOUT_MS, () => repositoryPRs(repo))
+        const result = await timeoutRace(requestTimeoutMs, () =>
+          repositoryPRs(repo, maxPRPages, requestTimeoutMs),
+        )
         if (isStale()) return
         setState((s) => ({
           ...s,

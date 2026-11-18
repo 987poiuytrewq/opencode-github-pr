@@ -25,6 +25,7 @@ export function getAuthToken(): string {
 export type OctokitOpts = {
   token?: string
   fetch?: typeof globalThis.fetch
+  requestTimeoutMs?: number
   throttle?: boolean
   retry?: boolean
 }
@@ -34,7 +35,7 @@ export function createOctokit(opts: OctokitOpts = {}): Octokit {
     userAgent: "opencode-gh-pr",
     auth: opts.token,
     fetch: opts.fetch,
-    request: { timeout: 15_000 },
+    request: { timeout: opts.requestTimeoutMs ?? 15_000 },
     throttle: opts.throttle === false ? { enabled: false } : {
       onRateLimit: (
         retryAfter: number,
@@ -64,13 +65,13 @@ export function createOctokit(opts: OctokitOpts = {}): Octokit {
   })
 }
 
-let cached: { token: string; client: Octokit } | null = null
+let cached: { token: string; requestTimeoutMs: number; client: Octokit } | null = null
 
-export function getOctokit(): Octokit {
-  if (cached) return cached.client
-  const token = getAuthToken()
-  const client = createOctokit({ token })
-  cached = { token, client }
+export function getOctokit(requestTimeoutMs = 15_000): Octokit {
+  const token = cached?.token ?? getAuthToken()
+  if (cached?.requestTimeoutMs === requestTimeoutMs) return cached.client
+  const client = createOctokit({ token, requestTimeoutMs })
+  cached = { token, requestTimeoutMs, client }
   return client
 }
 
@@ -78,6 +79,6 @@ export function setOctokit(client: Octokit | null): void {
   if (client === null) {
     cached = null
   } else {
-    cached = { token: "test", client }
+    cached = { token: "test", requestTimeoutMs: 15_000, client }
   }
 }

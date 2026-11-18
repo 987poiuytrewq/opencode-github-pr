@@ -13,6 +13,62 @@ OpenCode V2 plugin providing a TUI sidebar dashboard for GitHub pull requests.
 
 The package exports both parts via `package.json`; OpenCode V2 loads them together as one plugin.
 
+## Customize the dashboard
+
+Set plugin options in the plugin entry's `options` object. The following example shows every configurable color and icon:
+
+```json
+{
+  "plugins": [
+    {
+      "package": "/absolute/path/to/opencode-github-pr",
+      "options": {
+        "enabled": true,
+        "pageSize": 8,
+        "maxPRPages": 3,
+        "refreshIntervalMs": 30000,
+        "requestTimeoutMs": 15000,
+        "defaultScope": "author",
+        "defaultStatusFilter": "open",
+        "colors": {
+          "panel": "#161616",
+          "panelAlt": "#1d1d1d",
+          "border": "#3a3a3a",
+          "borderActive": "#5f87ff",
+          "text": "#e5e5e5",
+          "muted": "#888888",
+          "accent": "#5f87ff",
+          "success": "#5fbf5f",
+          "warning": "#d8a657",
+          "error": "#d86565",
+          "draft": "#888888",
+          "merged": "#a371f7"
+        },
+        "icons": {
+          "openPR": "",
+          "mergedPR": "",
+          "review": "",
+          "openComment": "󰅺",
+          "check": "●",
+          "scope": "",
+          "status": "",
+          "loading": "󰔟",
+          "info": "",
+          "error": "",
+          "previousPage": "",
+          "nextPage": ""
+        }
+      }
+    }
+  ]
+}
+```
+
+`pageSize`, `maxPRPages`, `refreshIntervalMs`, and `requestTimeoutMs` must be positive numbers. `defaultScope` accepts
+`branch`, `author`, `assignee`, or `all`; `defaultStatusFilter` accepts `open`, `closed`, or `all`. Colors can be any
+OpenTUI-supported color string. Icons accept any non-empty string, so plain ASCII glyphs work in terminals without a
+Nerd Font. Unspecified colors use the active OpenCode theme; unspecified icons and options retain their defaults.
+
 ## Run a local OpenCode session
 
 From this checkout, run:
