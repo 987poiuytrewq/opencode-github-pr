@@ -40,7 +40,7 @@ export function PRRow(props: {
   warn: string
   merged: string
 }) {
-  const title = truncateTitle(props.pr.title, String(props.pr.number).length + 1)
+  const title = truncateTitle(props.pr.title, 48)
   const icon = props.pr.isMerged ? MERGED_PR_ICON : OPEN_PR_ICON
   const iconColor = props.pr.isMerged
     ? props.merged
@@ -52,12 +52,19 @@ export function PRRow(props: {
   const checks = checkStatusGroups(props.pr)
   const reviews = reviewStatusGroups(props.pr)
   const comments = commentThreadCounts(props.pr)
+  const commentStatuses = comments
+    ? [
+        ...(comments.open > 0 ? [{ icon: OPEN_COMMENT_ICON, count: comments.open }] : []),
+        ...(comments.resolved > 0 ? [{ icon: RESOLVED_COMMENT_ICON, count: comments.resolved }] : []),
+      ]
+    : []
 
   return (
     <box
       flexDirection="column"
+      gap={1}
       paddingLeft={0}
-      paddingRight={1}
+      paddingRight={0}
       onMouseUp={() => props.onClick()}
     >
       <box flexDirection="row" gap={1}>
@@ -69,13 +76,12 @@ export function PRRow(props: {
         <text fg={props.pass} selectable={false}>{`+${props.pr.additions}`}</text>
         <text fg={props.fail} selectable={false}>{`-${props.pr.deletions}`}</text>
         <box flexGrow={1}></box>
-        <Show when={comments}>
-          {(counts) => (
-            <>
-              <text fg={props.muted} selectable={false}>{`${OPEN_COMMENT_ICON}${counts().open}`}</text>
-              <text fg={props.muted} selectable={false}>{`${RESOLVED_COMMENT_ICON}${counts().resolved}`}</text>
-            </>
-          )}
+        <Show when={commentStatuses.length > 0}>
+          <For each={commentStatuses}>
+            {(comment) => (
+              <text fg={props.muted} selectable={false}>{`${comment.icon}${comment.count}`}</text>
+            )}
+          </For>
         </Show>
         <For each={reviews}>
           {(group) => (
