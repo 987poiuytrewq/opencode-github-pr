@@ -34,7 +34,7 @@ function setup(api: TuiPluginContext) {
     fetchedAt: null,
   })
   const [selectedIdx, setSelectedIdx] = createSignal(0)
-  const [scope, setScope] = createSignal<PRScope>("branch")
+  const [scope, setScope] = createSignal<PRScope>("author")
   const [statusFilter, setStatusFilter] = createSignal<PRStatusFilter>("open")
   const visiblePRs = () =>
     filterPRs(state().prs, scope(), statusFilter(), state().currentBranch, state().viewerLogin)
