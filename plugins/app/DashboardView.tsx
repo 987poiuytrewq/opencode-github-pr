@@ -1,6 +1,8 @@
 /** @jsxImportSource @opentui/solid */
-import { createSignal, For, Show } from "solid-js"
+import { createSignal, For, onCleanup, onMount, Show } from "solid-js"
 import type { ResolvedTheme } from "@opencode/theme/tui"
+import type { BoxRenderable } from "@opentui/core"
+import { useRenderer } from "@opentui/solid"
 import {
   DashboardStatus,
   type DashboardState,
@@ -27,6 +29,19 @@ export function DashboardView(props: {
   const sk = skin(props.theme)
   const [scopeHovered, setScopeHovered] = createSignal(false)
   const [statusHovered, setStatusHovered] = createSignal(false)
+  let view: BoxRenderable | undefined
+  const [titleWidth, setTitleWidth] = createSignal(48)
+  const renderer = useRenderer()
+  onMount(() => {
+    const updateTitleWidth = () => {
+      if (!view) return
+      const nextWidth = Math.max(1, Math.floor(view.width) - 2)
+      setTitleWidth((current) => current === nextWidth ? current : nextWidth)
+    }
+    renderer.on("frame", updateTitleWidth)
+    onCleanup(() => renderer.off("frame", updateTitleWidth))
+  })
+
   const prs = () => filterPRs(
     props.state.prs,
     props.scope,
@@ -35,7 +50,7 @@ export function DashboardView(props: {
     props.state.viewerLogin,
   )
   return (
-    <box flexDirection="column" paddingTop={1} paddingBottom={1} gap={0}>
+    <box ref={(element) => { view = element }} flexDirection="column" paddingTop={1} paddingBottom={1} gap={0} width="100%">
       <box
         flexDirection="row"
         gap={1}
@@ -96,11 +111,12 @@ export function DashboardView(props: {
       </Show>
 
       <Show when={props.state.status === DashboardStatus.Ok && prs().length > 0}>
-        <box flexDirection="column" gap={1} paddingTop={1}>
+        <box flexDirection="column" gap={1} paddingTop={1} width="100%">
           <For each={prs()}>
             {(pr, i) => (
               <PRRow
                 pr={pr}
+                titleWidth={titleWidth()}
                 onClick={() => {
                   props.setSelectedIdx(i())
                   props.onOpen(pr.number)

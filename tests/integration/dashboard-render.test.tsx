@@ -13,7 +13,7 @@ async function renderState(state: DashboardState, handlers: Partial<{
   onCycleStatus: () => void
   scope: PRScope
   statusFilter: PRStatusFilter
-}> = {}) {
+}> = {}, width = 50) {
   const { api } = createMockTuiApi()
   return testRender(
     () => (
@@ -30,7 +30,7 @@ async function renderState(state: DashboardState, handlers: Partial<{
         onCycleStatus={handlers.onCycleStatus ?? (() => {})}
       />
     ),
-    { width: 50, height: 20 },
+    { width, height: 20 },
   )
 }
 
@@ -109,6 +109,20 @@ describe("DashboardView render", () => {
     }))
     await r.flush()
     expect(captureFrame(r)).toContain("This is a very long PR title that should only…")
+  })
+
+  test("truncates titles to one line at the available row width", async () => {
+    const r = await renderState(okState({
+      prs: [makeTUIPR({
+        title: "A very long pull request title that must remain on one line",
+      })],
+    }), {}, 24)
+    await r.flush()
+    const lines = r.captureCharFrame().split("\n")
+    const titleLine = lines.find((line) => line.includes(" A"))
+
+    expect(titleLine).toContain("A very long pull…")
+    expect(lines.filter((line) => line.includes("request title")).length).toBe(0)
   })
 
   test("right-aligns status indicators to the edge of the sidebar", async () => {
