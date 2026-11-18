@@ -27,7 +27,11 @@ export function DashboardView(props: {
       setTitleWidth((current) => current === nextWidth ? current : nextWidth)
     }
     renderer.on("frame", updateTitleWidth)
-    onCleanup(() => renderer.off("frame", updateTitleWidth))
+    renderer.on("resize", updateTitleWidth)
+    onCleanup(() => {
+      renderer.off("frame", updateTitleWidth)
+      renderer.off("resize", updateTitleWidth)
+    })
   })
 
   return (
