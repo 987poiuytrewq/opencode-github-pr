@@ -7,7 +7,7 @@ import { currentBranch } from "./git"
 import { type Repo, type ReviewThread, type PR } from "../domain/types"
 import { mapPullFromGraphQL, mapPullFromREST } from "./mappers"
 import {
-  CURRENT_BRANCH_PRS_QUERY,
+  PULL_REQUESTS_QUERY,
   REVIEWER_THREADS_QUERY,
 } from "./queries"
 
@@ -41,14 +41,46 @@ export async function addPullRequestReviewer(
   })
 }
 
+export async function repositoryPRs(
+  repo: Repo | null,
+): Promise<{ prs: PR[]; viewerLogin: string | null }> {
+  if (!repo) return { prs: [], viewerLogin: null }
+  const nodes: any[] = []
+  let after: string | null = null
+  let viewerLogin: string | null = null
+  do {
+    const data: any = await graphqlPartial(PULL_REQUESTS_QUERY, {
+      owner: repo.owner,
+      name: repo.repo,
+      head: null,
+      after,
+    })
+    const connection = data?.repository?.pullRequests
+    nodes.push(...(connection?.nodes ?? []).filter(Boolean))
+    viewerLogin = data?.viewer?.login ?? viewerLogin
+    const pageInfo = connection?.pageInfo
+    if (pageInfo?.hasNextPage) {
+      const nextCursor = pageInfo.endCursor
+      if (!nextCursor || nextCursor === after) {
+        throw new Error("GitHub returned an invalid pull request pagination cursor")
+      }
+      after = nextCursor
+    } else {
+      after = null
+    }
+  } while (after)
+  return { prs: nodes.map(mapPullFromGraphQL), viewerLogin }
+}
+
 export async function currentBranchPRs(repo: Repo | null, cwd: string = process.cwd()): Promise<PR[]> {
   if (!repo) return []
   const branch = currentBranch(cwd)
   if (!branch) return []
-  const data: any = await graphqlPartial(CURRENT_BRANCH_PRS_QUERY, {
+  const data: any = await graphqlPartial(PULL_REQUESTS_QUERY, {
     owner: repo.owner,
     name: repo.repo,
     head: branch,
+    after: null,
   })
   const nodes: any[] = data?.repository?.pullRequests?.nodes ?? []
   return nodes.filter(Boolean).map(mapPullFromGraphQL)
@@ -56,7 +88,7 @@ export async function currentBranchPRs(repo: Repo | null, cwd: string = process.
 
 export async function currentBranchPR(repo: Repo | null, cwd: string = process.cwd()): Promise<PR | null> {
   const prs = await currentBranchPRs(repo, cwd)
-  return prs.find((pr) => !pr.isMerged) ?? null
+  return prs.find((pr) => !pr.isClosed) ?? null
 }
 
 export async function fetchOnePR(repo: Repo, pullNumber: number): Promise<PR> {

@@ -12,6 +12,8 @@ export function createDashboard(api: TuiPluginContext) {
     status: DashboardStatus.Loading,
     repo: null,
     prs: [],
+    currentBranch: null,
+    viewerLogin: null,
     fetchedAt: null,
   })
   const dash = useDashboard(api, state, setState)

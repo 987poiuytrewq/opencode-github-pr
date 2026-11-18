@@ -3,7 +3,7 @@ import { createSignal, For, Show } from "solid-js"
 import type { PR, PRLinkTarget } from "../domain/types"
 import { truncateTitle } from "../domain/format"
 import {
-  classifyCI,
+  checkStatusGroups,
   commentThreadCounts,
   reviewStatusGroups,
   type StatusCategory,
@@ -38,8 +38,9 @@ function ClickableText(props: {
 }) {
   const [hovered, setHovered] = createSignal(false)
   return (
-    <box
-      flexDirection="row"
+    <text
+      fg={props.color}
+      selectable={false}
       onMouseOver={() => setHovered(true)}
       onMouseOut={() => setHovered(false)}
       onMouseUp={(event) => {
@@ -47,15 +48,14 @@ function ClickableText(props: {
         props.onClick(props.target)
       }}
     >
-      <text fg={props.color} selectable={false}>
-        {hovered() ? <u>{props.label}</u> : props.label}
-      </text>
-    </box>
+      {hovered() ? <u>{props.label}</u> : props.label}
+    </text>
   )
 }
 
 export function PRRow(props: {
   pr: PR
+  titleWidth: number
   onClick: (target: PRLinkTarget) => void
   text: string
   muted: string
@@ -64,7 +64,8 @@ export function PRRow(props: {
   warn: string
   merged: string
 }) {
-  const title = truncateTitle(props.pr.title, String(props.pr.number).length + 1)
+  const [titleHovered, setTitleHovered] = createSignal(false)
+  const title = () => truncateTitle(props.pr.title, props.titleWidth)
   const icon = props.pr.isMerged ? MERGED_PR_ICON : OPEN_PR_ICON
   const iconColor = props.pr.isMerged
     ? props.merged
@@ -73,13 +74,7 @@ export function PRRow(props: {
       : props.pr.mergeable === "CONFLICTING"
         ? props.fail
         : props.muted
-  const ci = classifyCI(props.pr)
-  const ciColor = {
-    pass: props.pass,
-    fail: props.fail,
-    pending: props.warn,
-    none: props.muted,
-  }[ci]
+  const checks = checkStatusGroups(props.pr)
   const reviews = reviewStatusGroups(props.pr)
   const comments = commentThreadCounts(props.pr)
   const commentStatuses = comments
@@ -94,25 +89,26 @@ export function PRRow(props: {
   return (
     <box
       flexDirection="column"
+      width="100%"
       paddingLeft={0}
-      paddingRight={1}
-      onMouseUp={() => props.onClick("overview")}
+      paddingRight={0}
     >
-      <box flexDirection="row" gap={1}>
-        <ClickableText
-          label={icon}
-          color={iconColor}
-          target="mergeStatus"
-          onClick={props.onClick}
-        />
-        <ClickableText
-          label={title}
-          color={props.text}
-          target="overview"
-          onClick={props.onClick}
-        />
+      <box
+        flexDirection="row"
+        gap={1}
+        width="100%"
+        onMouseOver={() => setTitleHovered(true)}
+        onMouseOut={() => setTitleHovered(false)}
+        onMouseUp={() => props.onClick("overview")}
+      >
+        <text fg={iconColor} selectable={false}>
+          {titleHovered() ? <u>{icon}</u> : icon}
+        </text>
+        <text fg={props.text} selectable={false} height={1} wrapMode="none">
+          {titleHovered() ? <u>{title()}</u> : title()}
+        </text>
       </box>
-      <box flexDirection="row" gap={1} paddingLeft={2}>
+      <box flexDirection="row" gap={1} paddingLeft={2} width="100%">
         <ClickableText
           label={`#${props.pr.number}`}
           color={props.muted}
@@ -154,12 +150,16 @@ export function PRRow(props: {
             />
           )}
         </For>
-        <ClickableText
-          label="●"
-          color={ciColor}
-          target="checks"
-          onClick={props.onClick}
-        />
+        <For each={checks}>
+          {(group) => (
+            <ClickableText
+              label={`●${checks.length > 1 ? group.count : ""}`}
+              color={statusColor(group.status, props)}
+              target="checks"
+              onClick={props.onClick}
+            />
+          )}
+        </For>
       </box>
     </box>
   )

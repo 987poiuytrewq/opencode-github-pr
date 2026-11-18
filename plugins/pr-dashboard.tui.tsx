@@ -2,7 +2,14 @@
 import { createSignal } from "solid-js"
 import { Plugin } from "@opencode/plugin/tui"
 import type { Context as TuiPluginContext } from "@opencode/plugin/tui/context"
-import { DashboardStatus, type DashboardContext, type DashboardState } from "./domain/types"
+import {
+  DashboardStatus,
+  type DashboardContext,
+  type DashboardState,
+  type PRScope,
+  type PRStatusFilter,
+} from "./domain/types"
+import { filterPRs, nextPRScope, nextPRStatusFilter } from "./domain/pr-filters"
 import { DashboardView } from "./app/DashboardView"
 import { useDashboard } from "./app/usePRData"
 import { createActions } from "./app/actions"
@@ -22,11 +29,23 @@ function setup(api: TuiPluginContext) {
     status: DashboardStatus.Loading,
     repo: null,
     prs: [],
+    currentBranch: null,
+    viewerLogin: null,
     fetchedAt: null,
   })
   const [selectedIdx, setSelectedIdx] = createSignal(0)
-  const [expanded, setExpanded] = createSignal(true)
-  const toggleExpanded = () => setExpanded((value) => !value)
+  const [scope, setScope] = createSignal<PRScope>("branch")
+  const [statusFilter, setStatusFilter] = createSignal<PRStatusFilter>("open")
+  const visiblePRs = () =>
+    filterPRs(state().prs, scope(), statusFilter(), state().currentBranch, state().viewerLogin)
+  const cycleScope = () => {
+    setScope(nextPRScope(scope()))
+    setSelectedIdx(0)
+  }
+  const cycleStatus = () => {
+    setStatusFilter(nextPRStatusFilter(statusFilter()))
+    setSelectedIdx(0)
+  }
 
   const dash = useDashboard(api, state, setState)
   const dashboard: DashboardContext = {
@@ -35,8 +54,6 @@ function setup(api: TuiPluginContext) {
     refreshOne: dash.refreshOne,
     selectedIdx,
     setSelectedIdx,
-    expanded,
-    toggleExpanded,
   }
   const actions = createActions(api, dashboard)
 
@@ -52,8 +69,10 @@ function setup(api: TuiPluginContext) {
         selectedIdx={selectedIdx()}
         setSelectedIdx={setSelectedIdx}
         onOpen={actions.openPR}
-        expanded={expanded()}
-        onToggleExpand={toggleExpanded}
+        scope={scope()}
+        statusFilter={statusFilter()}
+        onCycleScope={cycleScope}
+        onCycleStatus={cycleStatus}
       />
     ),
   })
@@ -83,9 +102,9 @@ function setup(api: TuiPluginContext) {
             group: "PR Dashboard",
             palette: true,
             slash: { name: "pr-open" },
-            enabled: () => state().prs.length > 0,
+            enabled: () => visiblePRs().length > 0,
             run() {
-              const pr = state().prs[selectedIdx()]
+              const pr = visiblePRs()[selectedIdx()]
               if (pr) void actions.openPR(pr.number)
             },
           },
@@ -95,9 +114,9 @@ function setup(api: TuiPluginContext) {
             group: "PR Dashboard",
             palette: true,
             slash: { name: "pr-add-reviewer" },
-            enabled: () => state().prs.length > 0,
+            enabled: () => visiblePRs().length > 0,
             run() {
-              const pr = state().prs[selectedIdx()]
+              const pr = visiblePRs()[selectedIdx()]
               if (pr) void actions.promptReviewer(pr.number, "add")
             },
           },
@@ -107,9 +126,9 @@ function setup(api: TuiPluginContext) {
             group: "PR Dashboard",
             palette: true,
             slash: { name: "pr-rerequest-review" },
-            enabled: () => state().prs.length > 0,
+            enabled: () => visiblePRs().length > 0,
             run() {
-              const pr = state().prs[selectedIdx()]
+              const pr = visiblePRs()[selectedIdx()]
               if (pr) void actions.promptReviewer(pr.number, "rerequest")
             },
           },

@@ -24,9 +24,9 @@ describe.skipIf(!isE2E())("E2E: sidebar content area", () => {
     expect(screen).toContain("┃")
   }, 30_000)
 
-  test("sidebar area contains the Changes heading", async () => {
+  test("sidebar area contains the Pull Requests heading", async () => {
     const screen = await session.capturePanePlain()
-    expect(screen).toContain("Changes")
+    expect(screen).toContain("Pull Requests")
   }, 30_000)
 
   test("sidebar does not contain a filter label", async () => {

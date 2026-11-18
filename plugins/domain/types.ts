@@ -10,19 +10,27 @@ export type PR = {
   url: string
   isDraft: boolean
   isMerged: boolean
+  isClosed: boolean
+  headRefName: string
+  authorLogin: string
+  assigneeLogins: string[]
   additions: number
   deletions: number
   baseRefName: string
   mergeable: string
   statusCheckRollup: { state: string } | null
+  checkStatuses: string[] | null
   reviewThreads: Array<{ isResolved: boolean }> | null
   reviewRequests: Array<{ login: string }> | null
   latestReviews: Array<{ author: { login: string }; state: string }> | null
 }
 
-export type PRLinkTarget = "overview" | "mergeStatus" | "checks" | "files"
+export type PRLinkTarget = "overview" | "checks" | "files"
 
 export type Repo = { owner: string; repo: string }
+
+export type PRScope = "branch" | "author" | "assignee" | "all"
+export type PRStatusFilter = "open" | "closed" | "all"
 
 export enum DashboardStatus {
   Loading = "loading",
@@ -35,6 +43,8 @@ export type DashboardState = {
   status: DashboardStatus
   repo: Repo | null
   prs: PR[]
+  currentBranch: string | null
+  viewerLogin: string | null
   fetchedAt: number | null
   error?: string
 }
@@ -57,6 +67,4 @@ export interface DashboardContext {
   refreshOne: (n: number) => Promise<void>
   selectedIdx: () => number
   setSelectedIdx: (n: number) => void
-  expanded: () => boolean
-  toggleExpanded: () => void
 }

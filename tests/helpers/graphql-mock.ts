@@ -25,7 +25,7 @@ export function makeFakeRepo(owner = "owner", repo = "repo"): string {
 }
 
 // GraphQL repository connection response with N fake PRs. Matches the shape
-// produced by CURRENT_BRANCH_PRS_QUERY.
+// produced by PULL_REQUESTS_QUERY.
 export function makeSearchResponse(prCount = 2) {
   const nodes = Array.from({ length: prCount }, (_, i) => ({
     number: i + 1,
@@ -33,18 +33,20 @@ export function makeSearchResponse(prCount = 2) {
     url: `https://github.com/owner/repo/pull/${i + 1}`,
     isDraft: false,
     state: "OPEN",
+    headRefName: "feature",
+    author: { login: "octocat" },
+    assignees: { nodes: [] },
     additions: 42,
     deletions: 8,
     baseRefName: "main",
     mergeable: "MERGEABLE",
-    statusCheckRollup: { state: "SUCCESS" },
+    statusCheckRollup: { state: "SUCCESS", contexts: { nodes: [] } },
     reviewThreads: { nodes: [] },
-    author: { login: "octocat" },
-    assignees: { nodes: [] },
     reviewRequests: { nodes: [] },
     latestReviews: { nodes: [] },
   }))
   return {
+    viewer: { login: "octocat" },
     repository: { pullRequests: { nodes } },
   }
 }

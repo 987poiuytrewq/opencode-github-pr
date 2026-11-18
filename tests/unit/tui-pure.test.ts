@@ -3,6 +3,7 @@ import { BOT_ALIASES, displayLogin, ellipsize } from "../../plugins/domain/login
 import {
   classifyCI,
   classifyRowState,
+  checkStatusGroups,
   commentThreadCounts,
   reviewSummary,
   reviewStatusGroups,
@@ -34,6 +35,43 @@ describe("classifyCI", () => {
   })
   test("returns 'none' for an unknown check state", () => {
     expect(classifyCI(makeTUIPR({ statusCheckRollup: { state: "UNKNOWN" } }))).toBe("none")
+  })
+})
+
+describe("status groups", () => {
+  test("groups mixed checks by status and preserves single-status compact display data", () => {
+    const mixed = makeTUIPR({ checkStatuses: ["SUCCESS", "SUCCESS", "FAILURE"] })
+    expect(checkStatusGroups(mixed)).toEqual([
+      { status: "pass", count: 2 },
+      { status: "fail", count: 1 },
+    ])
+    expect(checkStatusGroups(makeTUIPR({ checkStatuses: ["SUCCESS", "SUCCESS"] }))).toEqual([
+      { status: "pass", count: 2 },
+    ])
+  })
+
+  test("groups reviews including pending requests and comment-only reviews", () => {
+    const pr = makeTUIPR({
+      latestReviews: [
+        { author: { login: "alice" }, state: "APPROVED" },
+        { author: { login: "bob" }, state: "CHANGES_REQUESTED" },
+        { author: { login: "carol" }, state: "COMMENTED" },
+      ],
+      reviewRequests: [{ login: "dana" }],
+    })
+    expect(reviewStatusGroups(pr)).toEqual([
+      { status: "pass", count: 1 },
+      { status: "fail", count: 1 },
+      { status: "pending", count: 1 },
+      { status: "neutral", count: 1 },
+    ])
+  })
+
+  test("counts open and resolved review threads", () => {
+    expect(commentThreadCounts(makeTUIPR({
+      reviewThreads: [{ isResolved: false }, { isResolved: true }, { isResolved: false }],
+    }))).toEqual({ open: 2, resolved: 1 })
+    expect(commentThreadCounts(makeTUIPR({ reviewThreads: null }))).toBeNull()
   })
 })
 
@@ -245,26 +283,24 @@ describe("toHex", () => {
 
 describe("truncateTitle", () => {
   test("returns title unchanged when short enough", () => {
-    expect(truncateTitle("Short", 2)).toBe("Short")
+    expect(truncateTitle("Short", 12)).toBe("Short")
   })
-  test("truncates long titles", () => {
-    const long = "This is a very long PR title that should be truncated"
-    const out = truncateTitle(long, 3)
-    expect(out.length).toBeLessThan(long.length)
-    expect(out.endsWith("…")).toBe(true)
+  test("truncates long titles at the previous word boundary", () => {
+    expect(truncateTitle("The title continues past this point", 24)).toBe("The title continues…")
   })
-  test("respects minimum budget of 8", () => {
-    expect(truncateTitle("hi", 0)).toBe("hi")
+  test("truncates a single word when there is no earlier word boundary", () => {
+    expect(truncateTitle("supercalifragilistic", 8)).toBe("superca…")
   })
-  test("truncates when over budget", () => {
-    const long = "x".repeat(50)
-    const out = truncateTitle(long, 0)
-    expect(out.length).toBeLessThan(long.length)
-    expect(out.endsWith("…")).toBe(true)
+  test("truncates to terminal-cell width for wide characters", () => {
+    const title = truncateTitle("Fix界界界界界", 8)
+    expect(title).toBe("Fix界界…")
+    expect(Bun.stringWidth(title)).toBeLessThanOrEqual(8)
   })
-  test("budget decreases with wider numbers", () => {
-    const a = truncateTitle("aaaaaaaaaa", 2)
-    const b = truncateTitle("aaaaaaaaaa", 5)
-    expect(b.length).toBeLessThanOrEqual(a.length)
+  test("normalizes embedded whitespace so titles stay on one line", () => {
+    expect(truncateTitle("A title\nwith\tline breaks", 40)).toBe("A title with line breaks")
+  })
+  test("never returns a value wider than the requested terminal-cell width", () => {
+    const title = truncateTitle("A title longer than the limit", 8)
+    expect(Bun.stringWidth(title)).toBeLessThanOrEqual(8)
   })
 })

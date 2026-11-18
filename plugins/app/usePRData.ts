@@ -13,8 +13,8 @@ import {
   type DashboardState,
   type Repo,
 } from "../domain/types"
-import { detectRepo } from "../infra/git"
-import { currentBranchPRs, fetchOnePR } from "../infra/loader"
+import { currentBranch, detectRepo } from "../infra/git"
+import { repositoryPRs, fetchOnePR } from "../infra/loader"
 import { prListErrorMessage, parseRateLimitError } from "../domain/messages"
 
 export function useDashboard(
@@ -77,6 +77,8 @@ export function useDashboard(
             status: DashboardStatus.NoRepo,
             repo: null,
             prs: [],
+            currentBranch: null,
+            viewerLogin: null,
             error: undefined,
             fetchedAt: Date.now(),
           }))
@@ -84,13 +86,15 @@ export function useDashboard(
           return
         }
         const TIMEOUT_MS = 15_000
-        const prs = await timeoutRace(TIMEOUT_MS, () => currentBranchPRs(repo, directory))
+        const { prs, viewerLogin } = await timeoutRace(TIMEOUT_MS, () => repositoryPRs(repo))
         if (isStale()) return
         setState((s) => ({
           ...s,
           status: DashboardStatus.Ok,
           repo,
           prs,
+          currentBranch: currentBranch(directory),
+          viewerLogin,
           error: undefined,
           fetchedAt: Date.now(),
         }))
@@ -125,7 +129,13 @@ export function useDashboard(
       const updated = await fetchOnePR(repo, n)
       setState((s) => ({
         ...s,
-        prs: s.prs.map((p) => (p.number === n ? updated : p)),
+        prs: s.prs.map((p) => p.number === n
+          ? {
+              ...updated,
+              checkStatuses: updated.checkStatuses ?? p.checkStatuses,
+              reviewThreads: updated.reviewThreads ?? p.reviewThreads,
+            }
+          : p),
         fetchedAt: Date.now(),
       }))
     } catch {}

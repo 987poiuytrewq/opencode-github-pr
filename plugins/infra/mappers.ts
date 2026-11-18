@@ -12,14 +12,23 @@ export function mapPullFromGraphQL(p: any): PR {
     url: p.url,
     isDraft: p.isDraft ?? false,
     isMerged: p.state === "MERGED" || p.merged === true,
+    isClosed: p.state === "CLOSED" || p.state === "MERGED" || p.merged === true,
+    headRefName: p.headRefName ?? "",
+    authorLogin: p.author?.login ?? "",
+    assigneeLogins: (p.assignees?.nodes ?? []).map((assignee: any) => assignee.login).filter(Boolean),
     additions: p.additions ?? 0,
     deletions: p.deletions ?? 0,
     baseRefName: p.baseRefName,
     mergeable: (p.mergeable ?? "UNKNOWN").toUpperCase(),
     statusCheckRollup: p.statusCheckRollup ?? null,
-    reviewThreads: p.reviewThreads?.nodes?.map((thread: any) => ({
-      isResolved: thread.isResolved ?? false,
-    })) ?? null,
+    checkStatuses: Array.isArray(p.statusCheckRollup?.contexts?.nodes)
+      ? p.statusCheckRollup.contexts.nodes
+          .map((c: any) => c.__typename === "CheckRun" ? c.conclusion ?? c.status : c.state)
+          .filter(Boolean)
+      : null,
+    reviewThreads: Array.isArray(p.reviewThreads?.nodes)
+      ? p.reviewThreads.nodes.map((t: any) => ({ isResolved: Boolean(t.isResolved) }))
+      : null,
     reviewRequests: (p.reviewRequests?.nodes ?? [])
       .map((n: any) => n.requestedReviewer?.login)
       .filter(Boolean)
@@ -40,11 +49,16 @@ export function mapPullFromREST(p: any): PR {
     url: p.html_url,
     isDraft: p.draft ?? false,
     isMerged: p.merged ?? false,
+    isClosed: p.state === "closed" || p.merged === true,
+    headRefName: p.head?.ref ?? "",
+    authorLogin: p.user?.login ?? "",
+    assigneeLogins: (p.assignees ?? []).map((assignee: any) => assignee.login).filter(Boolean),
     additions: p.additions ?? 0,
     deletions: p.deletions ?? 0,
     baseRefName: p.base.ref,
     mergeable: p.mergeable ? "MERGEABLE" : p.mergeable === false ? "CONFLICTING" : "UNKNOWN",
     statusCheckRollup: null,
+    checkStatuses: null,
     reviewThreads: null,
     reviewRequests: (p.requested_reviewers ?? []).map((r: any) => ({ login: r.login })),
     latestReviews: (p.latest_reviews ?? []).map((r: any) => ({

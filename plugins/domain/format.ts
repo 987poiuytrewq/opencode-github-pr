@@ -1,12 +1,26 @@
 // Pure formatting helpers used by the TUI sidebar: title truncation and
 // relative age rendering.
 
-const TITLE_BUDGET = 30
+const graphemes = new Intl.Segmenter(undefined, { granularity: "grapheme" })
 
-export function truncateTitle(title: string, numWidth: number): string {
-  const budget = Math.max(8, TITLE_BUDGET - numWidth)
-  if (title.length <= budget) return title
-  return title.slice(0, budget - 1) + "…"
+export function truncateTitle(title: string, maxWidth: number): string {
+  const budget = Math.max(1, Math.floor(maxWidth))
+  const normalized = title.replace(/\s+/gu, " ").trim()
+  if (Bun.stringWidth(normalized) <= budget) return normalized
+
+  const contentBudget = Math.max(0, budget - Bun.stringWidth("…"))
+  let prefix = ""
+  let truncated = ""
+  for (const { segment } of graphemes.segment(normalized)) {
+    const next = prefix + segment
+    if (Bun.stringWidth(next) > contentBudget) break
+    prefix = next
+    truncated = prefix
+  }
+
+  const wordBoundary = truncated.lastIndexOf(" ")
+  if (wordBoundary > 0) truncated = truncated.slice(0, wordBoundary).trimEnd()
+  return `${truncated}…`
 }
 
 export function formatAge(iso: string): string {
