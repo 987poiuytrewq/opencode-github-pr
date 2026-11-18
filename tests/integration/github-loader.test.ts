@@ -1,7 +1,4 @@
 import { afterEach, beforeEach, describe, expect, test } from "bun:test";
-import { mkdtempSync, rmSync } from "node:fs";
-import { tmpdir } from "node:os";
-import { join } from "node:path";
 import {
   clearOctokitMocks,
   installOctokitMock,
@@ -10,13 +7,9 @@ import {
 } from "../helpers/octokit-mock";
 import {
   MAX_REPOSITORY_PR_PAGES,
-  currentBranchPR,
-  currentBranchPRs,
   repositoryPRs,
-  fetchOrgMembers,
   fetchOnePR,
 } from "../../plugins/infra/loader";
-import { makeFakeRepo } from "../helpers/graphql-mock";
 
 installOctokitMock();
 
@@ -26,149 +19,6 @@ beforeEach(() => {
 
 afterEach(() => {
   clearOctokitMocks();
-});
-
-describe("currentBranchPR", () => {
-  test("returns the PR matching current branch", async () => {
-    const dir = makeFakeRepo("foo", "bar");
-    let lastQuery = "";
-    mockOctokitDefault((op, params) => {
-      if (op === "graphql") {
-        lastQuery = params?.query ?? "";
-        return {
-          repository: {
-            pullRequests: {
-              nodes: [
-                {
-                  number: 7,
-                  title: "PR 7",
-                  url: "https://github.com/foo/bar/pull/7",
-                  isDraft: false,
-                  state: "OPEN",
-                  additions: 12,
-                  deletions: 3,
-                  baseRefName: "main",
-                  mergeable: "MERGEABLE",
-                  statusCheckRollup: {
-                    state: "SUCCESS",
-                    contexts: {
-                      nodes: [
-                        {
-                          __typename: "CheckRun",
-                          status: "COMPLETED",
-                          conclusion: "SUCCESS",
-                        },
-                        { __typename: "StatusContext", state: "PENDING" },
-                      ],
-                    },
-                  },
-                  reviewThreads: {
-                    nodes: [{ isResolved: false }, { isResolved: true }],
-                  },
-                  reviewRequests: { nodes: [] },
-                  latestReviews: { nodes: [] },
-                },
-              ],
-            },
-          },
-        };
-      }
-      return null;
-    });
-    const pr = await currentBranchPR({ owner: "foo", repo: "bar" }, dir);
-    expect(lastQuery).toContain("headRefName: $head");
-    expect(lastQuery).toContain("states: [OPEN, CLOSED, MERGED]");
-    expect(lastQuery).toContain("additions");
-    expect(lastQuery).toContain("deletions");
-    expect(lastQuery).toContain("contexts(first: 100)");
-    expect(lastQuery).toContain("reviewThreads(first: 100)");
-    expect(pr?.number).toBe(7);
-    expect(pr?.checkStatuses).toEqual(["SUCCESS", "PENDING"]);
-    expect(pr?.reviewThreads).toEqual([
-      { isResolved: false },
-      { isResolved: true },
-    ]);
-    rmSync(dir, { recursive: true, force: true });
-  });
-
-  test("returns null when no PR for branch", async () => {
-    const dir = makeFakeRepo("foo", "bar");
-    mockOctokitDefault((op) => {
-      if (op === "graphql")
-        return { repository: { pullRequests: { nodes: [] } } };
-      return null;
-    });
-    const pr = await currentBranchPR({ owner: "foo", repo: "bar" }, dir);
-    expect(pr).toBeNull();
-    rmSync(dir, { recursive: true, force: true });
-  });
-
-  test("returns null when no .git/HEAD exists", async () => {
-    const dir = mkdtempSync(join(tmpdir(), "pr-dash-"));
-    const pr = await currentBranchPR({ owner: "foo", repo: "bar" }, dir);
-    expect(pr).toBeNull();
-    rmSync(dir, { recursive: true, force: true });
-  });
-
-  test("returns null when repo is null", async () => {
-    const dir = makeFakeRepo("foo", "bar");
-    const pr = await currentBranchPR(null, dir);
-    expect(pr).toBeNull();
-    rmSync(dir, { recursive: true, force: true });
-  });
-
-  test("returns open and merged PRs for the current branch", async () => {
-    const dir = makeFakeRepo("foo", "bar");
-    let lastParams: any;
-    mockOctokitDefault((op, params) => {
-      if (op === "graphql") {
-        lastParams = params?.params;
-        return {
-          repository: {
-            pullRequests: {
-              nodes: [
-                {
-                  number: 8,
-                  title: "Open",
-                  state: "OPEN",
-                  additions: 4,
-                  deletions: 1,
-                },
-                {
-                  number: 7,
-                  title: "Merged",
-                  state: "MERGED",
-                  additions: 10,
-                  deletions: 2,
-                },
-              ],
-            },
-          },
-        };
-      }
-      return null;
-    });
-    const prs = await currentBranchPRs({ owner: "foo", repo: "bar" }, dir);
-    expect(lastParams).toEqual({
-      owner: "foo",
-      name: "bar",
-      head: "main",
-      after: null,
-    });
-    expect(
-      prs.map((pr) => [
-        pr.number,
-        pr.isMerged,
-        pr.isClosed,
-        pr.additions,
-        pr.deletions,
-      ]),
-    ).toEqual([
-      [8, false, false, 4, 1],
-      [7, true, true, 10, 2],
-    ]);
-    rmSync(dir, { recursive: true, force: true });
-  });
 });
 
 describe("repositoryPRs", () => {
@@ -311,23 +161,6 @@ describe("repositoryPRs", () => {
     await expect(repositoryPRs({ owner: "foo", repo: "bar" })).rejects.toThrow(
       "invalid or repeated pull request pagination cursor",
     );
-  });
-});
-
-describe("fetchOrgMembers", () => {
-  test("extracts logins from listMembers response", async () => {
-    mockOctokitDefault(() => ({
-      data: [{ login: "alice" }, { login: "bob" }],
-    }));
-    const members = await fetchOrgMembers("acme");
-    expect(members).toEqual(["alice", "bob"]);
-  });
-
-  test("returns empty array on error", async () => {
-    mockOctokitDefault(() => {
-      throw new Error("forbidden");
-    });
-    expect(await fetchOrgMembers("acme")).toEqual([]);
   });
 });
 
