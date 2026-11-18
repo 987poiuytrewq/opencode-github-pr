@@ -2,6 +2,8 @@
 
 OpenCode V2 plugin providing GitHub pull-request tools and a TUI sidebar dashboard.
 
+![OpenCode GitHub PR dashboard demo](demo/demo.gif)
+
 ## Plugin parts
 
 - `plugins/pr-dashboard.ts` — server part: `pr_add_reviewer` and `pr_rerequest_review` tools.
@@ -21,6 +23,22 @@ make opencode
 
 This starts the interactive TUI with a standalone server so the plugin can read the GitHub token. It uses an existing
 `GH_TOKEN`, `GITHUB_TOKEN`, or `GITHUB_PERSONAL_ACCESS_TOKEN`; if none is set, it reads the token from `gh auth token`.
+
+## Record a dashboard demo
+
+Use asciinema to create a headless, replayable recording and GIF of the real OpenCode TUI, including scripted pagination
+and filter interactions:
+
+```bash
+make demo
+```
+
+The command writes `demo/demo.cast` and `demo/demo.gif`. It requires `asciinema`, `agg`,
+`tmux`, Bun, and the OpenCode CLI. It uses fictional PR data in an isolated temporary repository, disables GitHub
+credentials and network-backed dashboard refreshes, and keeps OpenCode's user configuration in a temporary home
+directory. It pages through the list, changes scope and status filters, and leaves the recording on the combined view.
+Replay the recording with `asciinema play demo/demo.cast`. Re-running `make demo` replaces the generated
+recording and GIF.
 
 ## Install locally
 
