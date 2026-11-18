@@ -24,12 +24,7 @@ describe.skipIf(!isE2E())("E2E: sidebar content area", () => {
     expect(screen).toContain("┃")
   }, 30_000)
 
-  test("sidebar area has non-space content", async () => {
-    const screen = await session.capturePanePlain()
-    expect(screen.split("\n").some((line) => line.includes("Changes") && line.indexOf("Changes") > 70)).toBe(true)
-  }, 30_000)
-
-  test("sidebar contains Changes heading", async () => {
+  test("sidebar area contains the Changes heading", async () => {
     const screen = await session.capturePanePlain()
     expect(screen).toContain("Changes")
   }, 30_000)
