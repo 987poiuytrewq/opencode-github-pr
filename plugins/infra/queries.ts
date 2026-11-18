@@ -21,6 +21,11 @@ export const CURRENT_BRANCH_PRS_QUERY = `query CurrentBranchPRs($owner: String!,
         statusCheckRollup {
           state
         }
+        reviewThreads(first: 100) {
+          nodes {
+            isResolved
+          }
+        }
         reviewRequests(first: 5) {
           nodes {
             requestedReviewer {

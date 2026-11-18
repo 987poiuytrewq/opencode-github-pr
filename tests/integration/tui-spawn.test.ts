@@ -47,6 +47,7 @@ describe("currentBranchPR", () => {
               baseRefName: "main",
               mergeable: "MERGEABLE",
               statusCheckRollup: { state: "SUCCESS" },
+              reviewThreads: { nodes: [{ isResolved: false }, { isResolved: true }] },
               reviewRequests: { nodes: [] },
               latestReviews: { nodes: [] },
             }] },
@@ -60,7 +61,9 @@ describe("currentBranchPR", () => {
     expect(lastQuery).toContain("states: [OPEN, MERGED]")
     expect(lastQuery).toContain("additions")
     expect(lastQuery).toContain("deletions")
+    expect(lastQuery).toContain("reviewThreads(first: 100)")
     expect(pr?.number).toBe(7)
+    expect(pr?.reviewThreads).toEqual([{ isResolved: false }, { isResolved: true }])
     rmSync(dir, { recursive: true, force: true })
   })
 
@@ -266,6 +269,7 @@ describe("fetchOnePR", () => {
     expect(pr.isMerged).toBe(false)
     expect(pr.additions).toBe(9)
     expect(pr.deletions).toBe(2)
+    expect(pr.reviewThreads).toBeNull()
     expect(pr.reviewRequests).toEqual([{ login: "bob" }])
   })
 

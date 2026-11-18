@@ -3,6 +3,9 @@
 
 import type { PR } from "./types"
 
+export type StatusCategory = "pass" | "fail" | "pending" | "neutral" | "none"
+export type StatusGroup = { status: StatusCategory; count: number }
+
 // Row color: draft → grey, merge conflict → red, ready to merge → green,
 // otherwise → "default" (white/text).
 export function classifyRowState(pr: PR): "draft" | "blocked" | "ready" | "default" {
@@ -20,6 +23,36 @@ export function classifyCI(pr: PR): "pass" | "fail" | "pending" | "none" {
   if (state === "FAILURE" || state === "ERROR") return "fail"
   if (state === "PENDING" || state === "EXPECTED") return "pending"
   return "none"
+}
+
+const statusOrder: StatusCategory[] = ["pass", "fail", "pending", "neutral", "none"]
+
+function orderedGroups(counts: Map<StatusCategory, number>): StatusGroup[] {
+  return statusOrder
+    .filter((status) => (counts.get(status) ?? 0) > 0)
+    .map((status) => ({ status, count: counts.get(status)! }))
+}
+
+export function reviewStatusGroups(pr: PR): StatusGroup[] {
+  const summary = reviewSummary(pr)
+  return orderedGroups(new Map<StatusCategory, number>([
+    ["pass", summary.approved],
+    ["fail", summary.changes],
+    ["pending", summary.pending],
+    ["neutral", summary.commented],
+  ]))
+}
+
+export function commentThreadCounts(pr: PR): { open: number; resolved: number } | null {
+  if (pr.reviewThreads === null) return null
+  return pr.reviewThreads.reduce(
+    (counts, thread) => {
+      if (thread.isResolved) counts.resolved++
+      else counts.open++
+      return counts
+    },
+    { open: 0, resolved: 0 },
+  )
 }
 
 export function reviewSummary(pr: PR): {

@@ -15,9 +15,12 @@ export type PR = {
   baseRefName: string
   mergeable: string
   statusCheckRollup: { state: string } | null
+  reviewThreads: Array<{ isResolved: boolean }> | null
   reviewRequests: Array<{ login: string }> | null
   latestReviews: Array<{ author: { login: string }; state: string }> | null
 }
+
+export type PRLinkTarget = "overview" | "mergeStatus" | "checks" | "files"
 
 export type Repo = { owner: string; repo: string }
 

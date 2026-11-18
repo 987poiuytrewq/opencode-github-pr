@@ -17,6 +17,9 @@ export function mapPullFromGraphQL(p: any): PR {
     baseRefName: p.baseRefName,
     mergeable: (p.mergeable ?? "UNKNOWN").toUpperCase(),
     statusCheckRollup: p.statusCheckRollup ?? null,
+    reviewThreads: p.reviewThreads?.nodes?.map((thread: any) => ({
+      isResolved: thread.isResolved ?? false,
+    })) ?? null,
     reviewRequests: (p.reviewRequests?.nodes ?? [])
       .map((n: any) => n.requestedReviewer?.login)
       .filter(Boolean)
@@ -42,6 +45,7 @@ export function mapPullFromREST(p: any): PR {
     baseRefName: p.base.ref,
     mergeable: p.mergeable ? "MERGEABLE" : p.mergeable === false ? "CONFLICTING" : "UNKNOWN",
     statusCheckRollup: null,
+    reviewThreads: null,
     reviewRequests: (p.requested_reviewers ?? []).map((r: any) => ({ login: r.login })),
     latestReviews: (p.latest_reviews ?? []).map((r: any) => ({
       author: { login: r.user?.login ?? "" },

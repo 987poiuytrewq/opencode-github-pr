@@ -38,6 +38,7 @@ export function makeSearchResponse(prCount = 2) {
     baseRefName: "main",
     mergeable: "MERGEABLE",
     statusCheckRollup: { state: "SUCCESS" },
+    reviewThreads: { nodes: [] },
     author: { login: "octocat" },
     assignees: { nodes: [] },
     reviewRequests: { nodes: [] },
