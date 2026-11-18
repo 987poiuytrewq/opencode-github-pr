@@ -258,7 +258,16 @@ describe("truncateTitle", () => {
   test("truncates a single word when there is no earlier word boundary", () => {
     expect(truncateTitle("supercalifragilistic", 8)).toBe("superca…")
   })
-  test("never returns a value wider than the requested width", () => {
-    expect(truncateTitle("A title longer than the limit", 8).length).toBeLessThanOrEqual(8)
+  test("truncates to terminal-cell width for wide characters", () => {
+    const title = truncateTitle("Fix界界界界界", 8)
+    expect(title).toBe("Fix界界…")
+    expect(Bun.stringWidth(title)).toBeLessThanOrEqual(8)
+  })
+  test("normalizes embedded whitespace so titles stay on one line", () => {
+    expect(truncateTitle("A title\nwith\tline breaks", 40)).toBe("A title with line breaks")
+  })
+  test("never returns a value wider than the requested terminal-cell width", () => {
+    const title = truncateTitle("A title longer than the limit", 8)
+    expect(Bun.stringWidth(title)).toBeLessThanOrEqual(8)
   })
 })
