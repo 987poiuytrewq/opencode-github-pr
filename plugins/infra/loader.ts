@@ -3,9 +3,7 @@
 // retry, and timeouts.
 
 import { getOctokit } from "./octokit"
-import { currentBranch } from "./git"
 import { type Repo, type PR } from "../domain/types"
-import { parseReviewerTarget } from "../domain/reviewer-target"
 import { mapPullFromGraphQL, mapPullFromREST } from "./mappers"
 import { PULL_REQUESTS_QUERY } from "./queries"
 
@@ -56,31 +54,6 @@ async function graphqlPartial(query: string, vars: Record<string, unknown>): Pro
   }
 }
 
-export async function addPullRequestReviewer(
-  repo: Repo,
-  pullNumber: number,
-  reviewer: string,
-): Promise<void> {
-  if (!repo) throw new Error("no repo")
-  if (!Number.isInteger(pullNumber) || pullNumber < 1) {
-    throw new Error("Pull request number must be a positive integer")
-  }
-  const target = parseReviewerTarget(reviewer, repo)
-  if (!target) {
-    throw new Error(`Reviewer must be a GitHub login or a team in ${repo.owner}/team format`)
-  }
-  const octokit = getOctokit()
-  const request = {
-    owner: repo.owner,
-    repo: repo.repo,
-    pull_number: pullNumber,
-    ...(target.kind === "user"
-      ? { reviewers: [target.login] }
-      : { team_reviewers: [target.slug] }),
-  }
-  await octokit.pulls.requestReviewers(request)
-}
-
 export async function repositoryPRs(
   repo: Repo | null,
 ): Promise<RepositoryPRsResult> {
@@ -122,24 +95,6 @@ export async function repositoryPRs(
   }
 }
 
-export async function currentBranchPRs(repo: Repo | null, cwd: string = process.cwd()): Promise<PR[]> {
-  if (!repo) return []
-  const branch = currentBranch(cwd)
-  if (!branch) return []
-  const data = await graphqlPartial(PULL_REQUESTS_QUERY, {
-    owner: repo.owner,
-    name: repo.repo,
-    head: branch,
-    after: null,
-  })
-  return readPullRequestPage(data).nodes.map(mapPullFromGraphQL)
-}
-
-export async function currentBranchPR(repo: Repo | null, cwd: string = process.cwd()): Promise<PR | null> {
-  const prs = await currentBranchPRs(repo, cwd)
-  return prs.find((pr) => !pr.isClosed) ?? null
-}
-
 export async function fetchOnePR(repo: Repo, pullNumber: number): Promise<PR> {
   const octokit = getOctokit()
   const { data } = await octokit.pulls.get({
@@ -148,22 +103,4 @@ export async function fetchOnePR(repo: Repo, pullNumber: number): Promise<PR> {
     pull_number: pullNumber,
   })
   return mapPullFromREST(data)
-}
-
-export async function fetchOrgMembers(org: string): Promise<string[]> {
-  try {
-    const octokit = getOctokit()
-    const members: string[] = []
-    for await (const res of octokit.paginate.iterator(octokit.orgs.listMembers, {
-      org,
-      per_page: 100,
-    })) {
-      for (const m of res.data) {
-        if (typeof m.login === "string") members.push(m.login)
-      }
-    }
-    return members
-  } catch {
-    return []
-  }
 }

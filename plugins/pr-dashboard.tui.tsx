@@ -18,9 +18,6 @@ import { demoDashboardState } from "../demo/fixtures"
 const command = {
   refresh: "opencode-github-pr.refresh",
   open: "opencode-github-pr.open",
-  addReviewer: "opencode-github-pr.add-reviewer",
-  reRequestReview: "opencode-github-pr.rerequest-review",
-  addCurrentBranch: "opencode-github-pr.add-current-branch-reviewer",
 }
 
 function setup(api: TuiPluginContext) {
@@ -111,38 +108,6 @@ function setup(api: TuiPluginContext) {
               const pr = visiblePRs()[selectedIdx()]
               if (pr) void actions.openPR(pr.number)
             },
-          },
-          {
-            id: command.addReviewer,
-            title: "PRs: Add reviewer to selected",
-            group: "PR Dashboard",
-            palette: true,
-            slash: { name: "pr-add-reviewer" },
-            enabled: () => visiblePRs().length > 0,
-            run() {
-              const pr = visiblePRs()[selectedIdx()]
-              if (pr) void actions.promptReviewer(pr.number, "add")
-            },
-          },
-          {
-            id: command.reRequestReview,
-            title: "PRs: Re-request review on selected",
-            group: "PR Dashboard",
-            palette: true,
-            slash: { name: "pr-rerequest-review" },
-            enabled: () => visiblePRs().length > 0,
-            run() {
-              const pr = visiblePRs()[selectedIdx()]
-              if (pr) void actions.promptReviewer(pr.number, "rerequest")
-            },
-          },
-          {
-            id: command.addCurrentBranch,
-            title: "PRs: Add reviewer to current branch PR",
-            group: "PR Dashboard",
-            palette: true,
-            slash: { name: "pr-add-reviewer-current" },
-            run: () => actions.addReviewerToCurrentBranchPR(),
           },
         ],
       }))

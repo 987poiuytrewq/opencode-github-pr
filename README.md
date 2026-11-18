@@ -1,13 +1,13 @@
 # opencode-github-pr
 
-OpenCode V2 plugin providing GitHub pull-request tools and a TUI sidebar dashboard.
+OpenCode V2 plugin providing a TUI sidebar dashboard for GitHub pull requests.
 
 ![OpenCode GitHub PR dashboard demo](demo/demo.gif)
 
 ## Plugin parts
 
-- `plugins/pr-dashboard.ts` — server part: `pr_add_reviewer` and `pr_rerequest_review` tools.
-- `plugins/pr-dashboard.tui.tsx` — TUI part: PR list, CI/review status, reviewer actions, slash commands, and refresh-on-idle.
+- `plugins/pr-dashboard.ts` — server part: plugin registration.
+- `plugins/pr-dashboard.tui.tsx` — TUI part: PR list, CI/review status, slash commands, and refresh-on-idle.
 - `plugins/` — shared GitHub data loaders, domain logic, and Solid UI components.
 - `tests/` — unit, integration, and TUI end-to-end tests.
 

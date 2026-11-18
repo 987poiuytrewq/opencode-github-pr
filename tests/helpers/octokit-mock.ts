@@ -35,23 +35,11 @@ function buildMockClient() {
     pulls: {
       list: async (params: any) => dispatch("pulls.list", params),
       get: async (params: any) => dispatch("pulls.get", params),
-      requestReviewers: async (params: any) => dispatch("pulls.requestReviewers", params),
     },
     repos: {
       getBranchProtection: async (params: any) => dispatch("repos.getBranchProtection", params),
     },
-    orgs: {
-      listMembers: (params: any) => dispatch("orgs.listMembers", params),
-    },
     graphql: async (query: string, params: any) => dispatch("graphql", { query, params }),
-    paginate: {
-      iterator: (fn: any, params: any) => {
-        return (async function* () {
-          const res = await fn(params)
-          yield res
-        })()
-      },
-    },
   } as any
 }
 
