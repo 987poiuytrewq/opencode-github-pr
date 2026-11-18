@@ -46,6 +46,7 @@ export function errorState(overrides: Partial<DashboardState> = {}): DashboardSt
     viewerLogin: "octocat",
     fetchedAt: Date.now(),
     error: "Could not authenticate. Run `gh auth status` to confirm.",
+    errorKind: "authentication",
     ...overrides,
   }
 }

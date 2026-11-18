@@ -2,10 +2,10 @@
 
 exports[`DashboardView render loading state 1`] = `
 "
-Pull Requests Loading              branch   open
+Pull Requests                      branch   open
 
-
-
+ 󰔟 Loading PRs
+  Checking GitHub…
 
 
 
@@ -50,11 +50,11 @@ Pull Requests                      branch   open
 
 exports[`DashboardView render no-repo state 1`] = `
 "
-Pull Requests Not a git repo       branch   open
+Pull Requests                      branch   open
 
- Not a git repo
-
-
+  No GitHub repo
+  Add an origin remote or switch to the right
+ project.
 
 
 
@@ -74,10 +74,10 @@ Pull Requests Not a git repo       branch   open
 
 exports[`DashboardView render error state 1`] = `
 "
-Pull Requests Error                branch   open
+Pull Requests                      branch   open
 
- Could not authenticate. Run \`gh auth status\` to
- confirm.
+  GitHub sign-in failed
+  Set GITHUB_TOKEN or GH_TOKEN.
 
 
 
@@ -100,8 +100,8 @@ exports[`DashboardView render ok state with empty PRs 1`] = `
 "
 Pull Requests                      branch   open
 
- No PRs match these filters
-
+  No matching PRs
+  Try a different scope or status.
 
 
 
