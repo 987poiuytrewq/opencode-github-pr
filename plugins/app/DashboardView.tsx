@@ -3,7 +3,13 @@ import { createSignal, For, onCleanup, onMount, Show } from "solid-js"
 import type { ResolvedTheme } from "@opencode/theme/tui"
 import type { BoxRenderable } from "@opentui/core"
 import { useRenderer } from "@opentui/solid"
-import { DashboardStatus, type DashboardState } from "../domain/types"
+import {
+  DashboardStatus,
+  type DashboardState,
+  type PRScope,
+  type PRStatusFilter,
+} from "../domain/types"
+import { filterPRs } from "../domain/pr-filters"
 import { skin } from "./theme"
 import { errorMessages } from "../domain/messages"
 import { PRRow } from "./PRRow"
@@ -15,8 +21,14 @@ export function DashboardView(props: {
   selectedIdx: number
   setSelectedIdx: (n: number) => void
   onOpen: (n: number) => void
+  scope: PRScope
+  statusFilter: PRStatusFilter
+  onCycleScope: () => void
+  onCycleStatus: () => void
 }) {
   const sk = skin(props.theme)
+  const [scopeHovered, setScopeHovered] = createSignal(false)
+  const [statusHovered, setStatusHovered] = createSignal(false)
   let view: BoxRenderable | undefined
   const [titleWidth, setTitleWidth] = createSignal(48)
   const renderer = useRenderer()
@@ -30,6 +42,13 @@ export function DashboardView(props: {
     onCleanup(() => renderer.off("frame", updateTitleWidth))
   })
 
+  const prs = () => filterPRs(
+    props.state.prs,
+    props.scope,
+    props.statusFilter,
+    props.state.currentBranch,
+    props.state.viewerLogin,
+  )
   return (
     <box ref={(element) => { view = element }} flexDirection="column" paddingTop={1} paddingBottom={1} gap={0} width="100%">
       <box
@@ -50,6 +69,27 @@ export function DashboardView(props: {
         <Show when={props.state.status === DashboardStatus.NoRepo}>
           <text fg={sk.muted}>{errorMessages.noRepo}</text>
         </Show>
+        <box flexGrow={1}></box>
+        <box flexDirection="row" gap={2}>
+          <text
+            fg={scopeHovered() ? sk.text : sk.muted}
+            selectable={false}
+            onMouseOver={() => setScopeHovered(true)}
+            onMouseOut={() => setScopeHovered(false)}
+            onMouseUp={() => props.onCycleScope()}
+          >
+            {` ${props.scope}`}
+          </text>
+          <text
+            fg={statusHovered() ? sk.text : sk.muted}
+            selectable={false}
+            onMouseOver={() => setStatusHovered(true)}
+            onMouseOut={() => setStatusHovered(false)}
+            onMouseUp={() => props.onCycleStatus()}
+          >
+            {` ${props.statusFilter}`}
+          </text>
+        </box>
       </box>
 
       <Show when={props.state.status === DashboardStatus.NoRepo}>
@@ -64,15 +104,15 @@ export function DashboardView(props: {
         </box>
       </Show>
 
-      <Show when={props.state.status === DashboardStatus.Ok && props.state.prs.length === 0}>
+      <Show when={props.state.status === DashboardStatus.Ok && prs().length === 0}>
         <box flexDirection="column" paddingLeft={1} paddingTop={1} paddingRight={1}>
-          <text fg={sk.muted} selectable={false}>{errorMessages.noBranchPRs}</text>
+          <text fg={sk.muted} selectable={false}>{errorMessages.noMatchingPRs}</text>
         </box>
       </Show>
 
-      <Show when={props.state.status === DashboardStatus.Ok && props.state.prs.length > 0}>
+      <Show when={props.state.status === DashboardStatus.Ok && prs().length > 0}>
         <box flexDirection="column" gap={1} paddingTop={1} width="100%">
-          <For each={props.state.prs}>
+          <For each={prs()}>
             {(pr, i) => (
               <PRRow
                 pr={pr}

@@ -2,18 +2,30 @@
 //
 // Kept separate from loader.ts so the query surface is easy to audit
 // (scope requirements, field selection) without scrolling through the
-// orchestration code. Each query is consumed by exactly one loader.
+// orchestration code.
 
-// PRs for the current branch, including open and merged PRs.
-export const CURRENT_BRANCH_PRS_QUERY = `query CurrentBranchPRs($owner: String!, $name: String!, $head: String) {
+// PRs for a repository (or one head branch), including every GitHub state.
+export const PULL_REQUESTS_QUERY = `query PullRequests($owner: String!, $name: String!, $head: String, $after: String) {
+  viewer {
+    login
+  }
   repository(owner: $owner, name: $name) {
-    pullRequests(first: 100, states: [OPEN, MERGED], headRefName: $head, orderBy: {field: UPDATED_AT, direction: DESC}) {
+    pullRequests(first: 100, after: $after, states: [OPEN, CLOSED, MERGED], headRefName: $head, orderBy: {field: UPDATED_AT, direction: DESC}) {
+      pageInfo {
+        hasNextPage
+        endCursor
+      }
       nodes {
         number
         title
         url
         isDraft
         state
+        headRefName
+        author { login }
+        assignees(first: 100) {
+          nodes { login }
+        }
         additions
         deletions
         baseRefName

@@ -31,7 +31,6 @@ describe("useDashboard initialization", () => {
       mockOctokitDefault((op, params) => {
         if (op === "graphql") {
           const query: string = params?.query ?? ""
-          if (query.includes("query Viewer")) return { viewer: { login: "octocat" } }
           if (query.includes("pullRequests(")) return makeSearchResponse(2)
           return makeThreadCountResponse().data
         }
@@ -72,6 +71,8 @@ describe("useDashboard initialization", () => {
 
       expect(state().status).toBe(DashboardStatus.Ok)
       expect(state().prs.length).toBe(2)
+      expect(state().viewerLogin).toBe("octocat")
+      expect(state().currentBranch).toBe("main")
       expect(frame).toContain("status=ok")
       expect(frame).toContain("prCount=2")
     } finally {

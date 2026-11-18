@@ -37,7 +37,7 @@ export const errorMessages = {
   unknown: "unknown",
 
   // dashboard view banners / empty states
-  noBranchPRs: "No PRs for this branch",
+  noMatchingPRs: "No PRs match these filters",
 }
 
 // Map a thrown error to the right prListing message. Detects HTTP status

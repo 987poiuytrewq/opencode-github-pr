@@ -11,6 +11,7 @@ import {
 import {
   currentBranchPR,
   currentBranchPRs,
+  repositoryPRs,
   fetchOrgMembers,
   fetchOnePR,
   fetchReviewerThreads,
@@ -66,7 +67,7 @@ describe("currentBranchPR", () => {
     })
     const pr = await currentBranchPR({ owner: "foo", repo: "bar" }, dir)
     expect(lastQuery).toContain("headRefName: $head")
-    expect(lastQuery).toContain("states: [OPEN, MERGED]")
+    expect(lastQuery).toContain("states: [OPEN, CLOSED, MERGED]")
     expect(lastQuery).toContain("additions")
     expect(lastQuery).toContain("deletions")
     expect(lastQuery).toContain("contexts(first: 100)")
@@ -120,12 +121,58 @@ describe("currentBranchPR", () => {
       return null
     })
     const prs = await currentBranchPRs({ owner: "foo", repo: "bar" }, dir)
-    expect(lastParams).toEqual({ owner: "foo", name: "bar", head: "main" })
-    expect(prs.map((pr) => [pr.number, pr.isMerged, pr.additions, pr.deletions])).toEqual([
-      [8, false, 4, 1],
-      [7, true, 10, 2],
+    expect(lastParams).toEqual({ owner: "foo", name: "bar", head: "main", after: null })
+    expect(prs.map((pr) => [pr.number, pr.isMerged, pr.isClosed, pr.additions, pr.deletions])).toEqual([
+      [8, false, false, 4, 1],
+      [7, true, true, 10, 2],
     ])
     rmSync(dir, { recursive: true, force: true })
+  })
+})
+
+describe("repositoryPRs", () => {
+  test("loads every page and maps viewer, author, assignee, branch, and state data", async () => {
+    const paramsSeen: any[] = []
+    mockOctokitDefault((op, params) => {
+      if (op !== "graphql") return null
+      paramsSeen.push(params.params)
+      const secondPage = params.params.after === "cursor-1"
+      return {
+        viewer: { login: "octocat" },
+        repository: {
+          pullRequests: {
+            pageInfo: secondPage
+              ? { hasNextPage: false, endCursor: "cursor-2" }
+              : { hasNextPage: true, endCursor: "cursor-1" },
+            nodes: [{
+              number: secondPage ? 2 : 1,
+              title: secondPage ? "Closed PR" : "Open PR",
+              state: secondPage ? "CLOSED" : "OPEN",
+              headRefName: secondPage ? "fix" : "feature",
+              author: { login: secondPage ? "alice" : "octocat" },
+              assignees: { nodes: [{ login: secondPage ? "octocat" : "bob" }] },
+            }],
+          },
+        },
+      }
+    })
+
+    const result = await repositoryPRs({ owner: "foo", repo: "bar" })
+    expect(paramsSeen).toEqual([
+      { owner: "foo", name: "bar", head: null, after: null },
+      { owner: "foo", name: "bar", head: null, after: "cursor-1" },
+    ])
+    expect(result.viewerLogin).toBe("octocat")
+    expect(result.prs.map((pr) => ({
+      number: pr.number,
+      isClosed: pr.isClosed,
+      headRefName: pr.headRefName,
+      authorLogin: pr.authorLogin,
+      assigneeLogins: pr.assigneeLogins,
+    }))).toEqual([
+      { number: 1, isClosed: false, headRefName: "feature", authorLogin: "octocat", assigneeLogins: ["bob"] },
+      { number: 2, isClosed: true, headRefName: "fix", authorLogin: "alice", assigneeLogins: ["octocat"] },
+    ])
   })
 })
 
@@ -277,6 +324,9 @@ describe("fetchOnePR", () => {
     expect(pr.baseRefName).toBe("main")
     expect(pr.mergeable).toBe("MERGEABLE")
     expect(pr.isMerged).toBe(false)
+    expect(pr.headRefName).toBe("feature")
+    expect(pr.authorLogin).toBe("alice")
+    expect(pr.assigneeLogins).toEqual([])
     expect(pr.additions).toBe(9)
     expect(pr.deletions).toBe(2)
     expect(pr.reviewRequests).toEqual([{ login: "bob" }])
