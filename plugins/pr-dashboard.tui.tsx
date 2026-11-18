@@ -13,6 +13,7 @@ import { filterPRs, nextPRScope, nextPRStatusFilter } from "./domain/pr-filters"
 import { DashboardView } from "./app/DashboardView"
 import { useDashboard } from "./app/usePRData"
 import { createActions } from "./app/actions"
+import { demoDashboardState } from "../demo/fixtures"
 
 const command = {
   refresh: "opencode-github-pr.refresh",
@@ -34,6 +35,8 @@ function setup(api: TuiPluginContext) {
     fetchedAt: null,
     listingTruncated: false,
   })
+  const demoMode = process.env.OPENCODE_GITHUB_PR_DEMO === "1"
+  if (demoMode) setState(demoDashboardState())
   const [selectedIdx, setSelectedIdx] = createSignal(0)
   const [scope, setScope] = createSignal<PRScope>("author")
   const [statusFilter, setStatusFilter] = createSignal<PRStatusFilter>("open")
@@ -48,7 +51,9 @@ function setup(api: TuiPluginContext) {
     setSelectedIdx(0)
   }
 
-  const dash = useDashboard(api, state, setState)
+  const dash = demoMode
+    ? { refresh: async () => {}, refreshOne: async () => {} }
+    : useDashboard(api, state, setState)
   const dashboard: DashboardContext = {
     state,
     refresh: dash.refresh,
@@ -58,7 +63,7 @@ function setup(api: TuiPluginContext) {
   }
   const actions = createActions(api, dashboard)
 
-  void dash.refresh()
+  if (!demoMode) void dash.refresh()
 
   const unregisterSlot = api.ui.slot({
     append: "sidebar.content",

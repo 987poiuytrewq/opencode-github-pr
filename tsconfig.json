@@ -9,5 +9,11 @@
     "skipLibCheck": true,
     "types": ["bun-types"]
   },
-  "include": ["plugins/**/*.ts", "plugins/**/*.tsx", "tests/**/*.ts", "tests/**/*.tsx"]
+  "include": [
+    "demo/**/*.ts",
+    "plugins/**/*.ts",
+    "plugins/**/*.tsx",
+    "tests/**/*.ts",
+    "tests/**/*.tsx"
+  ]
 }

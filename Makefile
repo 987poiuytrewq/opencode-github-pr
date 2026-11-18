@@ -1,4 +1,4 @@
-.PHONY: opencode install format-check typecheck test test-unit test-integration test-e2e test-watch ci ci-tools ci-debug
+.PHONY: opencode install format-check typecheck test test-unit test-integration test-e2e test-watch demo ci ci-tools ci-debug
 
 BUN ?= bun
 OPENCODE_BIN ?= opencode
@@ -27,6 +27,9 @@ test-e2e:
 
 test-watch:
 	$(BUN) test --watch
+
+demo:
+	$(BUN) run demo/capture.ts --output demo/demo.cast --gif --overwrite
 
 test: format-check typecheck test-unit test-integration test-e2e
 
