@@ -1,10 +1,34 @@
 /** @jsxImportSource @opentui/solid */
 import type { PR } from "../domain/types"
 import { truncateTitle } from "../domain/format"
-import { classifyCI } from "../domain/pr-status"
+import {
+  checkStatusGroups,
+  commentThreadCounts,
+  reviewStatusGroups,
+  type StatusCategory,
+} from "../domain/pr-status"
+import { For, Show } from "solid-js"
 
 const OPEN_PR_ICON = ""
 const MERGED_PR_ICON = ""
+const REVIEW_ICON = ""
+const OPEN_COMMENT_ICON = "󰅺"
+const RESOLVED_COMMENT_ICON = ""
+
+function statusColor(status: StatusCategory, props: {
+  pass: string
+  fail: string
+  warn: string
+  muted: string
+}): string {
+  return {
+    pass: props.pass,
+    fail: props.fail,
+    pending: props.warn,
+    neutral: props.muted,
+    none: props.muted,
+  }[status]
+}
 
 export function PRRow(props: {
   pr: PR
@@ -25,13 +49,9 @@ export function PRRow(props: {
       : props.pr.mergeable === "CONFLICTING"
         ? props.fail
         : props.muted
-  const ci = classifyCI(props.pr)
-  const ciColor = {
-    pass: props.pass,
-    fail: props.fail,
-    pending: props.warn,
-    none: props.muted,
-  }[ci]
+  const checks = checkStatusGroups(props.pr)
+  const reviews = reviewStatusGroups(props.pr)
+  const comments = commentThreadCounts(props.pr)
 
   return (
     <box
@@ -49,7 +69,28 @@ export function PRRow(props: {
         <text fg={props.pass} selectable={false}>{`+${props.pr.additions}`}</text>
         <text fg={props.fail} selectable={false}>{`-${props.pr.deletions}`}</text>
         <box flexGrow={1}></box>
-        <text fg={ciColor} selectable={false}>●</text>
+        <Show when={comments}>
+          {(counts) => (
+            <>
+              <text fg={props.muted} selectable={false}>{`${OPEN_COMMENT_ICON}${counts().open}`}</text>
+              <text fg={props.muted} selectable={false}>{`${RESOLVED_COMMENT_ICON}${counts().resolved}`}</text>
+            </>
+          )}
+        </Show>
+        <For each={reviews}>
+          {(group) => (
+            <text fg={statusColor(group.status, props)} selectable={false}>
+              {`${REVIEW_ICON}${reviews.length > 1 ? group.count : ""}`}
+            </text>
+          )}
+        </For>
+        <For each={checks}>
+          {(group) => (
+            <text fg={statusColor(group.status, props)} selectable={false}>
+              {`●${checks.length > 1 ? group.count : ""}`}
+            </text>
+          )}
+        </For>
       </box>
     </box>
   )

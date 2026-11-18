@@ -3,7 +3,10 @@ import { BOT_ALIASES, displayLogin, ellipsize } from "../../plugins/domain/login
 import {
   classifyCI,
   classifyRowState,
+  checkStatusGroups,
+  commentThreadCounts,
   reviewSummary,
+  reviewStatusGroups,
 } from "../../plugins/domain/pr-status"
 import { toHex } from "../../plugins/app/theme"
 import { truncateTitle, formatAge } from "../../plugins/domain/format"
@@ -32,6 +35,43 @@ describe("classifyCI", () => {
   })
   test("returns 'none' for an unknown check state", () => {
     expect(classifyCI(makeTUIPR({ statusCheckRollup: { state: "UNKNOWN" } }))).toBe("none")
+  })
+})
+
+describe("status groups", () => {
+  test("groups mixed checks by status and preserves single-status compact display data", () => {
+    const mixed = makeTUIPR({ checkStatuses: ["SUCCESS", "SUCCESS", "FAILURE"] })
+    expect(checkStatusGroups(mixed)).toEqual([
+      { status: "pass", count: 2 },
+      { status: "fail", count: 1 },
+    ])
+    expect(checkStatusGroups(makeTUIPR({ checkStatuses: ["SUCCESS", "SUCCESS"] }))).toEqual([
+      { status: "pass", count: 2 },
+    ])
+  })
+
+  test("groups reviews including pending requests and comment-only reviews", () => {
+    const pr = makeTUIPR({
+      latestReviews: [
+        { author: { login: "alice" }, state: "APPROVED" },
+        { author: { login: "bob" }, state: "CHANGES_REQUESTED" },
+        { author: { login: "carol" }, state: "COMMENTED" },
+      ],
+      reviewRequests: [{ login: "dana" }],
+    })
+    expect(reviewStatusGroups(pr)).toEqual([
+      { status: "pass", count: 1 },
+      { status: "fail", count: 1 },
+      { status: "pending", count: 1 },
+      { status: "neutral", count: 1 },
+    ])
+  })
+
+  test("counts open and resolved review threads", () => {
+    expect(commentThreadCounts(makeTUIPR({
+      reviewThreads: [{ isResolved: false }, { isResolved: true }, { isResolved: false }],
+    }))).toEqual({ open: 2, resolved: 1 })
+    expect(commentThreadCounts(makeTUIPR({ reviewThreads: null }))).toBeNull()
   })
 })
 

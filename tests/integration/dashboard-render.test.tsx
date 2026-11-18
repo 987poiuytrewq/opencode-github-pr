@@ -7,8 +7,7 @@ import { makeTUIPR } from "../helpers/tui-fixtures"
 import { createMockTuiApi } from "../helpers/tui-api-mock"
 import { loadingState, okState, noRepoState, errorState } from "../helpers/state-fixtures"
 
-async function renderState(state: DashboardState, expanded = true, handlers: Partial<{
-  onToggleExpand: () => void
+async function renderState(state: DashboardState, handlers: Partial<{
   onOpen: (n: number) => void
 }> = {}) {
   const { api } = createMockTuiApi()
@@ -21,49 +20,45 @@ async function renderState(state: DashboardState, expanded = true, handlers: Par
         selectedIdx={0}
         setSelectedIdx={() => {}}
         onOpen={handlers.onOpen ?? (() => {})}
-        expanded={expanded}
-        onToggleExpand={handlers.onToggleExpand ?? (() => {})}
       />
     ),
     { width: 50, height: 20 },
   )
 }
 
+function captureFrame(r: Awaited<ReturnType<typeof renderState>>): string {
+  return r.captureCharFrame().split("\n").map((line) => line.trimEnd()).join("\n")
+}
+
 describe("DashboardView render", () => {
   test("loading state", async () => {
     const r = await renderState(loadingState())
     await r.flush()
-    expect(r.captureCharFrame()).toMatchSnapshot()
+    expect(captureFrame(r)).toMatchSnapshot()
   })
 
   test("ok state with PRs", async () => {
     const r = await renderState(okState())
     await r.flush()
-    expect(r.captureCharFrame()).toMatchSnapshot()
+    expect(captureFrame(r)).toMatchSnapshot()
   })
 
   test("no-repo state", async () => {
     const r = await renderState(noRepoState())
     await r.flush()
-    expect(r.captureCharFrame()).toMatchSnapshot()
+    expect(captureFrame(r)).toMatchSnapshot()
   })
 
   test("error state", async () => {
     const r = await renderState(errorState())
     await r.flush()
-    expect(r.captureCharFrame()).toMatchSnapshot()
-  })
-
-  test("collapsed state", async () => {
-    const r = await renderState(okState(), false)
-    await r.flush()
-    expect(r.captureCharFrame()).toMatchSnapshot()
+    expect(captureFrame(r)).toMatchSnapshot()
   })
 
   test("ok state with empty PRs", async () => {
     const r = await renderState(okState({ prs: [] }))
     await r.flush()
-    expect(r.captureCharFrame()).toMatchSnapshot()
+    expect(captureFrame(r)).toMatchSnapshot()
   })
 
   test("merged PR uses the merged icon and displays change totals", async () => {
@@ -77,29 +72,47 @@ describe("DashboardView render", () => {
       })],
     }))
     await r.flush()
-    const frame = r.captureCharFrame()
+    const frame = captureFrame(r)
     expect(frame).toContain(" Merged feature")
     expect(frame).toContain("#42 +17 -4")
     expect(frame).toContain("●")
+    expect(frame).toContain("󰅺0")
+    expect(frame).toContain("0")
+  })
+
+  test("status groups render comments, reviews, then mixed checks with single spaces", async () => {
+    const r = await renderState(okState({
+      prs: [makeTUIPR({
+        number: 42,
+        title: "Mixed status PR",
+        checkStatuses: ["SUCCESS", "SUCCESS", "SUCCESS", "FAILURE"],
+        reviewThreads: [{ isResolved: false }, { isResolved: true }],
+        latestReviews: [
+          { author: { login: "alice" }, state: "APPROVED" },
+          { author: { login: "bob" }, state: "CHANGES_REQUESTED" },
+        ],
+      })],
+    }))
+    await r.flush()
+    const frame = captureFrame(r)
+    expect(frame).toContain("󰅺1 1 1 1 ●3 ●1")
   })
 })
 
 describe("DashboardView mouse interaction", () => {
-  test("clicking the header toggles expand", async () => {
-    let toggles = 0
-    const r = await renderState(okState(), true, {
-      onToggleExpand: () => { toggles++ },
-    })
+  test("the PR list is visible without a collapse control", async () => {
+    const r = await renderState(okState())
     await r.flush()
-    // The collapse marker and "Changes" label are at the left of row 1.
-    await r.mockMouse.click(4, 1)
-    await r.flush()
-    expect(toggles).toBe(1)
+    const frame = captureFrame(r)
+    expect(frame).toContain("Pull Requests")
+    expect(frame).toContain("Add login flow")
+    expect(frame).not.toContain("▼")
+    expect(frame).not.toContain("▶")
   })
 
   test("clicking a PR row opens it", async () => {
     const opened: number[] = []
-    const r = await renderState(okState(), true, {
+    const r = await renderState(okState(), {
       onOpen: (n) => { opened.push(n) },
     })
     await r.flush()

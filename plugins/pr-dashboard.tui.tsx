@@ -25,8 +25,6 @@ function setup(api: TuiPluginContext) {
     fetchedAt: null,
   })
   const [selectedIdx, setSelectedIdx] = createSignal(0)
-  const [expanded, setExpanded] = createSignal(true)
-  const toggleExpanded = () => setExpanded((value) => !value)
 
   const dash = useDashboard(api, state, setState)
   const dashboard: DashboardContext = {
@@ -35,8 +33,6 @@ function setup(api: TuiPluginContext) {
     refreshOne: dash.refreshOne,
     selectedIdx,
     setSelectedIdx,
-    expanded,
-    toggleExpanded,
   }
   const actions = createActions(api, dashboard)
 
@@ -52,8 +48,6 @@ function setup(api: TuiPluginContext) {
         selectedIdx={selectedIdx()}
         setSelectedIdx={setSelectedIdx}
         onOpen={actions.openPR}
-        expanded={expanded()}
-        onToggleExpand={toggleExpanded}
       />
     ),
   })

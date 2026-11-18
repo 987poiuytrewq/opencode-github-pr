@@ -20,8 +20,6 @@ describe("DashboardView reactivity", () => {
           selectedIdx={0}
           setSelectedIdx={() => {}}
           onOpen={() => {}}
-          expanded={true}
-          onToggleExpand={() => {}}
         />
       ),
       { width: 80, height: 30 },
