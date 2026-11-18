@@ -7,6 +7,7 @@
 import { existsSync, readFileSync, statSync } from "node:fs"
 import { join, resolve } from "node:path"
 import type { Repo } from "../domain/types"
+import { enterpriseHostname } from "./github-enterprise"
 
 export type { Repo }
 
@@ -27,26 +28,48 @@ export function currentBranch(cwd: string): string | null {
 }
 
 export function originRemoteUrl(cwd: string): string | null {
+  return remoteUrls(cwd).find(({ name }) => name === "origin")?.url ?? null
+}
+
+function remoteUrls(cwd: string): Array<{ name: string; url: string }> {
   const paths = gitPaths(cwd)
-  if (!paths) return null
-  for (const configPath of new Set([
-    join(paths.commonDir, "config"),
-    join(paths.gitDir, "config"),
-  ])) {
+  if (!paths) return []
+  for (const configPath of new Set([join(paths.commonDir, "config"), join(paths.gitDir, "config")])) {
     try {
       if (!existsSync(configPath)) continue
       const text = readFileSync(configPath, "utf8")
-      // Find the [remote "origin"] section and its url = ... line.
-      const re = /\[remote "origin"\]([\s\S]*?)(?=\n\[|$)/
-      const match = re.exec(text)
-      if (!match) continue
-      const urlMatch = /^\s*url\s*=\s*(.+)\s*$/m.exec(match[1])
-      if (urlMatch) return urlMatch[1].trim()
+      const remotes: Array<{ name: string; url: string }> = []
+      const sectionRe = /^\s*\[remote\s+"([^"]+)"\]\s*$/gim
+      let section: RegExpExecArray | null
+
+      while ((section = sectionRe.exec(text)) !== null) {
+        const start = sectionRe.lastIndex
+        const nextSection = /^\s*\[/gm
+        nextSection.lastIndex = start
+        const end = nextSection.exec(text)?.index ?? text.length
+        const sectionText = text.slice(start, end)
+        const urlRe = /^\s*url\s*=\s*(.*?)\s*$/gim
+        let urlMatch: RegExpExecArray | null
+        while ((urlMatch = urlRe.exec(sectionText)) !== null) {
+          const url = unquoteConfigValue(urlMatch[1])
+          if (url) remotes.push({ name: section[1], url })
+        }
+      }
+
+      if (remotes.length) return remotes
     } catch {
       // Try the other config location, or let callers report no repository.
     }
   }
-  return null
+  return []
+}
+
+function unquoteConfigValue(value: string): string {
+  const trimmed = value.trim()
+  if (trimmed.startsWith('"') && trimmed.endsWith('"')) {
+    return trimmed.slice(1, -1).replace(/\\(["\\])/g, "$1")
+  }
+  return trimmed
 }
 
 function gitPaths(cwd: string): { gitDir: string; commonDir: string } | null {
@@ -83,32 +106,51 @@ function gitPaths(cwd: string): { gitDir: string; commonDir: string } | null {
   }
 }
 
-const SSH_PREFIX = "git" + "@" + "github.com:"
-const HTTPS_PREFIXES = ["https://github.com/", "http://github.com/"]
+export function parseGitHubRemote(url: string, enterpriseUrl?: string): Repo | null {
+  const remote = url.trim()
+  const configuredHost = enterpriseHostname(enterpriseUrl)
+  const supportedHosts = configuredHost ? [configuredHost] : ["github.com", "ssh.github.com"]
+  const hostPattern = supportedHosts.map((host) => host.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")).join("|")
+  // Git accepts both URI-style SSH URLs and scp-style SSH URLs.
+  const scp = new RegExp(`^(?:git@)?(?:${hostPattern}):([^?#]+)$`, "i").exec(remote)
+  if (scp) return splitOwnerRepo(scp[1])
 
-export function parseGitHubRemote(url: string): Repo | null {
-  if (url.startsWith(SSH_PREFIX)) {
-    const path = url.slice(SSH_PREFIX.length)
-    return splitOwnerRepo(path)
-  }
-  for (const prefix of HTTPS_PREFIXES) {
-    if (url.startsWith(prefix)) {
-      const path = url.slice(prefix.length)
-      return splitOwnerRepo(path)
+  try {
+    const parsed = new URL(remote)
+    if (
+      !supportedHosts.includes(parsed.hostname.toLowerCase()) ||
+      !["https:", "http:", "ssh:"].includes(parsed.protocol)
+    ) {
+      return null
     }
+    if (!configuredHost && parsed.hostname.toLowerCase() === "ssh.github.com" && parsed.protocol !== "ssh:") {
+      return null
+    }
+    return splitOwnerRepo(parsed.pathname)
+  } catch {
+    return null
+  }
+}
+
+export function detectRepo(
+  cwd: string = process.cwd(),
+  enterpriseUrl = process.env.GITHUB_ENTERPRISE_URL,
+): Repo | null {
+  const remotes = remoteUrls(cwd)
+  const preferred = [
+    ...remotes.filter(({ name }) => name === "origin"),
+    ...remotes.filter(({ name }) => name !== "origin"),
+  ]
+  for (const { url } of preferred) {
+    const repo = parseGitHubRemote(url, enterpriseUrl)
+    if (repo) return repo
   }
   return null
 }
 
-export function detectRepo(cwd: string = process.cwd()): Repo | null {
-  const url = originRemoteUrl(cwd)
-  if (!url) return null
-  return parseGitHubRemote(url)
-}
-
 function splitOwnerRepo(path: string): Repo | null {
-  const clean = path.replace(/\.git$/, "").replace(/^\/+/, "")
-  const slash = clean.indexOf("/")
-  if (slash < 1) return null
-  return { owner: clean.slice(0, slash), repo: clean.slice(slash + 1) }
+  const clean = path.replace(/^\/+|\/+$/g, "").replace(/\.git$/i, "")
+  const parts = clean.split("/")
+  if (parts.length !== 2 || !parts[0] || !parts[1]) return null
+  return { owner: parts[0], repo: parts[1] }
 }

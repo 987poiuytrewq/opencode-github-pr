@@ -118,8 +118,19 @@ from the server's active plugin list, including when connected to a remote serve
 ## GitHub authentication
 
 The server and TUI parts use Octokit. They check `GITHUB_TOKEN`, `GH_TOKEN`, or `GITHUB_PERSONAL_ACCESS_TOKEN` in the
-environment available to OpenCode, then fall back to `gh auth token`. The plugin reads the active session's repository
-from its GitHub `origin` remote.
+environment available to OpenCode, then fall back to `gh auth token`. The plugin recognizes GitHub HTTPS and SSH
+remote URLs, including SSH over port 443. It prefers a GitHub `origin` when available, and falls back to another GitHub
+remote if `origin` points elsewhere or is absent.
+
+For GitHub Enterprise Server, set `GITHUB_ENTERPRISE_URL` in the environment available to OpenCode:
+
+```sh
+export GITHUB_ENTERPRISE_URL="https://github.example.com"
+```
+
+Use the server URL or its `/api/v3` URL. The plugin detects remotes on that host and uses its REST and GraphQL APIs;
+when using `gh auth token` for authentication, it requests the token for the configured hostname. Leave this unset for
+GitHub.com.
 
 ## Test
 

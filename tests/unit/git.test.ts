@@ -18,6 +18,44 @@ describe("parseGitHubRemote", () => {
     expect(parseGitHubRemote(ssh)).toEqual({ owner: "foo", repo: "bar" })
   })
 
+  test("parses URI-style SSH urls", () => {
+    expect(parseGitHubRemote("ssh://git@github.com/foo/bar.git")).toEqual({
+      owner: "foo",
+      repo: "bar",
+    })
+  })
+
+  test("parses GitHub SSH over port 443", () => {
+    expect(parseGitHubRemote("ssh://git@ssh.github.com:443/foo/bar.git")).toEqual({ owner: "foo", repo: "bar" })
+  })
+
+  test("parses GitHub Enterprise HTTPS and SSH remotes when configured", () => {
+    const enterpriseUrl = "https://github.example.test"
+    expect(parseGitHubRemote("https://github.example.test/acme/widgets.git", enterpriseUrl)).toEqual({
+      owner: "acme",
+      repo: "widgets",
+    })
+    expect(parseGitHubRemote("ssh://git@github.example.test/acme/widgets.git", enterpriseUrl)).toEqual({
+      owner: "acme",
+      repo: "widgets",
+    })
+    expect(parseGitHubRemote("git@github.example.test:acme/widgets.git", enterpriseUrl)).toEqual({
+      owner: "acme",
+      repo: "widgets",
+    })
+  })
+
+  test("does not mistake a github.com remote for a configured enterprise host", () => {
+    expect(parseGitHubRemote("https://github.com/acme/widgets.git", "https://github.example.test")).toBeNull()
+  })
+
+  test("parses HTTPS URLs with credentials and trailing slash", () => {
+    expect(parseGitHubRemote("https://user@github.com/foo/bar.git/")).toEqual({
+      owner: "foo",
+      repo: "bar",
+    })
+  })
+
   test("strips .git suffix", () => {
     expect(parseGitHubRemote("https://github.com/foo/bar.git")).toEqual({
       owner: "foo",
@@ -65,10 +103,7 @@ describe("detectRepo", () => {
     mkdirSync(worktreeGitDir, { recursive: true })
     writeFileSync(join(worktree, ".git"), `gitdir: ${worktreeGitDir}\n`)
     writeFileSync(join(worktreeGitDir, "commondir"), "../..\n")
-    writeFileSync(
-      join(commonGitDir, "config"),
-      `[remote "origin"]\n\turl = git@github.com:foo/bar.git\n`,
-    )
+    writeFileSync(join(commonGitDir, "config"), `[remote "origin"]\n\turl = git@github.com:foo/bar.git\n`)
     writeFileSync(join(worktreeGitDir, "HEAD"), "ref: refs/heads/e2e-plugin-install\n")
 
     try {
@@ -102,7 +137,66 @@ describe("detectRepo", () => {
     }
   })
 
-  test("returns null when no [remote origin] section", () => {
+  test("finds a GitHub remote when origin is absent", () => {
+    const dir = mkdtempSync(join(tmpdir(), "pr-dash-"))
+    mkdirSync(join(dir, ".git"))
+    writeFileSync(join(dir, ".git", "config"), `[remote "upstream"]\n\turl = ssh://git@github.com/foo/bar.git\n`)
+    try {
+      expect(detectRepo(dir)).toEqual({ owner: "foo", repo: "bar" })
+    } finally {
+      rmSync(dir, { recursive: true, force: true })
+    }
+  })
+
+  test("prefers GitHub origin when multiple GitHub remotes exist", () => {
+    const dir = mkdtempSync(join(tmpdir(), "pr-dash-"))
+    mkdirSync(join(dir, ".git"))
+    writeFileSync(
+      join(dir, ".git", "config"),
+      `[remote "upstream"]\n\turl = https://github.com/upstream/repo.git\n[remote "origin"]\n\turl = https://github.com/fork/repo.git\n`,
+    )
+    try {
+      expect(detectRepo(dir)).toEqual({ owner: "fork", repo: "repo" })
+    } finally {
+      rmSync(dir, { recursive: true, force: true })
+    }
+  })
+
+  test("detects a configured GitHub Enterprise remote", () => {
+    const dir = mkdtempSync(join(tmpdir(), "pr-dash-"))
+    mkdirSync(join(dir, ".git"))
+    writeFileSync(
+      join(dir, ".git", "config"),
+      `[remote "origin"]\n\turl = https://github.example.test/acme/widgets.git\n`,
+    )
+    try {
+      expect(detectRepo(dir, "https://github.example.test")).toEqual({
+        owner: "acme",
+        repo: "widgets",
+      })
+    } finally {
+      rmSync(dir, { recursive: true, force: true })
+    }
+  })
+
+  test("falls back to another GitHub remote when origin is not GitHub", () => {
+    const dir = mkdtempSync(join(tmpdir(), "pr-dash-"))
+    mkdirSync(join(dir, ".git"))
+    writeFileSync(
+      join(dir, ".git", "config"),
+      `[remote "origin"]\n\turl = https://gitlab.com/foo/bar.git\n[remote "upstream"]\n\turl = git@github.com:octocat/Hello-World.git\n`,
+    )
+    try {
+      expect(detectRepo(dir)).toEqual({
+        owner: "octocat",
+        repo: "Hello-World",
+      })
+    } finally {
+      rmSync(dir, { recursive: true, force: true })
+    }
+  })
+
+  test("returns null when no GitHub remotes exist", () => {
     const dir = mkdtempSync(join(tmpdir(), "pr-dash-"))
     try {
       expect(detectRepo(dir)).toBeNull()

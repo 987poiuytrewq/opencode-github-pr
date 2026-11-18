@@ -53,7 +53,7 @@ exports[`DashboardView render no-repo state 1`] = `
 Pull Requests                      branch   open
 
   No GitHub repo
-  Add an origin remote or switch to the right
+  Add a GitHub remote or switch to the right
  project.
 
 
