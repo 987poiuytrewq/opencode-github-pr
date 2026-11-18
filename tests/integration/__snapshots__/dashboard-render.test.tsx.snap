@@ -2,7 +2,7 @@
 
 exports[`DashboardView render loading state 1`] = `
 "
-Pull Requests Loading
+Pull Requests Loading              branch   open
 
 
 
@@ -26,7 +26,7 @@ Pull Requests Loading
 
 exports[`DashboardView render ok state with PRs 1`] = `
 "
-Pull Requests
+Pull Requests                      branch   open
 
  Add login flow
   #10 +42 -8                                    ●
@@ -50,7 +50,7 @@ Pull Requests
 
 exports[`DashboardView render no-repo state 1`] = `
 "
-Pull Requests Not a git repo
+Pull Requests Not a git repo       branch   open
 
  Not a git repo
 
@@ -74,7 +74,7 @@ Pull Requests Not a git repo
 
 exports[`DashboardView render error state 1`] = `
 "
-Pull Requests Error
+Pull Requests Error                branch   open
 
  Could not authenticate. Run \`gh auth status\` to
  confirm.
@@ -98,9 +98,9 @@ Pull Requests Error
 
 exports[`DashboardView render ok state with empty PRs 1`] = `
 "
-Pull Requests
+Pull Requests                      branch   open
 
- No PRs for this branch
+ No PRs match these filters
 
 
 

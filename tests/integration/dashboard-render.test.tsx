@@ -1,7 +1,7 @@
 /** @jsxImportSource @opentui/solid */
 import { describe, expect, test } from "bun:test"
 import { testRender } from "@opentui/solid"
-import type { DashboardState } from "../../plugins/domain/types"
+import type { DashboardState, PRScope, PRStatusFilter } from "../../plugins/domain/types"
 import { DashboardView } from "../../plugins/app/DashboardView"
 import { makeTUIPR } from "../helpers/tui-fixtures"
 import { createMockTuiApi } from "../helpers/tui-api-mock"
@@ -9,6 +9,10 @@ import { loadingState, okState, noRepoState, errorState } from "../helpers/state
 
 async function renderState(state: DashboardState, handlers: Partial<{
   onOpen: (n: number) => void
+  onCycleScope: () => void
+  onCycleStatus: () => void
+  scope: PRScope
+  statusFilter: PRStatusFilter
 }> = {}) {
   const { api } = createMockTuiApi()
   return testRender(
@@ -20,6 +24,10 @@ async function renderState(state: DashboardState, handlers: Partial<{
         selectedIdx={0}
         setSelectedIdx={() => {}}
         onOpen={handlers.onOpen ?? (() => {})}
+        scope={handlers.scope ?? "branch"}
+        statusFilter={handlers.statusFilter ?? "open"}
+        onCycleScope={handlers.onCycleScope ?? (() => {})}
+        onCycleStatus={handlers.onCycleStatus ?? (() => {})}
       />
     ),
     { width: 50, height: 20 },
@@ -70,7 +78,7 @@ describe("DashboardView render", () => {
         additions: 17,
         deletions: 4,
       })],
-    }))
+    }), { statusFilter: "closed" })
     await r.flush()
     const frame = captureFrame(r)
     expect(frame).toContain(" Merged feature")
@@ -111,6 +119,14 @@ describe("DashboardView render", () => {
     const statusLine = r.captureCharFrame().split("\n").find((line) => line.includes("●"))
     expect(statusLine).toBeDefined()
     expect(statusLine?.trimEnd().length).toBe(50)
+  })
+
+  test("right-aligns the scope and status filters in the title bar", async () => {
+    const r = await renderState(okState())
+    await r.flush()
+    const heading = r.captureCharFrame().split("\n").find((line) => line.includes("Pull Requests"))
+    expect(heading).toContain(" branch   open")
+    expect(heading?.trimEnd().length).toBe(50)
   })
 
   test("status groups render comments, reviews, then mixed checks with single spaces", async () => {
@@ -171,5 +187,45 @@ describe("DashboardView mouse interaction", () => {
     await r.mockMouse.click(4, 3)
     await r.flush()
     expect(opened).toEqual([10])
+  })
+
+  test("clicking each title-bar filter invokes only its own cycle action", async () => {
+    let scopeCycles = 0
+    let statusCycles = 0
+    const r = await renderState(okState(), {
+      onCycleScope: () => { scopeCycles++ },
+      onCycleStatus: () => { statusCycles++ },
+    })
+    await r.flush()
+    await r.mockMouse.click(36, 1)
+    await r.flush()
+    expect(scopeCycles).toBe(1)
+    expect(statusCycles).toBe(0)
+
+    await r.mockMouse.click(46, 1)
+    await r.flush()
+    expect(scopeCycles).toBe(1)
+    expect(statusCycles).toBe(1)
+  })
+
+  test("each filter turns white only while hovered", async () => {
+    const r = await renderState(okState())
+    await r.flush()
+    const filterSpan = (label: string) =>
+      r.captureSpans().lines.flatMap((line) => line.spans).find((span) => span.text.includes(label))
+    const scopeDefault = filterSpan(" branch")
+    const statusDefault = filterSpan(" open")
+    expect(scopeDefault).toBeDefined()
+    expect(statusDefault).toBeDefined()
+
+    await r.mockMouse.moveTo(36, 1)
+    await r.flush()
+    expect(filterSpan(" branch")?.fg).not.toEqual(scopeDefault?.fg)
+    expect(filterSpan(" open")?.fg).toEqual(statusDefault?.fg)
+
+    await r.mockMouse.moveTo(46, 1)
+    await r.flush()
+    expect(filterSpan(" branch")?.fg).toEqual(scopeDefault?.fg)
+    expect(filterSpan(" open")?.fg).not.toEqual(statusDefault?.fg)
   })
 })

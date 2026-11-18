@@ -6,6 +6,8 @@ export function loadingState(overrides: Partial<DashboardState> = {}): Dashboard
     status: DashboardStatus.Loading,
     repo: { owner: "foo", repo: "bar" },
     prs: [],
+    currentBranch: "feature",
+    viewerLogin: "octocat",
     fetchedAt: null,
     ...overrides,
   }
@@ -16,6 +18,8 @@ export function okState(overrides: Partial<DashboardState> = {}): DashboardState
     status: DashboardStatus.Ok,
     repo: { owner: "foo", repo: "bar" },
     prs: sampleTUIPRs,
+    currentBranch: "feature",
+    viewerLogin: "octocat",
     fetchedAt: Date.now(),
     ...overrides,
   }
@@ -26,6 +30,8 @@ export function noRepoState(overrides: Partial<DashboardState> = {}): DashboardS
     status: DashboardStatus.NoRepo,
     repo: null,
     prs: [],
+    currentBranch: null,
+    viewerLogin: null,
     fetchedAt: Date.now(),
     ...overrides,
   }
@@ -36,6 +42,8 @@ export function errorState(overrides: Partial<DashboardState> = {}): DashboardSt
     status: DashboardStatus.Error,
     repo: { owner: "foo", repo: "bar" },
     prs: [],
+    currentBranch: "feature",
+    viewerLogin: "octocat",
     fetchedAt: Date.now(),
     error: "Could not authenticate. Run `gh auth status` to confirm.",
     ...overrides,

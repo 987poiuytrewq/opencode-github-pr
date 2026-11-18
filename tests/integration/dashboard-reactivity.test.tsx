@@ -20,6 +20,10 @@ describe("DashboardView reactivity", () => {
           selectedIdx={0}
           setSelectedIdx={() => {}}
           onOpen={() => {}}
+          scope="branch"
+          statusFilter="open"
+          onCycleScope={() => {}}
+          onCycleStatus={() => {}}
         />
       ),
       { width: 80, height: 30 },

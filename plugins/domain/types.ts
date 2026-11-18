@@ -10,6 +10,10 @@ export type PR = {
   url: string
   isDraft: boolean
   isMerged: boolean
+  isClosed: boolean
+  headRefName: string
+  authorLogin: string
+  assigneeLogins: string[]
   additions: number
   deletions: number
   baseRefName: string
@@ -23,6 +27,9 @@ export type PR = {
 
 export type Repo = { owner: string; repo: string }
 
+export type PRScope = "branch" | "author" | "assignee" | "all"
+export type PRStatusFilter = "open" | "closed" | "all"
+
 export enum DashboardStatus {
   Loading = "loading",
   Ok = "ok",
@@ -34,6 +41,8 @@ export type DashboardState = {
   status: DashboardStatus
   repo: Repo | null
   prs: PR[]
+  currentBranch: string | null
+  viewerLogin: string | null
   fetchedAt: number | null
   error?: string
 }
