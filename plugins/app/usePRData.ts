@@ -125,7 +125,13 @@ export function useDashboard(
       const updated = await fetchOnePR(repo, n)
       setState((s) => ({
         ...s,
-        prs: s.prs.map((p) => (p.number === n ? updated : p)),
+        prs: s.prs.map((p) => p.number === n
+          ? {
+              ...updated,
+              checkStatuses: updated.checkStatuses ?? p.checkStatuses,
+              reviewThreads: updated.reviewThreads ?? p.reviewThreads,
+            }
+          : p),
         fetchedAt: Date.now(),
       }))
     } catch {}

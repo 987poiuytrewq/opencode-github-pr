@@ -13,8 +13,6 @@ export function DashboardView(props: {
   selectedIdx: number
   setSelectedIdx: (n: number) => void
   onOpen: (n: number) => void
-  expanded: boolean
-  onToggleExpand: () => void
 }) {
   const sk = skin(props.theme)
   return (
@@ -24,11 +22,9 @@ export function DashboardView(props: {
         gap={1}
         paddingLeft={0}
         paddingRight={0}
-        onMouseUp={() => props.onToggleExpand()}
       >
-        <text fg={sk.text}>{props.expanded ? "▼" : "▶"}</text>
         <text fg={sk.text}>
-          <b>Changes</b>
+          <b>Pull Requests</b>
         </text>
         <Show when={props.state.status === DashboardStatus.Loading}>
           <text fg={sk.muted}>Loading</text>
@@ -53,13 +49,13 @@ export function DashboardView(props: {
         </box>
       </Show>
 
-      <Show when={props.expanded && props.state.status === DashboardStatus.Ok && props.state.prs.length === 0}>
+      <Show when={props.state.status === DashboardStatus.Ok && props.state.prs.length === 0}>
         <box flexDirection="column" paddingLeft={1} paddingTop={1} paddingRight={1}>
           <text fg={sk.muted} selectable={false}>{errorMessages.noBranchPRs}</text>
         </box>
       </Show>
 
-      <Show when={props.expanded && props.state.status === DashboardStatus.Ok && props.state.prs.length > 0}>
+      <Show when={props.state.status === DashboardStatus.Ok && props.state.prs.length > 0}>
         <box flexDirection="column" gap={1} paddingTop={0}>
           <For each={props.state.prs}>
             {(pr, i) => (

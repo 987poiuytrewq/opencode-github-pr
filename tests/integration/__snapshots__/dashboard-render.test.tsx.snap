@@ -1,145 +1,121 @@
 // Bun Snapshot v1, https://bun.sh/docs/test/snapshots
 
 exports[`DashboardView render loading state 1`] = `
-"                                                  
-▼ Changes Loading                                 
-                                                  
-                                                  
-                                                  
-                                                  
-                                                  
-                                                  
-                                                  
-                                                  
-                                                  
-                                                  
-                                                  
-                                                  
-                                                  
-                                                  
-                                                  
-                                                  
-                                                  
-                                                  
+"
+Pull Requests Loading
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 "
 `;
 
 exports[`DashboardView render ok state with PRs 1`] = `
-"                                                  
-▼ Changes                                         
- Add login flow                                  
-  #10 +42 -8                                    ● 
-                                                  
- Fix race condition                              
-  #11 +42 -8                                    ● 
-                                                  
- WIP: refactor                                   
-  #12 +42 -8                                    ● 
-                                                  
- Update docs                                     
-  #13 +42 -8                                    ● 
-                                                  
-                                                  
-                                                  
-                                                  
-                                                  
-                                                  
-                                                  
+"
+Pull Requests
+ Add login flow
+  #10 +42 -8                            󰅺0 0  ●
+
+ Fix race condition
+  #11 +42 -8                            󰅺0 0  ●
+
+ WIP: refactor
+  #12 +42 -8                              󰅺0 0 ●
+
+ Update docs
+  #13 +42 -8                              󰅺0 0 ●
+
+
+
+
+
+
+
 "
 `;
 
 exports[`DashboardView render no-repo state 1`] = `
-"                                                  
-▼ Changes Not a git repo                          
-                                                  
- Not a git repo                                   
-                                                  
-                                                  
-                                                  
-                                                  
-                                                  
-                                                  
-                                                  
-                                                  
-                                                  
-                                                  
-                                                  
-                                                  
-                                                  
-                                                  
-                                                  
-                                                  
+"
+Pull Requests Not a git repo
+
+ Not a git repo
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 "
 `;
 
 exports[`DashboardView render error state 1`] = `
-"                                                  
-▼ Changes Error                                   
-                                                  
- Could not authenticate. Run \`gh auth status\` to  
- confirm.                                         
-                                                  
-                                                  
-                                                  
-                                                  
-                                                  
-                                                  
-                                                  
-                                                  
-                                                  
-                                                  
-                                                  
-                                                  
-                                                  
-                                                  
-                                                  
 "
-`;
+Pull Requests Error
 
-exports[`DashboardView render collapsed state 1`] = `
-"                                                  
-▶ Changes                                         
-                                                  
-                                                  
-                                                  
-                                                  
-                                                  
-                                                  
-                                                  
-                                                  
-                                                  
-                                                  
-                                                  
-                                                  
-                                                  
-                                                  
-                                                  
-                                                  
-                                                  
-                                                  
+ Could not authenticate. Run \`gh auth status\` to
+ confirm.
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 "
 `;
 
 exports[`DashboardView render ok state with empty PRs 1`] = `
-"                                                  
-▼ Changes                                         
-                                                  
- No PRs for this branch                           
-                                                  
-                                                  
-                                                  
-                                                  
-                                                  
-                                                  
-                                                  
-                                                  
-                                                  
-                                                  
-                                                  
-                                                  
-                                                  
-                                                  
-                                                  
-                                                  
+"
+Pull Requests
+
+ No PRs for this branch
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 "
 `;

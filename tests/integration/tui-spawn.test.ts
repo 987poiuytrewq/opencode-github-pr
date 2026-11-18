@@ -46,7 +46,16 @@ describe("currentBranchPR", () => {
               deletions: 3,
               baseRefName: "main",
               mergeable: "MERGEABLE",
-              statusCheckRollup: { state: "SUCCESS" },
+              statusCheckRollup: {
+                state: "SUCCESS",
+                contexts: {
+                  nodes: [
+                    { __typename: "CheckRun", status: "COMPLETED", conclusion: "SUCCESS" },
+                    { __typename: "StatusContext", state: "PENDING" },
+                  ],
+                },
+              },
+              reviewThreads: { nodes: [{ isResolved: false }, { isResolved: true }] },
               reviewRequests: { nodes: [] },
               latestReviews: { nodes: [] },
             }] },
@@ -60,7 +69,11 @@ describe("currentBranchPR", () => {
     expect(lastQuery).toContain("states: [OPEN, MERGED]")
     expect(lastQuery).toContain("additions")
     expect(lastQuery).toContain("deletions")
+    expect(lastQuery).toContain("contexts(first: 100)")
+    expect(lastQuery).toContain("reviewThreads(first: 100)")
     expect(pr?.number).toBe(7)
+    expect(pr?.checkStatuses).toEqual(["SUCCESS", "PENDING"])
+    expect(pr?.reviewThreads).toEqual([{ isResolved: false }, { isResolved: true }])
     rmSync(dir, { recursive: true, force: true })
   })
 

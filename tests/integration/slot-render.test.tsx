@@ -18,7 +18,7 @@ describe("slot render: sidebar_content produces visible output", () => {
     clearOctokitMocks()
   })
 
-  test("slot renders Changes header with current branch data", async () => {
+  test("slot renders Pull Requests header with current branch data", async () => {
     const cwd = makeFakeRepo()
     const origCwd = process.cwd()
     process.chdir(cwd)
@@ -50,14 +50,14 @@ describe("slot render: sidebar_content produces visible output", () => {
 
       await r.flush()
       const frame = r.captureCharFrame()
-      expect(frame).toContain("Changes")
+      expect(frame).toContain("Pull Requests")
       cleanup?.()
     } finally {
       process.chdir(origCwd)
     }
   })
 
-  test("slot renders Changes header even with NoRepo", async () => {
+  test("slot renders Pull Requests header even with NoRepo", async () => {
     const { api, registry } = createMockTuiApi()
     const cleanup = await plugin.setup(api)
 
@@ -71,7 +71,7 @@ describe("slot render: sidebar_content produces visible output", () => {
     )
     await r.flush()
     const frame = r.captureCharFrame()
-    expect(frame).toContain("Changes")
+    expect(frame).toContain("Pull Requests")
     cleanup?.()
   })
 

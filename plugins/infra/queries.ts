@@ -20,6 +20,23 @@ export const CURRENT_BRANCH_PRS_QUERY = `query CurrentBranchPRs($owner: String!,
         mergeable
         statusCheckRollup {
           state
+          contexts(first: 100) {
+            nodes {
+              __typename
+              ... on CheckRun {
+                status
+                conclusion
+              }
+              ... on StatusContext {
+                state
+              }
+            }
+          }
+        }
+        reviewThreads(first: 100) {
+          nodes {
+            isResolved
+          }
         }
         reviewRequests(first: 5) {
           nodes {

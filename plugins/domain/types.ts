@@ -15,6 +15,8 @@ export type PR = {
   baseRefName: string
   mergeable: string
   statusCheckRollup: { state: string } | null
+  checkStatuses: string[] | null
+  reviewThreads: Array<{ isResolved: boolean }> | null
   reviewRequests: Array<{ login: string }> | null
   latestReviews: Array<{ author: { login: string }; state: string }> | null
 }
@@ -54,6 +56,4 @@ export interface DashboardContext {
   refreshOne: (n: number) => Promise<void>
   selectedIdx: () => number
   setSelectedIdx: (n: number) => void
-  expanded: () => boolean
-  toggleExpanded: () => void
 }

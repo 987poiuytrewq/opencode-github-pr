@@ -19,9 +19,9 @@ describe.skipIf(!isE2E())("E2E: PR dashboard sidebar renders", () => {
     repo?.cleanup()
   })
 
-  test("sidebar shows Changes heading", async () => {
+  test("sidebar shows Pull Requests heading", async () => {
     const screen = await session.capturePanePlain()
-    expect(screen).toContain("Changes")
+    expect(screen).toContain("Pull Requests")
   }, 30_000)
 
   test("sidebar does not show filter label", async () => {
@@ -31,7 +31,7 @@ describe.skipIf(!isE2E())("E2E: PR dashboard sidebar renders", () => {
 
   test("sidebar content is left of the separator", async () => {
     const screen = await session.capturePanePlain()
-    expect(screen).toContain("Changes")
+    expect(screen).toContain("Pull Requests")
     expect(screen).not.toContain("author:@me")
   }, 30_000)
 })
