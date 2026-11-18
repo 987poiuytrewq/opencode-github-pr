@@ -106,7 +106,7 @@ describe("DashboardView render", () => {
     expect(frame).toContain("#42 +17 -4")
     expect(frame).toContain("●")
     expect(frame).not.toContain("󰅺0")
-    expect(frame).not.toContain("0")
+    expect(frame).not.toContain("")
   })
 
   test("hides zero comment counts and only shows non-zero comment statuses", async () => {
@@ -118,7 +118,7 @@ describe("DashboardView render", () => {
     await r.flush()
     const frame = captureFrame(r)
     expect(frame).toContain("󰅺1")
-    expect(frame).not.toContain("0")
+    expect(frame).not.toContain("")
   })
 
   test("allows longer titles and truncates at a word boundary", async () => {
@@ -179,7 +179,8 @@ describe("DashboardView render", () => {
     }))
     await r.flush()
     const frame = captureFrame(r)
-    expect(frame).toContain("󰅺1 1 1 1 ●3 ●1")
+    expect(frame).toContain("󰅺1 1 1 ●3 ●1")
+    expect(frame).not.toContain("")
   })
 
   test("spaces the heading, PR titles, and status rows as requested", async () => {
@@ -212,7 +213,7 @@ describe("DashboardView render", () => {
     const frame = r.captureCharFrame()
     expect(frame).toContain("")
     expect(frame).toContain("󰅺1")
-    expect(frame).toContain("1")
+    expect(frame).not.toContain("")
   })
 
 })
