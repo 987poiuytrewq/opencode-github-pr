@@ -39,6 +39,17 @@ export enum DashboardStatus {
   Error = "error",
 }
 
+export type PRListErrorKind =
+  | "authentication"
+  | "forbidden"
+  | "rate-limit"
+  | "not-found"
+  | "invalid-query"
+  | "timeout"
+  | "network"
+  | "server"
+  | "unknown"
+
 export type DashboardState = {
   status: DashboardStatus
   repo: Repo | null
@@ -47,6 +58,7 @@ export type DashboardState = {
   viewerLogin: string | null
   fetchedAt: number | null
   error?: string
+  errorKind?: PRListErrorKind
 }
 
 export type ReviewThread = {

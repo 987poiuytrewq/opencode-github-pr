@@ -1,3 +1,5 @@
+import type { PRListErrorKind } from "./types"
+
 // Centralized user-facing error messages for the PR dashboard plugins.
 //
 // Message convention:
@@ -37,14 +39,13 @@ export const errorMessages = {
   unknown: "unknown",
 
   // dashboard view banners / empty states
-  noMatchingPRs: "No PRs match these filters",
+  noMatchingPRs: "No matching PRs",
 }
 
-// Map a thrown error to the right prListing message. Detects HTTP status
-// (from @octokit/request-error), aborts/timeouts, network error codes, and
+// Classify errors from HTTP status, aborts/timeouts, network codes, and
 // gh CLI stderr text (when no status is available).
-export function prListErrorMessage(e: unknown): string {
-  if (!e) return errorMessages.prListing.unknown("unknown")
+export function prListErrorKind(e: unknown): PRListErrorKind {
+  if (!e) return "unknown"
   const any = e as any
   const status = any?.status as number | undefined
   const name = any?.name as string | undefined
@@ -52,41 +53,70 @@ export function prListErrorMessage(e: unknown): string {
   const message = e instanceof Error ? e.message : String(e)
   const lower = message.toLowerCase()
 
-  if (name === "AbortError") return errorMessages.prListing.timeout
+  if (/not authenticated|unauthor/i.test(lower)) return "authentication"
+  if (name === "AbortError") return "timeout"
   if (
     code &&
     ["ECONNRESET", "ECONNREFUSED", "ETIMEDOUT", "ENOTFOUND", "EAI_AGAIN"].includes(code)
   ) {
-    return errorMessages.prListing.network(code)
+    return "network"
   }
 
   switch (status) {
     case 401:
-      return errorMessages.prListing.unauthorized
+      return "authentication"
     case 403:
-      return /rate limit/i.test(lower)
-        ? errorMessages.prListing.rateLimited
-        : errorMessages.prListing.forbidden
+      return /rate limit/i.test(lower) ? "rate-limit" : "forbidden"
     case 404:
-      return errorMessages.prListing.notFound
+      return "not-found"
     case 408:
-      return errorMessages.prListing.timeout
+      return "timeout"
     case 422:
-      return errorMessages.prListing.unprocessable
+      return "invalid-query"
   }
-  if (status && status >= 500) return errorMessages.prListing.server
+  if (status && status >= 500) return "server"
 
   // gh CLI stderr fallback (no status, just text)
-  if (/rate limit/i.test(lower)) return errorMessages.prListing.rateLimited
-  if (/not found|\b404\b/.test(lower)) return errorMessages.prListing.notFound
-  if (/unauthor|\b401\b/.test(lower)) return errorMessages.prListing.unauthorized
-  if (/forbidden|\b403\b/.test(lower)) return errorMessages.prListing.forbidden
+  if (/rate limit/i.test(lower)) return "rate-limit"
+  if (/not found|\b404\b/.test(lower)) return "not-found"
+  if (/forbidden|\b403\b/.test(lower)) return "forbidden"
   if (/network|econn|enotfound|etimedout|eai_again/.test(lower)) {
-    return errorMessages.prListing.network(message)
+    return "network"
   }
-  if (/timeout|timed out/.test(lower)) return errorMessages.prListing.timeout
+  if (/timeout|timed out/.test(lower)) return "timeout"
 
-  return errorMessages.prListing.unknown(message)
+  return "unknown"
+}
+
+// Map a thrown error to the existing user-facing detail string.
+export function prListErrorMessage(e: unknown): string {
+  if (!e) return errorMessages.prListing.unknown("unknown")
+  const any = e as any
+  const message = e instanceof Error ? e.message : String(e)
+  const code = any?.code as string | undefined
+
+  switch (prListErrorKind(e)) {
+    case "authentication":
+      return any?.status === 401 || /unauthor/i.test(message)
+        ? errorMessages.prListing.unauthorized
+        : errorMessages.noAuthToken
+    case "forbidden":
+      return errorMessages.prListing.forbidden
+    case "rate-limit":
+      return errorMessages.prListing.rateLimited
+    case "not-found":
+      return errorMessages.prListing.notFound
+    case "invalid-query":
+      return errorMessages.prListing.unprocessable
+    case "timeout":
+      return errorMessages.prListing.timeout
+    case "network":
+      return errorMessages.prListing.network(code ?? message)
+    case "server":
+      return errorMessages.prListing.server
+    case "unknown":
+      return errorMessages.prListing.unknown(message)
+  }
 }
 
 export type RateLimitInfo =
