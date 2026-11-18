@@ -50,6 +50,7 @@ export function errorState(overrides: Partial<DashboardState> = {}): DashboardSt
     fetchedAt: Date.now(),
     listingTruncated: false,
     error: "Could not authenticate. Run `gh auth status` to confirm.",
+    errorKind: "authentication",
     ...overrides,
   }
 }

@@ -164,7 +164,7 @@ export async function startOpenCodeE2ESession(
       hasPullRequestsHeading,
       { timeoutMs: 30_000, label: "Pull Requests heading" },
     )
-    await createdSession.waitForText("Not a git repo", { timeoutMs: 30_000 })
+    await createdSession.waitForText("No GitHub repo", { timeoutMs: 30_000 })
 
     return {
       session: createdSession,

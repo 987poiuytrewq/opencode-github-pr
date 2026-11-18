@@ -15,7 +15,7 @@ import {
 } from "../domain/types"
 import { currentBranch, detectRepo } from "../infra/git"
 import { repositoryPRs, fetchOnePR } from "../infra/loader"
-import { prListErrorMessage, parseRateLimitError } from "../domain/messages"
+import { prListErrorKind, prListErrorMessage, parseRateLimitError } from "../domain/messages"
 
 export function useDashboard(
   api: TuiPluginContext,
@@ -80,6 +80,7 @@ export function useDashboard(
             viewerLogin: null,
             listingTruncated: false,
             error: undefined,
+            errorKind: undefined,
             fetchedAt: Date.now(),
           }))
           return
@@ -96,6 +97,7 @@ export function useDashboard(
           viewerLogin: result.viewerLogin,
           listingTruncated: result.listingTruncated,
           error: undefined,
+          errorKind: undefined,
           fetchedAt: Date.now(),
         }))
       } catch (e: unknown) {
@@ -108,6 +110,7 @@ export function useDashboard(
           prs: rl.isRateLimit ? s.prs : [],
           listingTruncated: rl.isRateLimit ? s.listingTruncated : false,
           error: rl.message ?? prListErrorMessage(e),
+          errorKind: rl.isRateLimit ? "rate-limit" : prListErrorKind(e),
           fetchedAt: Date.now(),
         }))
       }

@@ -22,7 +22,7 @@ describe.skipIf(!isE2E())("E2E: PR dashboard sidebar renders", () => {
   test("sidebar shows Pull Requests heading", async () => {
     const screen = await session.capturePanePlain()
     expect(hasPullRequestsHeading(screen)).toBe(true)
-    expect(screen).toContain("Not a git repo")
+    expect(screen).toContain("No GitHub repo")
     expect(screen).not.toContain("Not authorised")
   }, 30_000)
 

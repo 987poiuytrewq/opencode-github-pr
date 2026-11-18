@@ -27,7 +27,7 @@ describe.skipIf(!isE2E())("E2E: sidebar content area", () => {
   test("sidebar area contains the Pull Requests heading", async () => {
     const screen = await session.capturePanePlain()
     expect(hasPullRequestsHeading(screen)).toBe(true)
-    expect(screen).toContain("Not a git repo")
+    expect(screen).toContain("No GitHub repo")
     expect(screen).not.toContain("Not authorised")
   }, 30_000)
 

@@ -39,6 +39,17 @@ export enum DashboardStatus {
   Error = "error",
 }
 
+export type PRListErrorKind =
+  | "authentication"
+  | "forbidden"
+  | "rate-limit"
+  | "not-found"
+  | "invalid-query"
+  | "timeout"
+  | "network"
+  | "server"
+  | "unknown"
+
 export type DashboardState = {
   status: DashboardStatus
   repo: Repo | null
@@ -48,6 +59,7 @@ export type DashboardState = {
   fetchedAt: number | null
   listingTruncated: boolean
   error?: string
+  errorKind?: PRListErrorKind
 }
 
 // The public surface of useDashboard() — the signal/accessor pairs and

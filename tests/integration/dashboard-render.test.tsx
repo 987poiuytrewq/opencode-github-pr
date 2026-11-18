@@ -60,6 +60,24 @@ describe("DashboardView render", () => {
     expect(captureFrame(r)).toMatchSnapshot()
   })
 
+  test("rate-limit error explains the limit and keeps cached PRs visible", async () => {
+    const r = await renderState(errorState({
+      errorKind: "rate-limit",
+      error: "GitHub API rate limit exceeded — resets at 1:30 PM.",
+      prs: [makeTUIPR({ number: 42, title: "Cached PR" })],
+    }))
+    await r.flush()
+    const frame = captureFrame(r)
+    const lines = frame.split("\n")
+    const heading = lines.findIndex((line) => line.includes("Pull Requests"))
+    const statusTitle = lines.findIndex((line) => line.includes("Rate limit exceeded"))
+
+    expect(lines[heading + 1]).toBe("")
+    expect(statusTitle).toBe(heading + 2)
+    expect(frame).toMatch(/Try again at 1:30\s+PM/)
+    expect(frame).toContain("Cached PR")
+  })
+
   test("ok state with empty PRs", async () => {
     const r = await renderState(okState({ prs: [] }))
     await r.flush()

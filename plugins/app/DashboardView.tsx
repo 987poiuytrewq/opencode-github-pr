@@ -7,6 +7,7 @@ import {
   DashboardStatus,
   type DashboardState,
   type PRLinkTarget,
+  type PRListErrorKind,
   type PRScope,
   type PRStatusFilter,
 } from "../domain/types"
@@ -63,6 +64,62 @@ export function DashboardView(props: {
     prs().slice(currentPage() * PAGE_SIZE, (currentPage() + 1) * PAGE_SIZE)
   const canGoPrevious = () => currentPage() > 0
   const canGoNext = () => currentPage() < pageCount() - 1
+  const listIsAvailable = () =>
+    props.state.status === DashboardStatus.Ok ||
+    (props.state.status === DashboardStatus.Error && props.state.prs.length > 0)
+
+  const errorPresentation = (): { title: string; description: string } => {
+    const detail = props.state.error ?? errorMessages.unknown
+    const kind: PRListErrorKind = props.state.errorKind ?? "unknown"
+    switch (kind) {
+      case "authentication":
+        return {
+          title: "GitHub sign-in failed",
+          description: "Set GITHUB_TOKEN or GH_TOKEN.",
+        }
+      case "forbidden":
+        return {
+          title: "Permission denied",
+          description: "Give your token read access to this repo.",
+        }
+      case "rate-limit":
+        const retryAt = /(?:resets at|try again at)\s+(.+?)(?:\.)?$/i.exec(detail)?.[1]
+        return {
+          title: "Rate limit exceeded",
+          description: retryAt ? `Try again at ${retryAt.replace(/\.$/, "")}.` : "Wait a little, then try again.",
+        }
+      case "not-found":
+        return {
+          title: "Repo not found",
+          description: "Check the URL and your access.",
+        }
+      case "invalid-query":
+        return {
+          title: "Invalid request",
+          description: "Update the plugin, then refresh.",
+        }
+      case "timeout":
+        return {
+          title: "Request timed out",
+          description: "Try again. Check your connection if it keeps happening.",
+        }
+      case "network":
+        return {
+          title: "Cannot reach GitHub",
+          description: "Check your internet connection and try again.",
+        }
+      case "server":
+        return {
+          title: "GitHub is unavailable",
+          description: "Try again in a moment.",
+        }
+      case "unknown":
+        return {
+          title: "Couldn't load PRs",
+          description: `Try again. Details: ${detail}`,
+        }
+    }
+  }
 
   return (
     <box ref={(element) => { view = element }} flexDirection="column" paddingTop={1} paddingBottom={1} gap={0} width="100%">
@@ -75,15 +132,6 @@ export function DashboardView(props: {
         <text fg={sk.text}>
           <b>Pull Requests</b>
         </text>
-        <Show when={props.state.status === DashboardStatus.Loading}>
-          <text fg={sk.muted}>Loading</text>
-        </Show>
-        <Show when={props.state.status === DashboardStatus.Error}>
-          <text fg={sk.error}>Error</text>
-        </Show>
-        <Show when={props.state.status === DashboardStatus.NoRepo}>
-          <text fg={sk.muted}>{errorMessages.noRepo}</text>
-        </Show>
         <box flexGrow={1}></box>
         <box flexDirection="row" gap={2}>
           <text
@@ -107,6 +155,13 @@ export function DashboardView(props: {
         </box>
       </box>
 
+      <Show when={props.state.status === DashboardStatus.Loading}>
+        <box flexDirection="column" paddingLeft={1} paddingTop={1} paddingRight={1}>
+          <text fg={sk.muted} selectable={false}>󰔟 Loading PRs</text>
+          <text fg={sk.muted} selectable={false}>  Checking GitHub…</text>
+        </box>
+      </Show>
+
       <Show when={props.state.listingTruncated}>
         <box paddingLeft={1}>
           <text fg={sk.warning}>Showing first 300 PRs; more are available</text>
@@ -115,23 +170,32 @@ export function DashboardView(props: {
 
       <Show when={props.state.status === DashboardStatus.NoRepo}>
         <box flexDirection="column" paddingLeft={1} paddingTop={1} paddingRight={1}>
-          <text fg={sk.muted} selectable={false}>{errorMessages.noRepo}</text>
+          <text fg={sk.muted} selectable={false}> No GitHub repo</text>
+          <text fg={sk.muted} selectable={false}>  Add an origin remote or switch to the right project.</text>
         </box>
       </Show>
 
       <Show when={props.state.status === DashboardStatus.Error}>
-        <box flexDirection="column" paddingLeft={1} paddingTop={1} paddingRight={1} gap={1}>
-          <text fg={sk.error} selectable={false}>{props.state.error ?? errorMessages.unknown}</text>
-        </box>
-      </Show>
-
-      <Show when={props.state.status === DashboardStatus.Ok && prs().length === 0}>
         <box flexDirection="column" paddingLeft={1} paddingTop={1} paddingRight={1}>
-          <text fg={sk.muted} selectable={false}>{errorMessages.noMatchingPRs}</text>
+          <text fg={sk.error} selectable={false}> {errorPresentation().title}</text>
+          <text fg={sk.muted} selectable={false}>  {errorPresentation().description}</text>
         </box>
       </Show>
 
-      <Show when={props.state.status === DashboardStatus.Ok && prs().length > 0}>
+      <Show
+        when={
+          listIsAvailable() &&
+          prs().length === 0 &&
+          (props.state.status === DashboardStatus.Ok || props.state.prs.length > 0)
+        }
+      >
+        <box flexDirection="column" paddingLeft={1} paddingTop={1} paddingRight={1}>
+          <text fg={sk.muted} selectable={false}> {errorMessages.noMatchingPRs}</text>
+          <text fg={sk.muted} selectable={false}>  Try a different scope or status.</text>
+        </box>
+      </Show>
+
+      <Show when={listIsAvailable() && prs().length > 0}>
         <box flexDirection="column" gap={0} width="100%">
           <box flexDirection="column" gap={1} paddingTop={1} width="100%">
             <For each={pagePRs()}>
