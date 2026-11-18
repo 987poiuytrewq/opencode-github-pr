@@ -32,6 +32,7 @@ function statusColor(status: StatusCategory, props: {
 
 export function PRRow(props: {
   pr: PR
+  titleWidth: number
   onClick: () => void
   text: string
   muted: string
@@ -40,7 +41,7 @@ export function PRRow(props: {
   warn: string
   merged: string
 }) {
-  const title = truncateTitle(props.pr.title, 48)
+  const title = () => truncateTitle(props.pr.title, props.titleWidth)
   const icon = props.pr.isMerged ? MERGED_PR_ICON : OPEN_PR_ICON
   const iconColor = props.pr.isMerged
     ? props.merged
@@ -62,13 +63,16 @@ export function PRRow(props: {
   return (
     <box
       flexDirection="column"
+      width="100%"
       paddingLeft={0}
       paddingRight={0}
       onMouseUp={() => props.onClick()}
     >
-      <box flexDirection="row" gap={1}>
+      <box flexDirection="row" gap={1} width="100%">
         <text fg={iconColor} selectable={false}>{icon}</text>
-        <text fg={props.text} selectable={false}>{title}</text>
+        <text fg={props.text} selectable={false} height={1} wrapMode="none">
+          {title()}
+        </text>
       </box>
       <box flexDirection="row" gap={1} paddingLeft={2}>
         <text fg={props.muted} selectable={false}>{`#${props.pr.number}`}</text>
