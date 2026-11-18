@@ -50,11 +50,6 @@ export const PULL_REQUESTS_QUERY = `query PullRequests($owner: String!, $name: S
             isResolved
           }
         }
-        reviewThreads(first: 100) {
-          nodes {
-            isResolved
-          }
-        }
         reviewRequests(first: 5) {
           nodes {
             requestedReviewer {

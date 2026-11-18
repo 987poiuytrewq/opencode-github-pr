@@ -25,7 +25,7 @@ export type PR = {
   latestReviews: Array<{ author: { login: string }; state: string }> | null
 }
 
-export type PRLinkTarget = "overview" | "checks" | "files"
+export type PRLinkTarget = "overview" | "mergeStatus" | "checks" | "files"
 
 export type Repo = { owner: string; repo: string }
 

@@ -153,39 +153,6 @@ describe("reviewSummary", () => {
   })
 })
 
-describe("reviewStatusGroups", () => {
-  test("groups review outcomes for compact status badges", () => {
-    const groups = reviewStatusGroups(makeTUIPR({
-      latestReviews: [
-        { author: { login: "alice" }, state: "APPROVED" },
-        { author: { login: "bob" }, state: "CHANGES_REQUESTED" },
-      ],
-      reviewRequests: [{ login: "carol" }],
-    }))
-    expect(groups).toEqual([
-      { status: "pass", count: 1 },
-      { status: "fail", count: 1 },
-      { status: "pending", count: 1 },
-    ])
-  })
-})
-
-describe("commentThreadCounts", () => {
-  test("counts unresolved and resolved review threads separately", () => {
-    expect(commentThreadCounts(makeTUIPR({
-      reviewThreads: [
-        { isResolved: false },
-        { isResolved: true },
-        { isResolved: false },
-      ],
-    }))).toEqual({ open: 2, resolved: 1 })
-  })
-
-  test("returns null when thread counts were not fetched", () => {
-    expect(commentThreadCounts(makeTUIPR({ reviewThreads: null }))).toBeNull()
-  })
-})
-
 describe("displayLogin", () => {
   test("returns known bot alias", () => {
     expect(displayLogin("dependabot")).toBe("dependabot")

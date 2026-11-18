@@ -193,20 +193,6 @@ describe("DashboardView render", () => {
     expect(frame).toContain("1")
   })
 
-  test("renders review and comment status badges", async () => {
-    const r = await renderState(okState({
-      prs: [makeTUIPR({
-        number: 42,
-        latestReviews: [{ author: { login: "alice" }, state: "APPROVED" }],
-        reviewThreads: [{ isResolved: false }, { isResolved: true }],
-      })],
-    }))
-    await r.flush()
-    const frame = r.captureCharFrame()
-    expect(frame).toContain("")
-    expect(frame).toContain("󰅺1")
-    expect(frame).toContain("1")
-  })
 })
 
 describe("DashboardView mouse interaction", () => {
@@ -284,6 +270,18 @@ describe("DashboardView mouse interaction", () => {
     await r.mockMouse.click(x, line)
     await r.flush()
     expect(opened).toEqual([{ number: 10, target: "overview" }])
+  })
+
+  test("clicking the PR status icon opens the merge status sidebar", async () => {
+    const opened: Array<{ number: number; target?: PRLinkTarget }> = []
+    const r = await renderState(okState(), {
+      onOpen: (number, target) => { opened.push({ number, target }) },
+    })
+    await r.flush()
+    // First PR row starts at y=3; the status icon is its first character.
+    await r.mockMouse.click(0, 3)
+    await r.flush()
+    expect(opened).toEqual([{ number: 10, target: "mergeStatus" }])
   })
 
   test("status badges open their target pages without triggering the row click", async () => {

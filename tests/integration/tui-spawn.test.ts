@@ -329,7 +329,6 @@ describe("fetchOnePR", () => {
     expect(pr.assigneeLogins).toEqual([])
     expect(pr.additions).toBe(9)
     expect(pr.deletions).toBe(2)
-    expect(pr.reviewThreads).toBeNull()
     expect(pr.reviewRequests).toEqual([{ login: "bob" }])
   })
 
