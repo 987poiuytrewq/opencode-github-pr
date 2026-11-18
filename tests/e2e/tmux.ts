@@ -32,9 +32,18 @@ export class TmuxSession {
       args.push("-e", `${k}=${v}`)
     }
     args.push("--", ...opts.command)
-    await session.run("tmux", args)
-    await session.run("tmux", ["set-option", "-t", opts.name, "mouse", "off"])
-    return session
+    let created = false
+    try {
+      await session.run("tmux", args)
+      created = true
+      await session.run("tmux", ["set-option", "-t", opts.name, "mouse", "off"])
+      return session
+    } catch (error) {
+      // `new-session` can succeed even if later setup fails. Do not leave that
+      // partially initialized session behind.
+      if (created) await session.kill()
+      throw error
+    }
   }
 
   private run(cmd: string, args: string[]): Promise<string> {
@@ -141,6 +150,15 @@ export class TmuxSession {
 
 export function isE2E(): boolean {
   return process.env.E2E === "1" || process.env.E2E === "true"
+}
+
+export function hasPullRequestsHeading(screen: string): boolean {
+  // The heading may wrap around other sidebar content at narrow widths.
+  const lines = screen.split("\n")
+  return lines.some((line, index) =>
+    line.includes("Pull") &&
+    (line.includes("Requests") || lines[index + 1]?.includes("Requests")),
+  )
 }
 
 export const OPENCODE_BIN = process.env.OPENCODE_BIN ?? "opencode"

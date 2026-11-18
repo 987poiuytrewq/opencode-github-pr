@@ -16,8 +16,6 @@ describe("DashboardView reactivity", () => {
         <DashboardView
           theme={api.theme}
           state={state()}
-          onRefresh={() => {}}
-          selectedIdx={0}
           setSelectedIdx={() => {}}
           onOpen={() => {}}
           scope="branch"

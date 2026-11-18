@@ -15,6 +15,7 @@ export function createDashboard(api: TuiPluginContext) {
     currentBranch: null,
     viewerLogin: null,
     fetchedAt: null,
+    listingTruncated: false,
   })
   const dash = useDashboard(api, state, setState)
   dash.refresh()

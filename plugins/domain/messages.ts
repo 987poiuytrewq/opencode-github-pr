@@ -17,7 +17,6 @@ export const errorMessages = {
 
   // repo / session context
   noRepo: "Not a git repo",
-  noActiveSession: "No active session",
 
   // server-side tool errors
   prListing: {
@@ -40,15 +39,19 @@ export const errorMessages = {
   noMatchingPRs: "No PRs match these filters",
 }
 
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === "object" && value !== null
+}
+
 // Map a thrown error to the right prListing message. Detects HTTP status
 // (from @octokit/request-error), aborts/timeouts, network error codes, and
-// gh CLI stderr text (when no status is available).
+// GitHub request messages (when no status is available).
 export function prListErrorMessage(e: unknown): string {
   if (!e) return errorMessages.prListing.unknown("unknown")
-  const any = e as any
-  const status = any?.status as number | undefined
-  const name = any?.name as string | undefined
-  const code = any?.code as string | undefined
+  const details = isRecord(e) ? e : {}
+  const status = typeof details.status === "number" ? details.status : undefined
+  const name = typeof details.name === "string" ? details.name : undefined
+  const code = typeof details.code === "string" ? details.code : undefined
   const message = e instanceof Error ? e.message : String(e)
   const lower = message.toLowerCase()
 
@@ -76,7 +79,7 @@ export function prListErrorMessage(e: unknown): string {
   }
   if (status && status >= 500) return errorMessages.prListing.server
 
-  // gh CLI stderr fallback (no status, just text)
+  // GitHub request message fallback (no status, just text)
   if (/rate limit/i.test(lower)) return errorMessages.prListing.rateLimited
   if (/not found|\b404\b/.test(lower)) return errorMessages.prListing.notFound
   if (/unauthor|\b401\b/.test(lower)) return errorMessages.prListing.unauthorized
@@ -97,9 +100,10 @@ export type RateLimitInfo =
 // reset time from the x-ratelimit-reset header. Used by useDashboard to
 // preserve the existing PR list when the error is a rate limit (the PRs
 // are still valid; only the fetch failed).
-export function parseRateLimitError(e: any): RateLimitInfo {
-  const msg: string = e?.message ?? ""
-  const status: number | undefined = e?.status
+export function parseRateLimitError(e: unknown): RateLimitInfo {
+  const details = isRecord(e) ? e : {}
+  const msg = typeof details.message === "string" ? details.message : ""
+  const status = typeof details.status === "number" ? details.status : undefined
   const isRateLimit =
     status === 429 ||
     (status === 403 && /rate limit/i.test(msg)) ||
@@ -107,7 +111,12 @@ export function parseRateLimitError(e: any): RateLimitInfo {
     /api rate limit/i.test(msg)
   if (!isRateLimit) return { isRateLimit: false, message: null, resetAt: null }
 
-  const headers = e?.response?.headers ?? e?.headers ?? {}
+  const response = isRecord(details.response) ? details.response : {}
+  const headers = isRecord(response.headers)
+    ? response.headers
+    : isRecord(details.headers)
+      ? details.headers
+      : {}
   const rawReset = headers["x-ratelimit-reset"] ?? headers["X-RateLimit-Reset"]
   const resetAt = rawReset ? parseInt(String(rawReset), 10) * 1000 : null
   const resetText = resetAt ? new Date(resetAt).toLocaleTimeString() : "unknown time"

@@ -48,7 +48,6 @@ export function useDashboard(
   let inFlight: Promise<void> | null = null
   let refreshToken = 0
   let currentRefreshToken = 0
-  let rateLimitedUntil = 0
 
   const refresh = async () => {
     if (inFlight) return inFlight
@@ -79,35 +78,35 @@ export function useDashboard(
             prs: [],
             currentBranch: null,
             viewerLogin: null,
+            listingTruncated: false,
             error: undefined,
             fetchedAt: Date.now(),
           }))
-          rateLimitedUntil = 0
           return
         }
         const TIMEOUT_MS = 15_000
-        const { prs, viewerLogin } = await timeoutRace(TIMEOUT_MS, () => repositoryPRs(repo))
+        const result = await timeoutRace(TIMEOUT_MS, () => repositoryPRs(repo))
         if (isStale()) return
         setState((s) => ({
           ...s,
           status: DashboardStatus.Ok,
           repo,
-          prs,
+          prs: result.prs,
           currentBranch: currentBranch(directory),
-          viewerLogin,
+          viewerLogin: result.viewerLogin,
+          listingTruncated: result.listingTruncated,
           error: undefined,
           fetchedAt: Date.now(),
         }))
-        rateLimitedUntil = 0
-      } catch (e: any) {
+      } catch (e: unknown) {
         if (isStale()) return
         const rl = parseRateLimitError(e)
-        if (rl.resetAt) rateLimitedUntil = rl.resetAt
         setState((s) => ({
           ...s,
           status: DashboardStatus.Error,
           repo: s.repo,
           prs: rl.isRateLimit ? s.prs : [],
+          listingTruncated: rl.isRateLimit ? s.listingTruncated : false,
           error: rl.message ?? prListErrorMessage(e),
           fetchedAt: Date.now(),
         }))

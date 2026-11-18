@@ -67,25 +67,3 @@ export const PULL_REQUESTS_QUERY = `query PullRequests($owner: String!, $name: S
     }
   }
 }`
-
-export const REVIEWER_THREADS_QUERY = `query Q($owner: String!, $name: String!, $number: Int!) {
-  repository(owner: $owner, name: $name) {
-    pullRequest(number: $number) {
-      reviewThreads(first: 100) {
-        totalCount
-        nodes {
-          isResolved
-          comments(first: 20) {
-            nodes {
-              author { login }
-              body
-              createdAt
-              path
-              line
-            }
-          }
-        }
-      }
-    }
-  }
-}`

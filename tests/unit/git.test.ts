@@ -37,8 +37,23 @@ describe("parseGitHubRemote", () => {
 describe("detectRepo", () => {
   test("reads .git/config and returns owner/repo", () => {
     const dir = makeFakeRepo("foo", "bar")
-    expect(detectRepo(dir)).toEqual({ owner: "foo", repo: "bar" })
-    rmSync(dir, { recursive: true, force: true })
+    try {
+      expect(detectRepo(dir)).toEqual({ owner: "foo", repo: "bar" })
+    } finally {
+      rmSync(dir, { recursive: true, force: true })
+    }
+  })
+
+  test("finds the nearest repository from a nested directory", () => {
+    const dir = makeFakeRepo("foo", "bar")
+    const nested = join(dir, "src", "deep")
+    mkdirSync(nested, { recursive: true })
+    try {
+      expect(detectRepo(nested)).toEqual({ owner: "foo", repo: "bar" })
+      expect(currentBranch(nested)).toBe("main")
+    } finally {
+      rmSync(dir, { recursive: true, force: true })
+    }
   })
 
   test("reads shared config and HEAD from a linked worktree", () => {
@@ -56,20 +71,44 @@ describe("detectRepo", () => {
     )
     writeFileSync(join(worktreeGitDir, "HEAD"), "ref: refs/heads/e2e-plugin-install\n")
 
-    expect(detectRepo(worktree)).toEqual({ owner: "foo", repo: "bar" })
-    expect(currentBranch(worktree)).toBe("e2e-plugin-install")
-    rmSync(root, { recursive: true, force: true })
+    try {
+      const nested = join(worktree, "src", "nested")
+      mkdirSync(nested, { recursive: true })
+
+      expect(detectRepo(nested)).toEqual({ owner: "foo", repo: "bar" })
+      expect(currentBranch(nested)).toBe("e2e-plugin-install")
+    } finally {
+      rmSync(root, { recursive: true, force: true })
+    }
+  })
+
+  test("returns null for a detached HEAD", () => {
+    const dir = makeFakeRepo("foo", "bar")
+    try {
+      writeFileSync(join(dir, ".git", "HEAD"), `${"a".repeat(40)}\n`)
+      expect(currentBranch(dir)).toBeNull()
+    } finally {
+      rmSync(dir, { recursive: true, force: true })
+    }
   })
 
   test("returns null when no .git/config exists", () => {
     const dir = mkdtempSync(join(tmpdir(), "pr-dash-"))
-    expect(detectRepo(dir)).toBeNull()
-    rmSync(dir, { recursive: true, force: true })
+    try {
+      expect(detectRepo(dir)).toBeNull()
+      expect(currentBranch(dir)).toBeNull()
+    } finally {
+      rmSync(dir, { recursive: true, force: true })
+    }
   })
 
   test("returns null when no [remote origin] section", () => {
     const dir = mkdtempSync(join(tmpdir(), "pr-dash-"))
-    rmSync(dir, { recursive: true, force: true })
-    expect(detectRepo(dir)).toBeNull()
+    try {
+      expect(detectRepo(dir)).toBeNull()
+      expect(currentBranch(dir)).toBeNull()
+    } finally {
+      rmSync(dir, { recursive: true, force: true })
+    }
   })
 })

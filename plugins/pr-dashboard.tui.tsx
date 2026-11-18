@@ -32,6 +32,7 @@ function setup(api: TuiPluginContext) {
     currentBranch: null,
     viewerLogin: null,
     fetchedAt: null,
+    listingTruncated: false,
   })
   const [selectedIdx, setSelectedIdx] = createSignal(0)
   const [scope, setScope] = createSignal<PRScope>("author")
@@ -65,8 +66,6 @@ function setup(api: TuiPluginContext) {
       <DashboardView
         theme={api.theme}
         state={state()}
-        onRefresh={dash.refresh}
-        selectedIdx={selectedIdx()}
         setSelectedIdx={setSelectedIdx}
         onOpen={actions.openPR}
         scope={scope()}

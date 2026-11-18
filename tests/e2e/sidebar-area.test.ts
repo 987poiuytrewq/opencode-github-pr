@@ -1,6 +1,6 @@
 import { describe, expect, test, beforeAll, afterAll } from "bun:test"
-import { TmuxSession, isE2E } from "./tmux"
-import { checkoutRepo, startOpenCodeE2ESession, type TempRepo } from "./fixtures"
+import { TmuxSession, isE2E, hasPullRequestsHeading } from "./tmux"
+import { makeTempRepo, startOpenCodeE2ESession, type TempRepo } from "./fixtures"
 
 describe.skipIf(!isE2E())("E2E: sidebar content area", () => {
   let session: TmuxSession
@@ -8,7 +8,7 @@ describe.skipIf(!isE2E())("E2E: sidebar content area", () => {
   let stopSession: () => Promise<void>
 
   beforeAll(async () => {
-    repo = checkoutRepo()
+    repo = await makeTempRepo()
     const launched = await startOpenCodeE2ESession(repo, `e2e-area-${Date.now()}`)
     session = launched.session
     stopSession = launched.cleanup
@@ -26,7 +26,9 @@ describe.skipIf(!isE2E())("E2E: sidebar content area", () => {
 
   test("sidebar area contains the Pull Requests heading", async () => {
     const screen = await session.capturePanePlain()
-    expect(screen).toContain("Pull Requests")
+    expect(hasPullRequestsHeading(screen)).toBe(true)
+    expect(screen).toContain("Not a git repo")
+    expect(screen).not.toContain("Not authorised")
   }, 30_000)
 
   test("sidebar does not contain a filter label", async () => {

@@ -50,26 +50,36 @@ export function originRemoteUrl(cwd: string): string | null {
 }
 
 function gitPaths(cwd: string): { gitDir: string; commonDir: string } | null {
-  const dotGit = join(cwd, ".git")
-  try {
-    if (!existsSync(dotGit)) return null
-    let gitDir: string
-    if (statSync(dotGit).isDirectory()) {
-      gitDir = dotGit
-    } else {
-      const gitFile = readFileSync(dotGit, "utf8").trim()
-      const match = /^gitdir:\s*(.+)$/m.exec(gitFile)
-      if (!match) return null
-      gitDir = resolve(cwd, match[1].trim())
+  let directory = resolve(cwd)
+  while (true) {
+    const dotGit = join(directory, ".git")
+    try {
+      if (existsSync(dotGit)) {
+        let gitDir: string
+        if (statSync(dotGit).isDirectory()) {
+          gitDir = dotGit
+        } else {
+          const gitFile = readFileSync(dotGit, "utf8").trim()
+          const match = /^gitdir:\s*(.+)$/m.exec(gitFile)
+          if (match) gitDir = resolve(directory, match[1].trim())
+          else gitDir = ""
+        }
+
+        if (gitDir) {
+          const commonDirFile = join(gitDir, "commondir")
+          const commonDir = existsSync(commonDirFile)
+            ? resolve(gitDir, readFileSync(commonDirFile, "utf8").trim())
+            : gitDir
+          return { gitDir, commonDir }
+        }
+      }
+    } catch {
+      // A malformed marker may be inside a parent repository; keep searching.
     }
 
-    const commonDirFile = join(gitDir, "commondir")
-    const commonDir = existsSync(commonDirFile)
-      ? resolve(gitDir, readFileSync(commonDirFile, "utf8").trim())
-      : gitDir
-    return { gitDir, commonDir }
-  } catch {
-    return null
+    const parent = resolve(directory, "..")
+    if (parent === directory) return null
+    directory = parent
   }
 }
 

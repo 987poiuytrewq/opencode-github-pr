@@ -20,8 +20,6 @@ const PAGE_SIZE = 5
 export function DashboardView(props: {
   theme: ResolvedTheme
   state: DashboardState
-  onRefresh: () => void
-  selectedIdx: number
   setSelectedIdx: (n: number) => void
   onOpen: (n: number, target?: PRLinkTarget) => void
   scope: PRScope
@@ -108,6 +106,12 @@ export function DashboardView(props: {
           </text>
         </box>
       </box>
+
+      <Show when={props.state.listingTruncated}>
+        <box paddingLeft={1}>
+          <text fg={sk.warning}>Showing first 300 PRs; more are available</text>
+        </box>
+      </Show>
 
       <Show when={props.state.status === DashboardStatus.NoRepo}>
         <box flexDirection="column" paddingLeft={1} paddingTop={1} paddingRight={1}>
