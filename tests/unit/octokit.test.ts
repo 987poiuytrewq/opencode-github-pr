@@ -17,15 +17,10 @@ describe("GitHub authentication token", () => {
     ).toBe("github-token")
 
     expect(
-      getAuthToken(
-        { GH_TOKEN: "gh-token", GITHUB_PERSONAL_ACCESS_TOKEN: "personal-token" },
-        () => undefined,
-      ),
+      getAuthToken({ GH_TOKEN: "gh-token", GITHUB_PERSONAL_ACCESS_TOKEN: "personal-token" }, () => undefined),
     ).toBe("gh-token")
 
-    expect(
-      getAuthToken({ GITHUB_PERSONAL_ACCESS_TOKEN: "personal-token" }, () => undefined),
-    ).toBe("personal-token")
+    expect(getAuthToken({ GITHUB_PERSONAL_ACCESS_TOKEN: "personal-token" }, () => undefined)).toBe("personal-token")
   })
 
   test("uses the GitHub CLI token when no environment token is set", () => {

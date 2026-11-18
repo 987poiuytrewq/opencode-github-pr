@@ -182,7 +182,7 @@ export function DashboardView(props: {
       <Show when={props.state.status === DashboardStatus.NoRepo}>
         <box flexDirection="column" paddingLeft={1} paddingTop={1} paddingRight={1}>
           <text fg={sk.muted} selectable={false}>{props.icons.info} No GitHub repo</text>
-          <text fg={sk.muted} selectable={false}>  Add an origin remote or switch to the right project.</text>
+          <text fg={sk.muted} selectable={false}>  Add a GitHub remote or switch to the right project.</text>
         </box>
       </Show>
 
