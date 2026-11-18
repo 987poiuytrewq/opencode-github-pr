@@ -130,6 +130,24 @@ describe("DashboardView render", () => {
     const frame = captureFrame(r)
     expect(frame).toContain("󰅺1 1 1 1 ●3 ●1")
   })
+
+  test("spaces the heading, PR titles, and status rows as requested", async () => {
+    const r = await renderState(okState({
+      prs: [
+        makeTUIPR({ number: 1, title: "First PR" }),
+        makeTUIPR({ number: 2, title: "Second PR" }),
+      ],
+    }))
+    await r.flush()
+    const lines = captureFrame(r).split("\n")
+    const heading = lines.findIndex((line) => line.includes("Pull Requests"))
+
+    expect(lines[heading + 1]).toBe("")
+    expect(lines[heading + 2]).toContain("First PR")
+    expect(lines[heading + 3]).toContain("#1")
+    expect(lines[heading + 4]).toBe("")
+    expect(lines[heading + 5]).toContain("Second PR")
+  })
 })
 
 describe("DashboardView mouse interaction", () => {
@@ -149,8 +167,8 @@ describe("DashboardView mouse interaction", () => {
       onOpen: (n) => { opened.push(n) },
     })
     await r.flush()
-    // First PR row "#10 Add login flow" is at row 2.
-    await r.mockMouse.click(4, 2)
+    // First PR title is at row 3, after the blank line under the heading.
+    await r.mockMouse.click(4, 3)
     await r.flush()
     expect(opened).toEqual([10])
   })

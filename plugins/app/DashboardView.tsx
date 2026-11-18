@@ -56,7 +56,7 @@ export function DashboardView(props: {
       </Show>
 
       <Show when={props.state.status === DashboardStatus.Ok && props.state.prs.length > 0}>
-        <box flexDirection="column" gap={1} paddingTop={0}>
+        <box flexDirection="column" gap={1} paddingTop={1}>
           <For each={props.state.prs}>
             {(pr, i) => (
               <PRRow
