@@ -13,7 +13,6 @@ const OPEN_PR_ICON = ""
 const MERGED_PR_ICON = ""
 const REVIEW_ICON = ""
 const OPEN_COMMENT_ICON = "󰅺"
-const RESOLVED_COMMENT_ICON = ""
 
 function statusColor(status: StatusCategory, props: {
   pass: string
@@ -83,13 +82,8 @@ export function PRRow(props: {
   const checks = checkStatusGroups(props.pr)
   const reviews = reviewStatusGroups(props.pr)
   const comments = commentThreadCounts(props.pr)
-  const commentStatuses = comments
-    ? [
-        ...(comments.open > 0 ? [{ icon: OPEN_COMMENT_ICON, count: comments.open }] : []),
-        ...(comments.resolved > 0
-          ? [{ icon: RESOLVED_COMMENT_ICON, count: comments.resolved }]
-          : []),
-      ]
+  const commentStatuses = comments?.open
+    ? [{ icon: OPEN_COMMENT_ICON, count: comments.open }]
     : []
 
   return (
