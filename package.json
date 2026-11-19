@@ -1,11 +1,32 @@
 {
   "name": "opencode-github-pr",
-  "private": true,
+  "version": "0.1.0",
+  "description": "GitHub pull request dashboard for the OpenCode sidebar: CI, review and merge status for your PRs.",
+  "keywords": [
+    "opencode",
+    "opencode-plugin",
+    "github",
+    "pull-requests",
+    "tui"
+  ],
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/987poiuytrewq/opencode-github-pr.git"
+  },
+  "homepage": "https://github.com/987poiuytrewq/opencode-github-pr#readme",
+  "bugs": {
+    "url": "https://github.com/987poiuytrewq/opencode-github-pr/issues"
+  },
   "type": "module",
   "exports": {
     ".": "./plugins/pr-dashboard.ts",
     "./tui": "./plugins/pr-dashboard.tui.tsx"
   },
+  "files": [
+    "plugins/",
+    "demo/fixtures.ts"
+  ],
   "scripts": {
     "test": "make test",
     "test:unit": "make test-unit",

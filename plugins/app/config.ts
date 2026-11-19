@@ -46,7 +46,7 @@ const scopes: PRScope[] = ["branch", "author", "assignee", "all"]
 const statusFilters: PRStatusFilter[] = ["open", "closed", "all"]
 
 export const DEFAULT_PAGE_SIZE = 5
-export const DEFAULT_MAX_PR_PAGES = 3
+export const DEFAULT_MAX_PR_PAGES = 1
 export const DEFAULT_REFRESH_INTERVAL_MS = 60_000
 export const DEFAULT_REQUEST_TIMEOUT_MS = 15_000
 

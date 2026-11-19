@@ -91,10 +91,37 @@ describe("DashboardView render", () => {
     expect(captureFrame(r)).toMatchSnapshot()
   })
 
-  test("shows when the PR listing was truncated", async () => {
-    const r = await renderState(okState({ listingTruncated: true }))
+  test("shows which listing was truncated, for the current status filter", async () => {
+    const truncated = { open: true, closed: false }
+    let r = await renderState(okState({ truncated }), { statusFilter: "open" })
     await r.flush()
-    expect(captureFrame(r)).toContain("Showing first 300 PRs; more are available")
+    expect(captureFrame(r)).toContain("Showing 100 newest open PRs")
+    expect(captureFrame(r)).toContain("raise maxPRPages")
+
+    r = await renderState(okState({ truncated }), { statusFilter: "closed" })
+    await r.flush()
+    expect(captureFrame(r)).not.toContain("Showing")
+
+    r = await renderState(okState({ truncated: { open: true, closed: true } }), { statusFilter: "all" })
+    await r.flush()
+    expect(captureFrame(r)).toContain("Showing 100 newest open and closed PRs")
+  })
+
+  test("truncation notice reflects the configured page limit", async () => {
+    const r = await renderState(okState({ truncated: { open: true, closed: false } }), {
+      statusFilter: "open",
+      options: { maxPRPages: 5 },
+    })
+    await r.flush()
+    expect(captureFrame(r)).toContain("Showing 500 newest open PRs")
+  })
+
+  test("shows a loading line instead of an empty list while closed PRs first load", async () => {
+    const r = await renderState(okState({ closedLoaded: false }), { scope: "all", statusFilter: "closed" })
+    await r.flush()
+    const frame = captureFrame(r)
+    expect(frame).toContain("Loading closed PRs")
+    expect(frame).not.toContain("No matching")
   })
 
   test("merged PR uses the merged icon and displays change totals", async () => {

@@ -17,6 +17,9 @@ import { errorMessages } from "../domain/messages"
 import { PRRow } from "./PRRow"
 import type { DashboardIcons } from "./config"
 
+// GitHub returns up to 100 PRs per GraphQL page (see PULL_REQUESTS_QUERY).
+const PRS_PER_PAGE = 100
+
 export function DashboardView(props: {
   theme: ResolvedTheme
   state: DashboardState
@@ -70,6 +73,16 @@ export function DashboardView(props: {
   const listIsAvailable = () =>
     props.state.status === DashboardStatus.Ok ||
     (props.state.status === DashboardStatus.Error && props.state.prs.length > 0)
+  // Closed PRs load the first time a status filter shows them.
+  const closedPending = () =>
+    props.statusFilter !== "open" && !props.state.closedLoaded && props.state.status === DashboardStatus.Ok
+  const truncationNotice = () => {
+    const open = props.statusFilter !== "closed" && props.state.truncated.open
+    const closed = props.statusFilter !== "open" && props.state.truncated.closed
+    if (!open && !closed) return null
+    const which = open && closed ? "open and closed" : open ? "open" : "closed"
+    return `Showing ${props.maxPRPages * PRS_PER_PAGE} newest ${which} PRs`
+  }
 
   const errorPresentation = (): { title: string; description: string } => {
     const detail = props.state.error ?? errorMessages.unknown
@@ -173,9 +186,16 @@ export function DashboardView(props: {
         </box>
       </Show>
 
-      <Show when={props.state.listingTruncated}>
-        <box paddingLeft={1}>
-          <text fg={sk.warning}>Showing first 300 PRs; more are available</text>
+      <Show when={closedPending()}>
+        <box flexDirection="column" paddingLeft={1} paddingTop={1} paddingRight={1}>
+          <text fg={sk.muted} selectable={false}>{props.icons.loading} Loading closed PRs</text>
+        </box>
+      </Show>
+
+      <Show when={truncationNotice()}>
+        <box flexDirection="column" paddingLeft={1}>
+          <text fg={sk.warning} selectable={false}>{truncationNotice()}</text>
+          <text fg={sk.muted} selectable={false}>  More exist; raise maxPRPages to load them.</text>
         </box>
       </Show>
 
@@ -196,6 +216,7 @@ export function DashboardView(props: {
       <Show
         when={
           listIsAvailable() &&
+          !closedPending() &&
           prs().length === 0 &&
           (props.state.status === DashboardStatus.Ok || props.state.prs.length > 0)
         }

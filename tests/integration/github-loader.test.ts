@@ -52,10 +52,16 @@ describe("repositoryPRs", () => {
       };
     });
 
-    const result = await repositoryPRs({ owner: "foo", repo: "bar" });
+    const result = await repositoryPRs({ owner: "foo", repo: "bar" }, 3);
     expect(paramsSeen).toEqual([
-      { owner: "foo", name: "bar", head: null, after: null },
-      { owner: "foo", name: "bar", head: null, after: "cursor-1" },
+      { owner: "foo", name: "bar", states: ["OPEN"], head: null, after: null },
+      {
+        owner: "foo",
+        name: "bar",
+        states: ["OPEN"],
+        head: null,
+        after: "cursor-1",
+      },
     ]);
     expect(result.viewerLogin).toBe("octocat");
     expect(result.listingTruncated).toBe(false);
@@ -86,7 +92,49 @@ describe("repositoryPRs", () => {
     ]);
   });
 
-  test("stops after three pages and reports that more PRs are available", async () => {
+  test("loads one page by default and reports that more PRs are available", async () => {
+    let calls = 0;
+    mockOctokitDefault((op) => {
+      if (op !== "graphql") return null;
+      calls++;
+      return {
+        viewer: { login: "octocat" },
+        repository: {
+          pullRequests: {
+            pageInfo: { hasNextPage: true, endCursor: `cursor-${calls}` },
+            nodes: [{ number: calls, title: `PR ${calls}`, state: "OPEN" }],
+          },
+        },
+      };
+    });
+
+    const result = await repositoryPRs({ owner: "foo", repo: "bar" });
+
+    expect(MAX_REPOSITORY_PR_PAGES).toBe(1);
+    expect(calls).toBe(1);
+    expect(result.listingTruncated).toBe(true);
+  });
+
+  test("requests closed and merged PRs for the closed listing", async () => {
+    const paramsSeen: any[] = [];
+    mockOctokitDefault((op, params) => {
+      if (op !== "graphql") return null;
+      paramsSeen.push(params.params);
+      return {
+        repository: {
+          pullRequests: { pageInfo: { hasNextPage: false }, nodes: [] },
+        },
+      };
+    });
+
+    await repositoryPRs({ owner: "foo", repo: "bar" }, 1, 15_000, "closed");
+
+    expect(paramsSeen.map(({ states }) => states)).toEqual([
+      ["CLOSED", "MERGED"],
+    ]);
+  });
+
+  test("stops after the page limit and reports that more PRs are available", async () => {
     const paramsSeen: any[] = [];
     let lastQuery = "";
     mockOctokitDefault((op, params) => {
@@ -105,9 +153,8 @@ describe("repositoryPRs", () => {
       };
     });
 
-    const result = await repositoryPRs({ owner: "foo", repo: "bar" });
+    const result = await repositoryPRs({ owner: "foo", repo: "bar" }, 3);
 
-    expect(MAX_REPOSITORY_PR_PAGES).toBe(3);
     expect(paramsSeen).toHaveLength(3);
     expect(paramsSeen.map(({ after }) => after)).toEqual([
       null,
@@ -161,9 +208,9 @@ describe("repositoryPRs", () => {
       };
     });
 
-    await expect(repositoryPRs({ owner: "foo", repo: "bar" })).rejects.toThrow(
-      "invalid or repeated pull request pagination cursor",
-    );
+    await expect(
+      repositoryPRs({ owner: "foo", repo: "bar" }, 3),
+    ).rejects.toThrow("invalid or repeated pull request pagination cursor");
     expect(calls).toBe(2);
   });
 

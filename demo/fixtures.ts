@@ -152,6 +152,7 @@ export function demoDashboardState(): DashboardState {
     currentBranch: "feature/passkeys",
     viewerLogin: "octocat",
     fetchedAt: 0,
-    listingTruncated: false,
+    closedLoaded: true,
+    truncated: { open: false, closed: false },
   };
 }

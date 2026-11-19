@@ -9,7 +9,7 @@ install:
 
 format-check:
 	$(BUN) fmt --check package.json .github/workflows/ci.yml tests/integration/github-loader.test.ts
-	$(BUN) -e 'const readme = await Bun.file("README.md").text(); const match = readme.match(/```json\s*\n([\s\S]*?)\n```/); if (!match) throw new Error("README strict JSON example not found"); JSON.parse(match[1])'
+	$(BUN) -e 'const readme = await Bun.file("README.md").text(); const match = readme.match(/```json\s*\n([\s\S]*?)\n\s*```/); if (!match) throw new Error("README strict JSON example not found"); JSON.parse(match[1])'
 
 typecheck:
 	$(BUN) ./node_modules/typescript/bin/tsc --noEmit
