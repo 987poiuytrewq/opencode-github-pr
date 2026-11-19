@@ -15,9 +15,9 @@ const HEAD_REF_PREFIX = "ref: refs/heads/"
 
 export function currentBranch(cwd: string): string | null {
   const paths = gitPaths(cwd)
-  if (!paths) return null
+  if (!paths?.branchDir) return null
   try {
-    const headPath = join(paths.gitDir, "HEAD")
+    const headPath = join(paths.branchDir, "HEAD")
     if (!existsSync(headPath)) return null
     const head = readFileSync(headPath, "utf8").trim()
     if (!head.startsWith(HEAD_REF_PREFIX)) return null
@@ -72,11 +72,13 @@ function unquoteConfigValue(value: string): string {
   return trimmed
 }
 
-function gitPaths(cwd: string): { gitDir: string; commonDir: string } | null {
+type GitPaths = { gitDir: string; commonDir: string; branchDir: string | null }
+
+function gitPaths(cwd: string): GitPaths | null {
   let directory = resolve(cwd)
   while (true) {
-    const dotGit = join(directory, ".git")
     try {
+      const dotGit = join(directory, ".git")
       if (existsSync(dotGit)) {
         let gitDir: string
         if (statSync(dotGit).isDirectory()) {
@@ -84,18 +86,18 @@ function gitPaths(cwd: string): { gitDir: string; commonDir: string } | null {
         } else {
           const gitFile = readFileSync(dotGit, "utf8").trim()
           const match = /^gitdir:\s*(.+)$/m.exec(gitFile)
-          if (match) gitDir = resolve(directory, match[1].trim())
-          else gitDir = ""
+          gitDir = match ? resolve(directory, match[1].trim()) : ""
         }
-
-        if (gitDir) {
-          const commonDirFile = join(gitDir, "commondir")
-          const commonDir = existsSync(commonDirFile)
-            ? resolve(gitDir, readFileSync(commonDirFile, "utf8").trim())
-            : gitDir
-          return { gitDir, commonDir }
-        }
+        if (gitDir) return pathsForGitDir(gitDir, gitDir)
       }
+
+      // A worktree container may keep its shared repository in a sibling .bare.
+      // Its HEAD is the default branch, not the active worktree branch.
+      const bareDir = join(directory, ".bare")
+      if (isBareGitDir(bareDir)) return pathsForGitDir(bareDir, null)
+
+      // Also support opening the bare repository directory directly.
+      if (isBareGitDir(directory)) return pathsForGitDir(directory, directory)
     } catch {
       // A malformed marker may be inside a parent repository; keep searching.
     }
@@ -103,6 +105,27 @@ function gitPaths(cwd: string): { gitDir: string; commonDir: string } | null {
     const parent = resolve(directory, "..")
     if (parent === directory) return null
     directory = parent
+  }
+}
+
+function pathsForGitDir(gitDir: string, branchDir: string | null): GitPaths {
+  const commonDirFile = join(gitDir, "commondir")
+  const commonDir = existsSync(commonDirFile)
+    ? resolve(gitDir, readFileSync(commonDirFile, "utf8").trim())
+    : gitDir
+  return { gitDir, commonDir, branchDir }
+}
+
+function isBareGitDir(directory: string): boolean {
+  try {
+    return (
+      statSync(directory).isDirectory() &&
+      existsSync(join(directory, "config")) &&
+      existsSync(join(directory, "HEAD")) &&
+      statSync(join(directory, "objects")).isDirectory()
+    )
+  } catch {
+    return false
   }
 }
 
