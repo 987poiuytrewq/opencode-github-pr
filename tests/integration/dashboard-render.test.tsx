@@ -43,6 +43,16 @@ function captureFrame(r: Awaited<ReturnType<typeof renderState>>): string {
 }
 
 describe("DashboardView render", () => {
+  test("leaves the dashboard background transparent", async () => {
+    const r = await renderState(loadingState())
+    await r.flush()
+    const heading = r.captureSpans().lines
+      .flatMap((line) => line.spans)
+      .find((span) => span.text.includes("Pull Requests"))
+
+    expect(heading?.bg?.toInts()[3]).toBe(0)
+  })
+
   test("loading state", async () => {
     const r = await renderState(loadingState())
     await r.flush()
