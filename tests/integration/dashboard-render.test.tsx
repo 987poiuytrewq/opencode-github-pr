@@ -85,6 +85,22 @@ describe("DashboardView render", () => {
     expect(frame).toContain("Cached PR")
   })
 
+  test("error description wraps under its text and stays dim", async () => {
+    const r = await renderState(errorState({ errorKind: "network" }), {}, 32)
+    await r.flush()
+    const lines = captureFrame(r).split("\n")
+    const descriptionStart = lines.findIndex((line) => line.includes("Check your internet"))
+    const descriptionLines = lines.slice(descriptionStart).filter((line) => line.trim().length > 0).slice(0, 2)
+    const spans = r.captureSpans().lines.flatMap((line) => line.spans)
+    const description = spans.find((span) => span.text.includes("Check your internet"))
+    const muted = spans.find((span) => span.text.includes(" branch"))
+
+    expect(descriptionStart).toBeGreaterThanOrEqual(0)
+    expect(descriptionLines).toHaveLength(2)
+    expect(descriptionLines.every((line) => line.startsWith("   "))).toBe(true)
+    expect(description?.fg).toEqual(muted?.fg)
+  })
+
   test("ok state with empty PRs", async () => {
     const r = await renderState(okState({ prs: [] }))
     await r.flush()

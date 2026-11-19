@@ -209,7 +209,9 @@ export function DashboardView(props: {
       <Show when={props.state.status === DashboardStatus.Error}>
         <box flexDirection="column" paddingLeft={1} paddingTop={1} paddingRight={1}>
           <text fg={sk.error} selectable={false}>{props.icons.error} {errorPresentation().title}</text>
-          <text fg={sk.muted} selectable={false}>  {errorPresentation().description}</text>
+          <box paddingLeft={2} width="100%">
+            <text fg={sk.muted} selectable={false}>{errorPresentation().description}</text>
+          </box>
         </box>
       </Show>
 
