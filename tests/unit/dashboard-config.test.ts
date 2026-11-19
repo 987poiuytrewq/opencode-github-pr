@@ -1,5 +1,5 @@
 import { describe, expect, test } from "bun:test"
-import { dashboardOptions, DEFAULT_ICONS } from "../../plugins/app/config"
+import { dashboardOptions, DEFAULT_ICONS, UNICODE_ICONS } from "../../plugins/app/config"
 import { DEFAULT_SKIN } from "../../plugins/app/theme"
 
 describe("dashboard options", () => {
@@ -12,6 +12,7 @@ describe("dashboard options", () => {
       requestTimeoutMs: 15_000,
       defaultScope: "author",
       defaultStatusFilter: "open",
+      iconStyle: "nerd",
       colors: {},
       icons: { ...DEFAULT_ICONS },
     })
@@ -37,8 +38,20 @@ describe("dashboard options", () => {
       requestTimeoutMs: 10_000,
       defaultScope: "assignee",
       defaultStatusFilter: "closed",
+      iconStyle: "nerd",
       colors: { accent: "#123456", merged: "magenta" },
       icons: { ...DEFAULT_ICONS, openPR: "P", nextPage: ">" },
+    })
+  })
+
+  test("uses Unicode icons when selected and lets explicit icon overrides take precedence", () => {
+    expect(dashboardOptions({ iconStyle: "unicode" })).toMatchObject({
+      iconStyle: "unicode",
+      icons: UNICODE_ICONS,
+    })
+    expect(dashboardOptions({ iconStyle: "unicode", icons: { openPR: "P" } })).toMatchObject({
+      iconStyle: "unicode",
+      icons: { ...UNICODE_ICONS, openPR: "P" },
     })
   })
 
@@ -51,6 +64,7 @@ describe("dashboard options", () => {
         requestTimeoutMs: 0,
         defaultScope: "unknown",
         defaultStatusFilter: "pending",
+        iconStyle: "unknown",
         colors: { accent: "" },
         icons: { openPR: " " },
       }),
@@ -61,6 +75,7 @@ describe("dashboard options", () => {
       requestTimeoutMs: 15_000,
       defaultScope: "author",
       defaultStatusFilter: "open",
+      iconStyle: "nerd",
       colors: {},
       icons: DEFAULT_ICONS,
     })
