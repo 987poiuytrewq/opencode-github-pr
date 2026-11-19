@@ -28,16 +28,16 @@ exports[`DashboardView render ok state with PRs 1`] = `
 "
 Pull Requests                      branch   open
 
- Add login flow
+ Add login flow
   #10 +42 -8                                    ●
 
- Fix race condition
+ Fix race condition
   #11 +42 -8                                    ●
 
- WIP: refactor
+ WIP: refactor
   #12 +42 -8                                     ●
 
- Update docs
+ Update docs
   #13 +42 -8                                     ●
 
 

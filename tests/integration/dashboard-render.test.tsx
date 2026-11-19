@@ -162,7 +162,7 @@ describe("DashboardView render", () => {
     }), { statusFilter: "closed" })
     await r.flush()
     const frame = captureFrame(r)
-    expect(frame).toContain(" Merged feature")
+    expect(frame).toContain(" Merged feature")
     expect(frame).toContain("#42 +17 -4")
     expect(frame).toContain("●")
     expect(frame).not.toContain("󰅺0")
@@ -201,10 +201,25 @@ describe("DashboardView render", () => {
     }), {}, 24)
     await r.flush()
     const lines = r.captureCharFrame().split("\n")
-    const titleLine = lines.find((line) => line.includes(" A"))
+    const titleLine = lines.find((line) => line.includes(" A"))
 
     expect(titleLine).toContain("A very long pull…")
     expect(lines.filter((line) => line.includes("request title")).length).toBe(0)
+  })
+
+  test("keeps the title ellipsis visible when a configured PR icon is wider than one cell", async () => {
+    const r = await renderState(okState({
+      prs: [makeTUIPR({
+        title: "A very long pull request title that must remain on one line",
+      })],
+    }), {
+      options: { icons: { openPR: "PR" } },
+    }, 24)
+    await r.flush()
+    const titleLine = r.captureCharFrame().split("\n").find((line) => line.includes("PR A"))
+
+    expect(titleLine).toContain("A very long pull…")
+    expect(titleLine?.length).toBeLessThanOrEqual(24)
   })
 
   test("right-aligns status indicators to the edge of the sidebar", async () => {
@@ -449,9 +464,9 @@ describe("DashboardView mouse interaction", () => {
 
     let frame = r.captureCharFrame()
     expect(frame).toContain("1 of 3")
-    expect(frame).toContain(" PR 10")
-    expect(frame).toContain(" PR 14")
-    expect(frame).not.toContain(" PR 15")
+    expect(frame).toContain(" PR 10")
+    expect(frame).toContain(" PR 14")
+    expect(frame).not.toContain(" PR 15")
 
     await clickArrow("1 of 3", "")
     expect(r.captureCharFrame()).toContain("1 of 3")
@@ -459,8 +474,8 @@ describe("DashboardView mouse interaction", () => {
     await clickArrow("1 of 3", "")
     frame = r.captureCharFrame()
     expect(frame).toContain("2 of 3")
-    expect(frame).toContain(" PR 15")
-    expect(frame).not.toContain(" PR 14")
+    expect(frame).toContain(" PR 15")
+    expect(frame).not.toContain(" PR 14")
 
     await clickArrow("2 of 3", "")
     expect(r.captureCharFrame()).toContain("3 of 3")

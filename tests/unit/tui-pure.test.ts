@@ -255,6 +255,9 @@ describe("truncateTitle", () => {
   test("truncates long titles at the previous word boundary", () => {
     expect(truncateTitle("The title continues past this point", 24)).toBe("The title continues…")
   })
+  test("prefers a complete word over a longer partial-word prefix", () => {
+    expect(truncateTitle("first incomplete", 12)).toBe("first…")
+  })
   test("truncates a single word when there is no earlier word boundary", () => {
     expect(truncateTitle("supercalifragilistic", 8)).toBe("superca…")
   })

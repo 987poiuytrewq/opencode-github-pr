@@ -9,18 +9,22 @@ export function truncateTitle(title: string, maxWidth: number): string {
   if (Bun.stringWidth(normalized) <= budget) return normalized
 
   const contentBudget = Math.max(0, budget - Bun.stringWidth("…"))
+  let wholeWords = ""
+  for (const word of normalized.split(" ")) {
+    const next = wholeWords ? `${wholeWords} ${word}` : word
+    if (Bun.stringWidth(next) > contentBudget) break
+    wholeWords = next
+  }
+  if (wholeWords) return `${wholeWords}…`
+
+  // If even the first word is too long, fall back to a grapheme-safe cut.
   let prefix = ""
-  let truncated = ""
   for (const { segment } of graphemes.segment(normalized)) {
     const next = prefix + segment
     if (Bun.stringWidth(next) > contentBudget) break
     prefix = next
-    truncated = prefix
   }
-
-  const wordBoundary = truncated.lastIndexOf(" ")
-  if (wordBoundary > 0) truncated = truncated.slice(0, wordBoundary).trimEnd()
-  return `${truncated}…`
+  return `${prefix}…`
 }
 
 export function formatAge(iso: string): string {

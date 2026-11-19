@@ -46,7 +46,11 @@ export function DashboardView(props: {
   onMount(() => {
     const updateTitleWidth = () => {
       if (!view) return
-      const nextWidth = Math.max(1, Math.floor(view.width) - 2)
+      const iconWidth = Math.max(
+        Bun.stringWidth(props.icons.openPR),
+        Bun.stringWidth(props.icons.mergedPR),
+      )
+      const nextWidth = Math.max(1, Math.floor(view.width) - iconWidth - 1)
       setTitleWidth((current) => current === nextWidth ? current : nextWidth)
     }
     renderer.on("frame", updateTitleWidth)

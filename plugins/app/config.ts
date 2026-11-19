@@ -2,8 +2,8 @@ import type { PRScope, PRStatusFilter } from "../domain/types"
 import { DEFAULT_SKIN, type Skin } from "./theme"
 
 export const DEFAULT_ICONS = {
-  openPR: "",
-  mergedPR: "",
+  openPR: "",
+  mergedPR: "",
   review: "",
   openComment: "󰅺",
   check: "●",
