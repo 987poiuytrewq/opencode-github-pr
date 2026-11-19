@@ -2,12 +2,12 @@
 import { createSignal } from "solid-js"
 import type { Context as TuiPluginContext } from "@opencode/plugin/tui/context"
 import { DashboardStatus, type DashboardState } from "../../plugins/domain/types"
-import { useDashboard, type DashboardLoaderOptions } from "../../plugins/app/usePRData"
+import { useDashboard } from "../../plugins/app/usePRData"
 
 // Creates a dashboard with reactive signals. Must live in a .tsx file so
 // that Bun's @opentui/solid plugin rewrites solid-js imports to the
 // reactive build (not the SSR build that .ts files get).
-export function createDashboard(api: TuiPluginContext, options: DashboardLoaderOptions = {}) {
+export function createDashboard(api: TuiPluginContext) {
   const [state, setState] = createSignal<DashboardState>({
     status: DashboardStatus.Loading,
     repo: null,
@@ -15,11 +15,9 @@ export function createDashboard(api: TuiPluginContext, options: DashboardLoaderO
     currentBranch: null,
     viewerLogin: null,
     fetchedAt: null,
-    page: 0,
-    totalCount: 0,
-    hasNextPage: false,
+    listingTruncated: false,
   })
-  const dash = useDashboard(api, state, setState, options)
+  const dash = useDashboard(api, state, setState)
   dash.refresh()
   return { state, ...dash }
 }

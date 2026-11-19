@@ -1,5 +1,5 @@
 import { describe, expect, test } from "bun:test"
-import { filterPRs, nextPRScope, nextPRStatusFilter, prSearchQuery } from "../../plugins/domain/pr-filters"
+import { filterPRs, nextPRScope, nextPRStatusFilter } from "../../plugins/domain/pr-filters"
 import type { PRScope, PRStatusFilter } from "../../plugins/domain/types"
 import { makeTUIPR } from "../helpers/tui-fixtures"
 
@@ -56,29 +56,5 @@ describe("filterPRs", () => {
   test("user scopes return no matches without an authenticated login", () => {
     expect(filterPRs(prs, "author", "all", "feature", null)).toEqual([])
     expect(filterPRs(prs, "assignee", "all", "feature", null)).toEqual([])
-  })
-})
-
-describe("prSearchQuery", () => {
-  const repo = { owner: "acme", repo: "app" }
-
-  test("builds a qualifier for each scope", () => {
-    expect(prSearchQuery(repo, "author", "open", "main")).toBe("repo:acme/app is:pr author:@me is:open sort:updated-desc")
-    expect(prSearchQuery(repo, "assignee", "open", "main")).toBe("repo:acme/app is:pr assignee:@me is:open sort:updated-desc")
-    expect(prSearchQuery(repo, "branch", "open", "feature/x")).toBe("repo:acme/app is:pr head:feature/x is:open sort:updated-desc")
-    expect(prSearchQuery(repo, "all", "open", "main")).toBe("repo:acme/app is:pr is:open sort:updated-desc")
-  })
-
-  test("builds a qualifier for each status", () => {
-    expect(prSearchQuery(repo, "all", "closed", null)).toBe("repo:acme/app is:pr is:closed sort:updated-desc")
-    expect(prSearchQuery(repo, "all", "all", null)).toBe("repo:acme/app is:pr sort:updated-desc")
-  })
-
-  test("quotes branch names that contain quotes", () => {
-    expect(prSearchQuery(repo, "branch", "all", 'say-"hi"')).toBe('repo:acme/app is:pr head:"say-\\"hi\\"" sort:updated-desc')
-  })
-
-  test("skips the search when the branch scope has no current branch", () => {
-    expect(prSearchQuery(repo, "branch", "open", null)).toBeNull()
   })
 })

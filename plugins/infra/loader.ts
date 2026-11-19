@@ -3,32 +3,41 @@
 // retry, and timeouts.
 
 import { getOctokit } from "./octokit"
-import { type Repo, type PR, type PRSearchPage } from "../domain/types"
+import { type Repo, type PR } from "../domain/types"
 import { mapPullFromGraphQL, mapPullFromREST } from "./mappers"
-import { SEARCH_PULL_REQUESTS_QUERY } from "./queries"
+import { PULL_REQUESTS_QUERY } from "./queries"
 
-export type { Repo, PR, PRSearchPage }
+export type { Repo, PR }
+
+export const MAX_REPOSITORY_PR_PAGES = 3
+
+export type RepositoryPRsResult = {
+  prs: PR[]
+  viewerLogin: string | null
+  listingTruncated: boolean
+  fetchedPages: number
+}
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null
 }
 
-function readSearchPage(value: unknown): PRSearchPage {
+function readPullRequestPage(value: unknown): {
+  nodes: unknown[]
+  viewerLogin: string | null
+  hasNextPage: boolean
+  endCursor: string | null
+} {
   const root = isRecord(value) ? value : {}
   const viewer = isRecord(root.viewer) ? root.viewer : {}
-  const connection = isRecord(root.search) ? root.search : {}
+  const repository = isRecord(root.repository) ? root.repository : {}
+  const connection = isRecord(repository.pullRequests) ? repository.pullRequests : {}
   const pageInfo = isRecord(connection.pageInfo) ? connection.pageInfo : {}
-  // Search can return other node types; only PullRequest nodes have fields.
-  const nodes = Array.isArray(connection.nodes)
-    ? connection.nodes.filter((node) => isRecord(node) && typeof node.number === "number")
-    : []
-  const totalCount = typeof connection.issueCount === "number" ? connection.issueCount : nodes.length
   return {
-    prs: nodes.map(mapPullFromGraphQL),
+    nodes: Array.isArray(connection.nodes) ? connection.nodes.filter((node) => node != null) : [],
     viewerLogin: typeof viewer.login === "string" ? viewer.login : null,
-    totalCount,
     hasNextPage: pageInfo.hasNextPage === true,
-    endCursor: typeof pageInfo.endCursor === "string" && pageInfo.endCursor ? pageInfo.endCursor : null,
+    endCursor: typeof pageInfo.endCursor === "string" ? pageInfo.endCursor : null,
   }
 }
 
@@ -49,16 +58,47 @@ async function graphqlPartial(
   }
 }
 
-// Fetch one page of PRs matching a search query built by prSearchQuery.
-// `after` is the endCursor of the previous page, or null for the first.
-export async function searchPRs(
-  query: string,
-  first: number,
-  after: string | null,
+export async function repositoryPRs(
+  repo: Repo | null,
+  maxPages = MAX_REPOSITORY_PR_PAGES,
   requestTimeoutMs = 15_000,
-): Promise<PRSearchPage> {
-  const data = await graphqlPartial(SEARCH_PULL_REQUESTS_QUERY, { query, first, after }, requestTimeoutMs)
-  return readSearchPage(data)
+): Promise<RepositoryPRsResult> {
+  if (!repo) return { prs: [], viewerLogin: null, listingTruncated: false, fetchedPages: 0 }
+  const nodes: unknown[] = []
+  let after: string | null = null
+  let viewerLogin: string | null = null
+  let fetchedPages = 0
+  let hasNextPage = false
+  const seenCursors = new Set<string>()
+  do {
+    const data = await graphqlPartial(PULL_REQUESTS_QUERY, {
+      owner: repo.owner,
+      name: repo.repo,
+      head: null,
+      after,
+    }, requestTimeoutMs)
+    const page = readPullRequestPage(data)
+    nodes.push(...page.nodes)
+    if (page.viewerLogin) viewerLogin = page.viewerLogin
+    hasNextPage = page.hasNextPage
+    fetchedPages++
+    if (!hasNextPage) {
+      after = null
+      break
+    }
+    const nextCursor = page.endCursor
+    if (typeof nextCursor !== "string" || nextCursor.length === 0 || seenCursors.has(nextCursor)) {
+      throw new Error("GitHub returned an invalid or repeated pull request pagination cursor")
+    }
+    seenCursors.add(nextCursor)
+    after = nextCursor
+  } while (hasNextPage && fetchedPages < maxPages)
+  return {
+    prs: nodes.map(mapPullFromGraphQL),
+    viewerLogin,
+    listingTruncated: hasNextPage,
+    fetchedPages,
+  }
 }
 
 export async function fetchOnePR(repo: Repo, pullNumber: number): Promise<PR> {

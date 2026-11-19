@@ -4,20 +4,18 @@
 // (scope requirements, field selection) without scrolling through the
 // orchestration code.
 
-// One page of PRs matching a GitHub search query (see prSearchQuery). The
-// search runs server-side, so only the rows the sidebar shows are fetched.
-export const SEARCH_PULL_REQUESTS_QUERY = `query SearchPullRequests($query: String!, $first: Int!, $after: String) {
+// PRs for a repository (or one head branch), including every GitHub state.
+export const PULL_REQUESTS_QUERY = `query PullRequests($owner: String!, $name: String!, $head: String, $after: String) {
   viewer {
     login
   }
-  search(query: $query, type: ISSUE, first: $first, after: $after) {
-    issueCount
-    pageInfo {
-      hasNextPage
-      endCursor
-    }
-    nodes {
-      ... on PullRequest {
+  repository(owner: $owner, name: $name) {
+    pullRequests(first: 100, after: $after, states: [OPEN, CLOSED, MERGED], headRefName: $head, orderBy: {field: UPDATED_AT, direction: DESC}) {
+      pageInfo {
+        hasNextPage
+        endCursor
+      }
+      nodes {
         number
         title
         url

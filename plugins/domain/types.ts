@@ -25,15 +25,6 @@ export type PR = {
   latestReviews: Array<{ author: { login: string }; state: string }> | null
 }
 
-// One page of PR search results from GitHub.
-export type PRSearchPage = {
-  prs: PR[]
-  viewerLogin: string | null
-  totalCount: number
-  hasNextPage: boolean
-  endCursor: string | null
-}
-
 export type PRLinkTarget = "overview" | "mergeStatus" | "checks" | "files"
 
 export type Repo = { owner: string; repo: string }
@@ -66,11 +57,7 @@ export type DashboardState = {
   currentBranch: string | null
   viewerLogin: string | null
   fetchedAt: number | null
-  // Zero-based page of search results held in `prs`.
-  page: number
-  // PRs matching the current filters on GitHub, across all pages.
-  totalCount: number
-  hasNextPage: boolean
+  listingTruncated: boolean
   error?: string
   errorKind?: PRListErrorKind
 }
@@ -80,7 +67,7 @@ export type DashboardState = {
 // the actions module can import it without depending on usePRData.
 export interface DashboardContext {
   state: () => DashboardState
-  refresh: (page?: number) => Promise<void>
+  refresh: () => Promise<void>
   refreshOne: (n: number) => Promise<void>
   selectedIdx: () => number
   setSelectedIdx: (n: number) => void

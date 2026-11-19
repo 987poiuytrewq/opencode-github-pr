@@ -35,7 +35,7 @@ describe("useDashboard reentrancy and cancellation", () => {
       mockOctokitOp("graphql", async (params) => {
         const query: string = params?.query ?? ""
         if (query.includes("query Viewer")) return { viewer: { login: "octocat" } }
-        if (query.includes("search(")) {
+        if (query.includes("pullRequests(")) {
           searchCalls++
           await new Promise((r) => setTimeout(r, 50))
           return makeSearchResponse(2)
@@ -72,7 +72,7 @@ describe("useDashboard reentrancy and cancellation", () => {
       mockOctokitOp("graphql", async (params) => {
         const query: string = params?.query ?? ""
         if (query.includes("query Viewer")) return { viewer: { login: "octocat" } }
-        if (query.includes("search(")) {
+        if (query.includes("pullRequests(")) {
           callIndex++
           if (callIndex === 1) return new Promise(() => {})
           return makeSearchResponse(1)

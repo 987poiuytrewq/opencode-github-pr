@@ -31,11 +31,11 @@ describe("useDashboard initialization", () => {
       mockOctokitDefault((op, params) => {
         if (op === "graphql") {
           const query: string = params?.query ?? ""
-          if (query.includes("search(")) return makeSearchResponse(2)
+          if (query.includes("pullRequests(")) return makeSearchResponse(2)
           return makeThreadCountResponse().data
         }
         if (op === "pulls.get") {
-          const node = makeSearchResponse(1).search.nodes[0]
+          const node = makeSearchResponse(1).repository.pullRequests.nodes[0]
           return { data: node }
         }
         return null

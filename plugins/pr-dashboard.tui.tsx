@@ -9,9 +9,9 @@ import {
   type PRScope,
   type PRStatusFilter,
 } from "./domain/types"
-import { nextPRScope, nextPRStatusFilter } from "./domain/pr-filters"
+import { filterPRs, nextPRScope, nextPRStatusFilter } from "./domain/pr-filters"
 import { DashboardView } from "./app/DashboardView"
-import { useDashboard, type PRPageLoader } from "./app/usePRData"
+import { useDashboard } from "./app/usePRData"
 import { createActions } from "./app/actions"
 import { dashboardOptions } from "./app/config"
 
@@ -31,40 +31,30 @@ async function setup(api: TuiPluginContext) {
     currentBranch: null,
     viewerLogin: null,
     fetchedAt: null,
-    page: 0,
-    totalCount: 0,
-    hasNextPage: false,
+    listingTruncated: false,
   })
-  // Demo mode serves fictional PRs from local fixtures instead of GitHub.
-  let loadPage: PRPageLoader | undefined
-  if (process.env.OPENCODE_GITHUB_PR_DEMO === "1") {
-    loadPage = (await import("../demo/fixtures")).demoPageLoader
+  const demoMode = process.env.OPENCODE_GITHUB_PR_DEMO === "1"
+  if (demoMode) {
+    const { demoDashboardState } = await import("../demo/fixtures")
+    setState(demoDashboardState())
   }
   const [selectedIdx, setSelectedIdx] = createSignal(0)
   const [scope, setScope] = createSignal<PRScope>(options.defaultScope)
   const [statusFilter, setStatusFilter] = createSignal<PRStatusFilter>(options.defaultStatusFilter)
-  const visiblePRs = () => state().prs
-  const dash = useDashboard(api, state, setState, {
-    filters: () => ({ scope: scope(), statusFilter: statusFilter() }),
-    pageSize: options.pageSize,
-    requestTimeoutMs: options.requestTimeoutMs,
-    loadPage,
-  })
-  // Filters run on GitHub, so changing one loads its first page.
+  const visiblePRs = () =>
+    filterPRs(state().prs, scope(), statusFilter(), state().currentBranch, state().viewerLogin)
   const cycleScope = () => {
     setScope(nextPRScope(scope()))
     setSelectedIdx(0)
-    void dash.refresh(0)
   }
   const cycleStatus = () => {
     setStatusFilter(nextPRStatusFilter(statusFilter()))
     setSelectedIdx(0)
-    void dash.refresh(0)
   }
-  const goToPage = (page: number) => {
-    setSelectedIdx(0)
-    void dash.refresh(page)
-  }
+
+  const dash = demoMode
+    ? { refresh: async () => {}, refreshOne: async () => {} }
+    : useDashboard(api, state, setState, options.requestTimeoutMs, options.maxPRPages)
   const dashboard: DashboardContext = {
     state,
     refresh: dash.refresh,
@@ -74,7 +64,7 @@ async function setup(api: TuiPluginContext) {
   }
   const actions = createActions(api, dashboard)
 
-  void dash.refresh()
+  if (!demoMode) void dash.refresh()
 
   const unregisterSlot = api.ui.slot({
     append: "sidebar.content",
@@ -88,8 +78,8 @@ async function setup(api: TuiPluginContext) {
         statusFilter={statusFilter()}
         onCycleScope={cycleScope}
         onCycleStatus={cycleStatus}
-        onPageChange={goToPage}
         pageSize={options.pageSize}
+        maxPRPages={options.maxPRPages}
         colors={options.colors}
         icons={options.icons}
       />
@@ -123,7 +113,7 @@ async function setup(api: TuiPluginContext) {
             slash: { name: "pr-open" },
             enabled: () => visiblePRs().length > 0,
             run() {
-              const pr = visiblePRs()[selectedIdx()] ?? visiblePRs()[0]
+              const pr = visiblePRs()[selectedIdx()]
               if (pr) void actions.openPR(pr.number)
             },
           },
