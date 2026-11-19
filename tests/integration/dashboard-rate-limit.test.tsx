@@ -34,7 +34,7 @@ describe("useDashboard rate limit handling", () => {
         if (op === "graphql") {
           const query: string = params?.query ?? ""
           if (query.includes("query Viewer")) return { viewer: { login: "octocat" } }
-          if (query.includes("pullRequests(")) {
+          if (query.includes("search(")) {
             const err: any = new Error(
               "Request failed due to following response errors: - API rate limit already exceeded for user ID 12345.",
             )
@@ -73,7 +73,7 @@ describe("useDashboard rate limit handling", () => {
         if (op === "graphql") {
           const query: string = params?.query ?? ""
           if (query.includes("query Viewer")) return { viewer: { login: "octocat" } }
-          if (query.includes("pullRequests(")) {
+          if (query.includes("search(")) {
             const err: any = new Error("API rate limit exceeded for installation ID 99999")
             err.status = 403
             err.response = { headers: {} }
@@ -110,7 +110,7 @@ describe("useDashboard rate limit handling", () => {
         if (op === "graphql") {
           const query: string = params?.query ?? ""
           if (query.includes("query Viewer")) return { viewer: { login: "octocat" } }
-          if (query.includes("pullRequests(")) {
+          if (query.includes("search(")) {
             callIndex++
             if (callIndex === 1) return makeSearchResponse(3)
             // Second call: rate limited.
@@ -155,7 +155,7 @@ describe("useDashboard rate limit handling", () => {
         if (op === "graphql") {
           const query: string = params?.query ?? ""
           if (query.includes("query Viewer")) return { viewer: { login: "octocat" } }
-          if (query.includes("pullRequests(")) {
+          if (query.includes("search(")) {
             callIndex++
             if (callIndex === 1) return makeSearchResponse(2)
             throw new Error("Network unreachable")

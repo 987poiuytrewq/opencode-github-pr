@@ -26,7 +26,7 @@ describe("slot render: sidebar_content produces visible output", () => {
       mockOctokitDefault((op, params) => {
         if (op === "graphql") {
           const query: string = params?.query ?? ""
-          if (query.includes("pullRequests(")) return makeSearchResponse(2)
+          if (query.includes("search(")) return makeSearchResponse(2)
           return makeThreadCountResponse().data
         }
         return null
@@ -83,7 +83,7 @@ describe("slot render: sidebar_content produces visible output", () => {
       mockOctokitDefault((op, params) => {
         if (op === "graphql") {
           const query: string = params?.query ?? ""
-          if (query.includes("pullRequests(")) return makeSearchResponse(1)
+          if (query.includes("search(")) return makeSearchResponse(1)
           return makeThreadCountResponse().data
         }
         return null

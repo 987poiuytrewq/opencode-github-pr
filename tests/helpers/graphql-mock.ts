@@ -24,8 +24,8 @@ export function makeFakeRepo(owner = "owner", repo = "repo"): string {
   return dir
 }
 
-// GraphQL repository connection response with N fake PRs. Matches the shape
-// produced by PULL_REQUESTS_QUERY.
+// GraphQL search response with N fake PRs. Matches the shape produced by
+// SEARCH_PULL_REQUESTS_QUERY.
 export function makeSearchResponse(prCount = 2) {
   const nodes = Array.from({ length: prCount }, (_, i) => ({
     number: i + 1,
@@ -47,7 +47,11 @@ export function makeSearchResponse(prCount = 2) {
   }))
   return {
     viewer: { login: "octocat" },
-    repository: { pullRequests: { nodes } },
+    search: {
+      issueCount: prCount,
+      pageInfo: { hasNextPage: false, endCursor: null },
+      nodes,
+    },
   }
 }
 

@@ -109,9 +109,17 @@ The two labels at the top right of the panel are filters. Click one to cycle thr
 
 You can change the defaults with [`defaultScope` and `defaultStatusFilter`](#configuration).
 
+Filtering happens on GitHub, using its search, so the panel only downloads the PRs it shows. GitHub's search index can
+take a few seconds to catch up, so a PR you've just opened may appear on the next refresh rather than immediately.
+
 ### Pages
 
-The panel shows five PRs at a time. When there are more, use the arrows at the bottom of the panel to page through them.
+The panel shows five PRs at a time, sorted by most recently updated. When there are more, use the arrows at the bottom
+of the panel to page through them. Each page is loaded from GitHub when you open it. Change the number per page with
+[`pageSize`](#configuration).
+
+GitHub search returns at most 1,000 results, so with very large result sets only the first 1,000 PRs can be paged to.
+Narrow the filters to find older PRs.
 
 ### Commands
 
@@ -125,10 +133,8 @@ These commands are available as slash commands and in the command palette, under
 ### Refreshing
 
 The list refreshes when OpenCode starts, each time a session goes idle (for example after the agent finishes a task),
-and every 60 seconds while a session is open. Use `/pr-refresh` to reload it on demand.
-
-The dashboard loads the 300 most recently updated PRs in the repository. If there are more, it says so at the top of
-the list. Raise [`maxPRPages`](#configuration) to load more.
+and every 60 seconds while a session is open. A refresh reloads the page you're on. Use `/pr-refresh` to reload it on
+demand.
 
 ## Configuration
 
@@ -154,8 +160,7 @@ Pass options in the plugin entry's `options` object. Every option is optional:
 | Option | Default | Description |
 | --- | --- | --- |
 | `enabled` | `true` | Set to `false` to turn the dashboard off without uninstalling it. |
-| `pageSize` | `5` | PRs shown per page. |
-| `maxPRPages` | `3` | Pages of 100 PRs to load from GitHub, so `3` loads up to 300. Higher values use more API quota. |
+| `pageSize` | `5` | PRs per page. Each page is one request to GitHub, so this is also how many PRs each refresh loads. Maximum `100`. |
 | `refreshIntervalMs` | `60000` | How often the list refreshes while a session is open, in milliseconds. |
 | `requestTimeoutMs` | `15000` | How long to wait for a GitHub request before giving up, in milliseconds. |
 | `defaultScope` | `"author"` | Scope filter at startup: `branch`, `author`, `assignee` or `all`. |
@@ -264,9 +269,9 @@ unset for GitHub.com.
 | **No GitHub repo** | The session's directory isn't a Git repository with a GitHub remote. Add a remote, or open a session in the right project. For Enterprise, check `GITHUB_ENTERPRISE_URL`. |
 | **GitHub sign-in failed** | No valid token was found. Run `gh auth login`, or set `GITHUB_TOKEN` where the OpenCode server starts. |
 | **Permission denied** or **Repo not found** | Your token can't read this repository. Check its scopes or fine-grained permissions, and SSO authorisation for organisation repositories. |
-| **Rate limit exceeded** | GitHub's API limit has been reached. The panel shows when you can try again. Lower `maxPRPages` or raise `refreshIntervalMs` to use less quota. |
+| **Rate limit exceeded** | GitHub's API limit has been reached. The panel shows when you can try again. Lower `pageSize` or raise `refreshIntervalMs` to use less quota. |
 | **Request timed out** or **Cannot reach GitHub** | Check your connection or proxy. On slow networks, raise `requestTimeoutMs`. |
-| **No matching PRs** | No PRs match the current filters. Click the scope or status label to widen them. |
+| **No matching PRs** | No PRs match the current filters. Click the scope or status label to widen them. A PR opened in the last few seconds may not be in GitHub's search index yet. |
 | `branch` scope is empty | The current branch has no PR, or the session is in detached HEAD. |
 
 ## Development

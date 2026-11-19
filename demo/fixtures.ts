@@ -3,6 +3,8 @@ import {
   type DashboardState,
   type PR,
 } from "../plugins/domain/types";
+import { filterPRs } from "../plugins/domain/pr-filters";
+import type { PRPageLoader } from "../plugins/app/usePRData";
 
 function demoPR(overrides: Partial<PR> & Pick<PR, "number" | "title">): PR {
   const { number, title, ...values } = overrides;
@@ -152,6 +154,30 @@ export function demoDashboardState(): DashboardState {
     currentBranch: "feature/passkeys",
     viewerLogin: "octocat",
     fetchedAt: 0,
-    listingTruncated: false,
+    page: 0,
+    totalCount: demoPRs.length,
+    hasNextPage: false,
   };
 }
+
+// Serves the fixtures the way GitHub search would: filtered by scope and
+// status, one page at a time, with the offset as the cursor.
+export const demoPageLoader: PRPageLoader = async (request) => {
+  const state = demoDashboardState();
+  const matches = filterPRs(
+    state.prs,
+    request.scope,
+    request.statusFilter,
+    state.currentBranch,
+    state.viewerLogin,
+  );
+  const offset = request.after ? Number(request.after) : 0;
+  const end = offset + request.first;
+  return {
+    prs: matches.slice(offset, end),
+    viewerLogin: state.viewerLogin,
+    totalCount: matches.length,
+    hasNextPage: end < matches.length,
+    endCursor: end < matches.length ? String(end) : null,
+  };
+};

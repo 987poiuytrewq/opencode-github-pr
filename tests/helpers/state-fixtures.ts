@@ -9,7 +9,9 @@ export function loadingState(overrides: Partial<DashboardState> = {}): Dashboard
     currentBranch: "feature",
     viewerLogin: "octocat",
     fetchedAt: null,
-    listingTruncated: false,
+    page: 0,
+    totalCount: 0,
+    hasNextPage: false,
     ...overrides,
   }
 }
@@ -22,7 +24,9 @@ export function okState(overrides: Partial<DashboardState> = {}): DashboardState
     currentBranch: "feature",
     viewerLogin: "octocat",
     fetchedAt: Date.now(),
-    listingTruncated: false,
+    page: 0,
+    totalCount: sampleTUIPRs.length,
+    hasNextPage: false,
     ...overrides,
   }
 }
@@ -35,7 +39,9 @@ export function noRepoState(overrides: Partial<DashboardState> = {}): DashboardS
     currentBranch: null,
     viewerLogin: null,
     fetchedAt: Date.now(),
-    listingTruncated: false,
+    page: 0,
+    totalCount: 0,
+    hasNextPage: false,
     ...overrides,
   }
 }
@@ -48,7 +54,9 @@ export function errorState(overrides: Partial<DashboardState> = {}): DashboardSt
     currentBranch: "feature",
     viewerLogin: "octocat",
     fetchedAt: Date.now(),
-    listingTruncated: false,
+    page: 0,
+    totalCount: 0,
+    hasNextPage: false,
     error: "Could not authenticate. Run `gh auth status` to confirm.",
     errorKind: "authentication",
     ...overrides,

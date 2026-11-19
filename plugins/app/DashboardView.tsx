@@ -11,14 +11,11 @@ import {
   type PRScope,
   type PRStatusFilter,
 } from "../domain/types"
-import { filterPRs } from "../domain/pr-filters"
+import { SEARCH_RESULT_LIMIT } from "../domain/pr-filters"
 import { skin, type Skin } from "./theme"
 import { errorMessages } from "../domain/messages"
 import { PRRow } from "./PRRow"
 import type { DashboardIcons } from "./config"
-
-// GitHub returns up to 100 PRs per GraphQL page (see PULL_REQUESTS_QUERY).
-const PRS_PER_PAGE = 100
 
 export function DashboardView(props: {
   theme: ResolvedTheme
@@ -29,15 +26,14 @@ export function DashboardView(props: {
   statusFilter: PRStatusFilter
   onCycleScope: () => void
   onCycleStatus: () => void
+  onPageChange: (page: number) => void
   pageSize: number
-  maxPRPages: number
   colors: Partial<Skin>
   icons: DashboardIcons
 }) {
   const sk = skin(props.theme, props.colors)
   const [scopeHovered, setScopeHovered] = createSignal(false)
   const [statusHovered, setStatusHovered] = createSignal(false)
-  const [page, setPage] = createSignal(0)
   const [previousHovered, setPreviousHovered] = createSignal(false)
   const [nextHovered, setNextHovered] = createSignal(false)
   let view: BoxRenderable | undefined
@@ -57,19 +53,13 @@ export function DashboardView(props: {
     })
   })
 
-  const prs = () => filterPRs(
-    props.state.prs,
-    props.scope,
-    props.statusFilter,
-    props.state.currentBranch,
-    props.state.viewerLogin,
-  )
-  const pageCount = () => Math.max(1, Math.ceil(prs().length / props.pageSize))
-  const currentPage = () => Math.min(page(), pageCount() - 1)
-  const pagePRs = () =>
-    prs().slice(currentPage() * props.pageSize, (currentPage() + 1) * props.pageSize)
+  // The state holds one page of results; GitHub did the filtering.
+  const prs = () => props.state.prs
+  const currentPage = () => props.state.page
+  const pageCount = () =>
+    Math.max(currentPage() + 1, Math.ceil(Math.min(props.state.totalCount, SEARCH_RESULT_LIMIT) / props.pageSize))
   const canGoPrevious = () => currentPage() > 0
-  const canGoNext = () => currentPage() < pageCount() - 1
+  const canGoNext = () => props.state.hasNextPage && currentPage() < pageCount() - 1
   const listIsAvailable = () =>
     props.state.status === DashboardStatus.Ok ||
     (props.state.status === DashboardStatus.Error && props.state.prs.length > 0)
@@ -176,12 +166,6 @@ export function DashboardView(props: {
         </box>
       </Show>
 
-      <Show when={props.state.listingTruncated}>
-        <box paddingLeft={1}>
-          <text fg={sk.warning}>{`Showing first ${props.maxPRPages * PRS_PER_PAGE} PRs; more are available`}</text>
-        </box>
-      </Show>
-
       <Show when={props.state.status === DashboardStatus.NoRepo}>
         <box flexDirection="column" paddingLeft={1} paddingTop={1} paddingRight={1}>
           <text fg={sk.muted} selectable={false}>{props.icons.info} No GitHub repo</text>
@@ -212,14 +196,14 @@ export function DashboardView(props: {
       <Show when={listIsAvailable() && prs().length > 0}>
         <box flexDirection="column" gap={0} width="100%">
           <box flexDirection="column" gap={1} paddingTop={1} width="100%">
-            <For each={pagePRs()}>
+            <For each={prs()}>
               {(pr, i) => (
                 <PRRow
                   pr={pr}
                   titleWidth={titleWidth()}
                   secondaryBackground={sk.panelAlt}
                   onClick={(target) => {
-                    props.setSelectedIdx(currentPage() * props.pageSize + i())
+                    props.setSelectedIdx(i())
                     props.onOpen(pr.number, target)
                   }}
                   text={sk.text}
@@ -249,7 +233,7 @@ export function DashboardView(props: {
                 selectable={false}
                 onMouseOver={() => canGoPrevious() && setPreviousHovered(true)}
                 onMouseOut={() => setPreviousHovered(false)}
-                onMouseUp={() => canGoPrevious() && setPage(currentPage() - 1)}
+                onMouseUp={() => canGoPrevious() && props.onPageChange(currentPage() - 1)}
               >
                 {props.icons.previousPage}
               </text>
@@ -259,7 +243,7 @@ export function DashboardView(props: {
                 selectable={false}
                 onMouseOver={() => canGoNext() && setNextHovered(true)}
                 onMouseOut={() => setNextHovered(false)}
-                onMouseUp={() => canGoNext() && setPage(currentPage() + 1)}
+                onMouseUp={() => canGoNext() && props.onPageChange(currentPage() + 1)}
               >
                 {props.icons.nextPage}
               </text>

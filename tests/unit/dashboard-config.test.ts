@@ -7,7 +7,6 @@ describe("dashboard options", () => {
     expect(dashboardOptions()).toEqual({
       enabled: true,
       pageSize: 5,
-      maxPRPages: 3,
       refreshIntervalMs: 60_000,
       requestTimeoutMs: 15_000,
       defaultScope: "author",
@@ -21,7 +20,6 @@ describe("dashboard options", () => {
     expect(
       dashboardOptions({
         pageSize: 8,
-        maxPRPages: 4,
         refreshIntervalMs: 30_000,
         requestTimeoutMs: 10_000,
         defaultScope: "assignee",
@@ -32,7 +30,6 @@ describe("dashboard options", () => {
     ).toEqual({
       enabled: true,
       pageSize: 8,
-      maxPRPages: 4,
       refreshIntervalMs: 30_000,
       requestTimeoutMs: 10_000,
       defaultScope: "assignee",
@@ -46,7 +43,6 @@ describe("dashboard options", () => {
     expect(
       dashboardOptions({
         pageSize: -1,
-        maxPRPages: 0,
         refreshIntervalMs: "soon",
         requestTimeoutMs: 0,
         defaultScope: "unknown",
@@ -56,7 +52,6 @@ describe("dashboard options", () => {
       }),
     ).toMatchObject({
       pageSize: 5,
-      maxPRPages: 3,
       refreshIntervalMs: 60_000,
       requestTimeoutMs: 15_000,
       defaultScope: "author",
@@ -65,5 +60,9 @@ describe("dashboard options", () => {
       icons: DEFAULT_ICONS,
     })
     expect(Object.keys(DEFAULT_SKIN)).toHaveLength(12)
+  })
+
+  test("caps the page size at GitHub's 100 results per request", () => {
+    expect(dashboardOptions({ pageSize: 250 }).pageSize).toBe(100)
   })
 })

@@ -11,23 +11,61 @@ import type { Context as TuiPluginContext } from "@opencode/plugin/tui/context"
 import {
   DashboardStatus,
   type DashboardState,
+  type PRScope,
+  type PRSearchPage,
+  type PRStatusFilter,
   type Repo,
 } from "../domain/types"
 import { currentBranch, detectRepo } from "../infra/git"
-import { repositoryPRs, fetchOnePR } from "../infra/loader"
+import { searchPRs, fetchOnePR } from "../infra/loader"
+import { prSearchQuery } from "../domain/pr-filters"
 import { prListErrorKind, prListErrorMessage, parseRateLimitError } from "../domain/messages"
-import { DEFAULT_MAX_PR_PAGES, DEFAULT_REQUEST_TIMEOUT_MS } from "./config"
+import { DEFAULT_PAGE_SIZE, DEFAULT_REQUEST_TIMEOUT_MS } from "./config"
+
+export type DashboardFilters = { scope: PRScope; statusFilter: PRStatusFilter }
+
+export type PRPageRequest = DashboardFilters & {
+  repo: Repo
+  currentBranch: string | null
+  first: number
+  // endCursor of the previous page, or null for the first page.
+  after: string | null
+  requestTimeoutMs: number
+}
+
+// Loads one page of PRs. The default asks GitHub search to do the filtering;
+// demo mode swaps in a loader over local fixtures.
+export type PRPageLoader = (request: PRPageRequest) => Promise<PRSearchPage>
+
+const emptyPage: PRSearchPage = { prs: [], viewerLogin: null, totalCount: 0, hasNextPage: false, endCursor: null }
+
+export const githubPageLoader: PRPageLoader = async (request) => {
+  const query = prSearchQuery(request.repo, request.scope, request.statusFilter, request.currentBranch)
+  if (!query) return emptyPage
+  return searchPRs(query, request.first, request.after, request.requestTimeoutMs)
+}
+
+export type DashboardLoaderOptions = {
+  filters?: () => DashboardFilters
+  pageSize?: number
+  requestTimeoutMs?: number
+  loadPage?: PRPageLoader
+}
 
 export function useDashboard(
   api: TuiPluginContext,
   state: () => DashboardState,
   setState: (fn: (s: DashboardState) => DashboardState) => void,
-  requestTimeoutMs = DEFAULT_REQUEST_TIMEOUT_MS,
-  maxPRPages = DEFAULT_MAX_PR_PAGES,
+  options: DashboardLoaderOptions = {},
 ): {
-  refresh: () => Promise<void>
+  refresh: (page?: number) => Promise<void>
   refreshOne: (n: number) => Promise<void>
 } {
+  const filters = options.filters ?? (() => ({ scope: "author", statusFilter: "open" }))
+  const pageSize = options.pageSize ?? DEFAULT_PAGE_SIZE
+  const requestTimeoutMs = options.requestTimeoutMs ?? DEFAULT_REQUEST_TIMEOUT_MS
+  const loadPage = options.loadPage ?? githubPageLoader
+
   // Resolve the working directory explicitly when the TUI exposes it, so
   // repo detection doesn't depend on where opencode happens to launch.
   // Falls back to process.cwd() for tests that chdir() into a temp repo.
@@ -49,12 +87,24 @@ export function useDashboard(
   }
 
   let inFlight: Promise<void> | null = null
+  let inFlightKey = ""
   let refreshToken = 0
   let currentRefreshToken = 0
+  // GitHub search pages by cursor, so remember the cursor that starts each
+  // page of the current list. cursors[n] starts page n; page 0 has none.
+  let cursorsKey = ""
+  let cursors: Array<string | null> = [null]
 
-  const refresh = async () => {
-    if (inFlight) return inFlight
+  // Load `page` of the PR list for the current filters. Without a page,
+  // reload the page that is showing.
+  const refresh = async (page?: number) => {
     const prev = state()
+    const { scope, statusFilter } = filters()
+    const requestedPage = Math.max(0, Math.floor(page ?? prev.page))
+    const requestKey = `${scope}|${statusFilter}|${requestedPage}`
+    // A background reload (no page) never interrupts a load in progress; a
+    // new page or filter replaces it, and the older result is discarded.
+    if (inFlight && (page === undefined || inFlightKey === requestKey)) return inFlight
     const token = ++refreshToken
     const release = () => {
       if (inFlight && currentRefreshToken === token) inFlight = null
@@ -64,14 +114,6 @@ export function useDashboard(
       try {
         const directory = await cwd()
         const repo = detectRepo(directory)
-        const isFirstLoad = prev.fetchedAt === null
-        const isDirChange =
-          !!prev.repo && !!repo && (prev.repo.owner !== repo.owner || prev.repo.repo !== repo.repo)
-        const showLoading = isFirstLoad || isDirChange || prev.status === DashboardStatus.Loading
-        if (showLoading && prev.status !== DashboardStatus.Loading) {
-          if (isStale()) return
-          setState((s) => ({ ...s, error: undefined, status: DashboardStatus.Loading }))
-        }
         if (!repo) {
           if (isStale()) return
           setState((s) => ({
@@ -81,25 +123,65 @@ export function useDashboard(
             prs: [],
             currentBranch: null,
             viewerLogin: null,
-            listingTruncated: false,
+            page: 0,
+            totalCount: 0,
+            hasNextPage: false,
             error: undefined,
             errorKind: undefined,
             fetchedAt: Date.now(),
           }))
           return
         }
-        const result = await timeoutRace(requestTimeoutMs, () =>
-          repositoryPRs(repo, maxPRPages, requestTimeoutMs),
-        )
+        const branch = currentBranch(directory)
+        const listKey = [repo.owner, repo.repo, scope, statusFilter, branch ?? "", pageSize].join("|")
+        const isNewList = listKey !== cursorsKey
+        const pageCursors = isNewList ? [null] : [...cursors]
+        // Pages are reached one step at a time; if the cursor for a page
+        // isn't known (the list changed), start again from the first page.
+        let targetPage = pageCursors[requestedPage] !== undefined ? requestedPage : 0
+
+        const isFirstLoad = prev.fetchedAt === null
+        const showLoading = isFirstLoad || isNewList || targetPage !== prev.page || prev.status === DashboardStatus.Loading
+        if (showLoading && prev.status !== DashboardStatus.Loading) {
+          if (isStale()) return
+          setState((s) => ({ ...s, error: undefined, status: DashboardStatus.Loading }))
+        }
+
+        const request = (pageNumber: number) =>
+          timeoutRace(requestTimeoutMs, () =>
+            loadPage({
+              repo,
+              scope,
+              statusFilter,
+              currentBranch: branch,
+              first: pageSize,
+              after: pageCursors[pageNumber] ?? null,
+              requestTimeoutMs,
+            }),
+          )
+        let result = await request(targetPage)
+        // PRs can drop out of the list between refreshes, leaving a later
+        // page empty. Fall back to the first page.
+        if (result.prs.length === 0 && targetPage > 0) {
+          if (isStale()) return
+          targetPage = 0
+          result = await request(0)
+        }
         if (isStale()) return
+        pageCursors.length = targetPage + 1
+        if (result.hasNextPage && result.endCursor) pageCursors[targetPage + 1] = result.endCursor
+        cursors = pageCursors
+        cursorsKey = listKey
         setState((s) => ({
           ...s,
           status: DashboardStatus.Ok,
           repo,
           prs: result.prs,
-          currentBranch: currentBranch(directory),
-          viewerLogin: result.viewerLogin,
-          listingTruncated: result.listingTruncated,
+          currentBranch: branch,
+          viewerLogin: result.viewerLogin ?? s.viewerLogin,
+          page: targetPage,
+          totalCount: result.totalCount,
+          hasNextPage: result.hasNextPage && !!result.endCursor,
           error: undefined,
           errorKind: undefined,
           fetchedAt: Date.now(),
@@ -112,7 +194,6 @@ export function useDashboard(
           status: DashboardStatus.Error,
           repo: s.repo,
           prs: rl.isRateLimit ? s.prs : [],
-          listingTruncated: rl.isRateLimit ? s.listingTruncated : false,
           error: rl.message ?? prListErrorMessage(e),
           errorKind: rl.isRateLimit ? "rate-limit" : prListErrorKind(e),
           fetchedAt: Date.now(),
@@ -121,6 +202,7 @@ export function useDashboard(
     })()
     currentRefreshToken = token
     inFlight = promise
+    inFlightKey = requestKey
     promise.finally(release)
     return inFlight
   }

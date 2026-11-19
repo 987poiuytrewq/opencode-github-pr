@@ -1,6 +1,7 @@
 /** @jsxImportSource @opentui/solid */
 import { describe, expect, test } from "bun:test"
 import { testRender } from "@opentui/solid"
+import { createSignal } from "solid-js"
 import type { DashboardState, PRScope, PRStatusFilter, PRLinkTarget } from "../../plugins/domain/types"
 import { DashboardView } from "../../plugins/app/DashboardView"
 import { dashboardOptions } from "../../plugins/app/config"
@@ -11,6 +12,7 @@ async function renderState(state: DashboardState, handlers: Partial<{
   onOpen: (n: number, target?: PRLinkTarget) => void
   onCycleScope: () => void
   onCycleStatus: () => void
+  onPageChange: (page: number) => void
   scope: PRScope
   statusFilter: PRStatusFilter
   options: Parameters<typeof dashboardOptions>[0]
@@ -29,7 +31,7 @@ async function renderState(state: DashboardState, handlers: Partial<{
         onCycleScope={handlers.onCycleScope ?? (() => {})}
         onCycleStatus={handlers.onCycleStatus ?? (() => {})}
         pageSize={options.pageSize}
-        maxPRPages={options.maxPRPages}
+        onPageChange={handlers.onPageChange ?? (() => {})}
         colors={options.colors}
         icons={options.icons}
       />
@@ -91,16 +93,14 @@ describe("DashboardView render", () => {
     expect(captureFrame(r)).toMatchSnapshot()
   })
 
-  test("shows when the PR listing was truncated", async () => {
-    const r = await renderState(okState({ listingTruncated: true }))
+  test("page count comes from GitHub's total, capped at the search limit", async () => {
+    let r = await renderState(okState({ totalCount: 23 }), { options: { pageSize: 5 } })
     await r.flush()
-    expect(captureFrame(r)).toContain("Showing first 300 PRs; more are available")
-  })
+    expect(captureFrame(r)).toContain("1 of 5")
 
-  test("truncation notice reflects the configured page limit", async () => {
-    const r = await renderState(okState({ listingTruncated: true }), { options: { maxPRPages: 5 } })
+    r = await renderState(okState({ totalCount: 5000, hasNextPage: true }), { options: { pageSize: 10 } })
     await r.flush()
-    expect(captureFrame(r)).toContain("Showing first 500 PRs; more are available")
+    expect(captureFrame(r)).toContain("1 of 100")
   })
 
   test("merged PR uses the merged icon and displays change totals", async () => {
@@ -175,8 +175,9 @@ describe("DashboardView render", () => {
       prs: [
         makeTUIPR({ number: 1, title: "First" }),
         makeTUIPR({ number: 2, title: "Second" }),
-        makeTUIPR({ number: 3, title: "Third" }),
       ],
+      totalCount: 3,
+      hasNextPage: true,
     }), {
       scope: "all",
       statusFilter: "all",
@@ -382,11 +383,42 @@ describe("DashboardView mouse interaction", () => {
     expect(opened.at(-1)).toEqual({ number: 42, target: "files" })
   })
 
-  test("paginates PRs five at a time and stops at the first and last page", async () => {
-    const prs = Array.from({ length: 12 }, (_, i) =>
+  test("page arrows request neighbouring pages and stop at the first and last page", async () => {
+    const all = Array.from({ length: 12 }, (_, i) =>
       makeTUIPR({ number: 10 + i, title: `PR ${10 + i}` }),
     )
-    const r = await renderState(okState({ prs }), { scope: "all", statusFilter: "all" })
+    const pageState = (page: number) => okState({
+      prs: all.slice(page * 5, page * 5 + 5),
+      page,
+      totalCount: all.length,
+      hasNextPage: page * 5 + 5 < all.length,
+    })
+    const [state, setState] = createSignal(pageState(0))
+    const requested: number[] = []
+    const { api } = createMockTuiApi()
+    const options = dashboardOptions()
+    const r = await testRender(
+      () => (
+        <DashboardView
+          theme={api.theme}
+          state={state()}
+          setSelectedIdx={() => {}}
+          onOpen={() => {}}
+          scope="all"
+          statusFilter="all"
+          onCycleScope={() => {}}
+          onCycleStatus={() => {}}
+          onPageChange={(page) => {
+            requested.push(page)
+            setState(pageState(page))
+          }}
+          pageSize={options.pageSize}
+          colors={options.colors}
+          icons={options.icons}
+        />
+      ),
+      { width: 50, height: 20 },
+    )
     await r.flush()
 
     const clickArrow = async (pageLabel: string, arrow: string) => {
@@ -402,24 +434,25 @@ describe("DashboardView mouse interaction", () => {
 
     let frame = r.captureCharFrame()
     expect(frame).toContain("1 of 3")
-    expect(frame).toContain(" PR 10")
-    expect(frame).toContain(" PR 14")
-    expect(frame).not.toContain(" PR 15")
+    expect(frame).toContain(" PR 10")
+    expect(frame).toContain(" PR 14")
 
     await clickArrow("1 of 3", "")
-    expect(r.captureCharFrame()).toContain("1 of 3")
+    expect(requested).toEqual([])
 
     await clickArrow("1 of 3", "")
     frame = r.captureCharFrame()
+    expect(requested).toEqual([1])
     expect(frame).toContain("2 of 3")
-    expect(frame).toContain(" PR 15")
-    expect(frame).not.toContain(" PR 14")
+    expect(frame).toContain(" PR 15")
+    expect(frame).not.toContain(" PR 14")
 
     await clickArrow("2 of 3", "")
     expect(r.captureCharFrame()).toContain("3 of 3")
     await clickArrow("3 of 3", "")
-    expect(r.captureCharFrame()).toContain("3 of 3")
+    expect(requested).toEqual([1, 2])
     await clickArrow("3 of 3", "")
+    expect(requested).toEqual([1, 2, 1])
     expect(r.captureCharFrame()).toContain("2 of 3")
   })
 })

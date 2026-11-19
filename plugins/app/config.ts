@@ -21,7 +21,6 @@ export type DashboardIcons = Record<keyof typeof DEFAULT_ICONS, string>
 export type DashboardOptions = {
   enabled: boolean
   pageSize: number
-  maxPRPages: number
   refreshIntervalMs: number
   requestTimeoutMs: number
   defaultScope: PRScope
@@ -33,7 +32,6 @@ export type DashboardOptions = {
 type DashboardOptionsInput = {
   enabled?: unknown
   pageSize?: unknown
-  maxPRPages?: unknown
   refreshIntervalMs?: unknown
   requestTimeoutMs?: unknown
   defaultScope?: unknown
@@ -46,7 +44,8 @@ const scopes: PRScope[] = ["branch", "author", "assignee", "all"]
 const statusFilters: PRStatusFilter[] = ["open", "closed", "all"]
 
 export const DEFAULT_PAGE_SIZE = 5
-export const DEFAULT_MAX_PR_PAGES = 3
+// GitHub returns at most 100 search results per request.
+export const MAX_PAGE_SIZE = 100
 export const DEFAULT_REFRESH_INTERVAL_MS = 60_000
 export const DEFAULT_REQUEST_TIMEOUT_MS = 15_000
 
@@ -71,8 +70,7 @@ function mergeStrings<T extends Record<string, string>>(defaults: T, input: unkn
 export function dashboardOptions(input: DashboardOptionsInput = {}): DashboardOptions {
   return {
     enabled: input.enabled !== false,
-    pageSize: positiveNumber(input.pageSize, DEFAULT_PAGE_SIZE),
-    maxPRPages: positiveNumber(input.maxPRPages, DEFAULT_MAX_PR_PAGES),
+    pageSize: Math.min(MAX_PAGE_SIZE, positiveNumber(input.pageSize, DEFAULT_PAGE_SIZE)),
     refreshIntervalMs: positiveNumber(input.refreshIntervalMs, DEFAULT_REFRESH_INTERVAL_MS),
     requestTimeoutMs: positiveNumber(input.requestTimeoutMs, DEFAULT_REQUEST_TIMEOUT_MS),
     defaultScope: scopes.includes(input.defaultScope as PRScope) ? (input.defaultScope as PRScope) : "author",

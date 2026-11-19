@@ -1,7 +1,7 @@
 import { describe, expect, test } from "bun:test";
 import { filterPRs } from "../../plugins/domain/pr-filters";
 import { DashboardStatus } from "../../plugins/domain/types";
-import { demoDashboardState } from "../../demo/fixtures";
+import { demoDashboardState, demoPageLoader } from "../../demo/fixtures";
 
 describe("dashboard demo data", () => {
   test("has enough authored open PRs to demonstrate pagination", () => {
@@ -49,5 +49,25 @@ describe("dashboard demo data", () => {
     first.prs[0].assigneeLogins.push("changed");
 
     expect(second.prs[0].assigneeLogins).not.toContain("changed");
+  });
+
+  test("pages filtered fixtures the way GitHub search would", async () => {
+    const request = {
+      repo: { owner: "acme", repo: "launchpad" },
+      scope: "author" as const,
+      statusFilter: "open" as const,
+      currentBranch: "main",
+      first: 5,
+      after: null,
+      requestTimeoutMs: 1000,
+    };
+    const first = await demoPageLoader(request);
+    expect(first.prs).toHaveLength(5);
+    expect(first.totalCount).toBeGreaterThan(5);
+    expect(first.hasNextPage).toBe(true);
+
+    const second = await demoPageLoader({ ...request, after: first.endCursor });
+    expect(second.prs[0].number).not.toBe(first.prs[0].number);
+    expect(5 + second.prs.length).toBe(first.totalCount);
   });
 });

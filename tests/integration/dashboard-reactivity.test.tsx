@@ -24,7 +24,7 @@ describe("DashboardView reactivity", () => {
           onCycleScope={() => {}}
           onCycleStatus={() => {}}
           pageSize={dashboardOptions().pageSize}
-          maxPRPages={dashboardOptions().maxPRPages}
+          onPageChange={() => {}}
           colors={dashboardOptions().colors}
           icons={dashboardOptions().icons}
         />
