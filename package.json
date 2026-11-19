@@ -1,6 +1,7 @@
 {
   "name": "opencode-github-pr",
   "private": true,
+  "license": "MIT",
   "type": "module",
   "exports": {
     ".": "./plugins/pr-dashboard.ts",

@@ -322,3 +322,7 @@ This records the real OpenCode TUI with fictional PR data, then writes `demo/dem
 `asciinema`, `agg`, `tmux`, Bun and the OpenCode CLI. It runs in a temporary repository and home directory with GitHub
 access turned off, so it doesn't touch your config or make network requests. Replay it with
 `asciinema play demo/demo.cast`.
+
+## License
+
+[MIT](LICENSE)
