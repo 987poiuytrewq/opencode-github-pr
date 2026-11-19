@@ -7,7 +7,7 @@ describe("dashboard options", () => {
     expect(dashboardOptions()).toEqual({
       enabled: true,
       pageSize: 5,
-      maxPRPages: 3,
+      maxPRPages: 1,
       refreshIntervalMs: 60_000,
       requestTimeoutMs: 15_000,
       defaultScope: "author",
@@ -56,7 +56,7 @@ describe("dashboard options", () => {
       }),
     ).toMatchObject({
       pageSize: 5,
-      maxPRPages: 3,
+      maxPRPages: 1,
       refreshIntervalMs: 60_000,
       requestTimeoutMs: 15_000,
       defaultScope: "author",

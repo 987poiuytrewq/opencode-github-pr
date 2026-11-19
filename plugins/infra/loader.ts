@@ -9,7 +9,16 @@ import { PULL_REQUESTS_QUERY } from "./queries"
 
 export type { Repo, PR }
 
-export const MAX_REPOSITORY_PR_PAGES = 3
+export const MAX_REPOSITORY_PR_PAGES = 1
+
+// Which PRs a listing covers. Open PRs are loaded on their own so that a
+// backlog of closed PRs can't push them out of the page limit.
+export type PRListing = "open" | "closed"
+
+const LISTING_STATES: Record<PRListing, string[]> = {
+  open: ["OPEN"],
+  closed: ["CLOSED", "MERGED"],
+}
 
 export type RepositoryPRsResult = {
   prs: PR[]
@@ -62,6 +71,7 @@ export async function repositoryPRs(
   repo: Repo | null,
   maxPages = MAX_REPOSITORY_PR_PAGES,
   requestTimeoutMs = 15_000,
+  listing: PRListing = "open",
 ): Promise<RepositoryPRsResult> {
   if (!repo) return { prs: [], viewerLogin: null, listingTruncated: false, fetchedPages: 0 }
   const nodes: unknown[] = []
@@ -74,6 +84,7 @@ export async function repositoryPRs(
     const data = await graphqlPartial(PULL_REQUESTS_QUERY, {
       owner: repo.owner,
       name: repo.repo,
+      states: LISTING_STATES[listing],
       head: null,
       after,
     }, requestTimeoutMs)

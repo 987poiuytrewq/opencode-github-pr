@@ -57,7 +57,10 @@ export type DashboardState = {
   currentBranch: string | null
   viewerLogin: string | null
   fetchedAt: number | null
-  listingTruncated: boolean
+  // Closed and merged PRs load only once a status filter needs them.
+  closedLoaded: boolean
+  // Whether more PRs exist than the page limit loaded, per listing.
+  truncated: { open: boolean; closed: boolean }
   error?: string
   errorKind?: PRListErrorKind
 }

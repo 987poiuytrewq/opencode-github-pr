@@ -24,6 +24,8 @@ export function useDashboard(
   setState: (fn: (s: DashboardState) => DashboardState) => void,
   requestTimeoutMs = DEFAULT_REQUEST_TIMEOUT_MS,
   maxPRPages = DEFAULT_MAX_PR_PAGES,
+  // Whether the status filter shows closed PRs, so they need loading.
+  includeClosed: () => boolean = () => false,
 ): {
   refresh: () => Promise<void>
   refreshOne: (n: number) => Promise<void>
@@ -49,11 +51,18 @@ export function useDashboard(
   }
 
   let inFlight: Promise<void> | null = null
+  let inFlightIncludesClosed = false
   let refreshToken = 0
   let currentRefreshToken = 0
 
-  const refresh = async () => {
-    if (inFlight) return inFlight
+  const refresh = async (): Promise<void> => {
+    const wantClosed = includeClosed()
+    if (inFlight) {
+      // A refresh that skipped closed PRs can't serve a filter that needs
+      // them; run another once it lands.
+      if (wantClosed && !inFlightIncludesClosed) return inFlight.then((): Promise<void> => refresh())
+      return inFlight
+    }
     const prev = state()
     const token = ++refreshToken
     const release = () => {
@@ -81,29 +90,48 @@ export function useDashboard(
             prs: [],
             currentBranch: null,
             viewerLogin: null,
-            listingTruncated: false,
+            closedLoaded: false,
+            truncated: { open: false, closed: false },
             error: undefined,
             errorKind: undefined,
             fetchedAt: Date.now(),
           }))
           return
         }
-        const result = await timeoutRace(requestTimeoutMs, () =>
-          repositoryPRs(repo, maxPRPages, requestTimeoutMs),
+        const [open, closed] = await timeoutRace(requestTimeoutMs, () =>
+          Promise.all([
+            repositoryPRs(repo, maxPRPages, requestTimeoutMs, "open"),
+            wantClosed ? repositoryPRs(repo, maxPRPages, requestTimeoutMs, "closed") : Promise.resolve(null),
+          ]),
         )
         if (isStale()) return
-        setState((s) => ({
-          ...s,
-          status: DashboardStatus.Ok,
-          repo,
-          prs: result.prs,
-          currentBranch: currentBranch(directory),
-          viewerLogin: result.viewerLogin,
-          listingTruncated: result.listingTruncated,
-          error: undefined,
-          errorKind: undefined,
-          fetchedAt: Date.now(),
-        }))
+        setState((s) => {
+          // Keep closed PRs from an earlier load of the same repository, so
+          // switching back to a closed view is instant.
+          const sameRepo = s.repo?.owner === repo.owner && s.repo?.repo === repo.repo
+          const keptClosed = sameRepo && s.closedLoaded
+          const openNumbers = new Set(open.prs.map((pr) => pr.number))
+          // A kept PR that has since been reopened is in the open list.
+          const closedPRs = closed ? closed.prs : keptClosed
+            ? s.prs.filter((pr) => pr.isClosed && !openNumbers.has(pr.number))
+            : []
+          return {
+            ...s,
+            status: DashboardStatus.Ok,
+            repo,
+            prs: [...open.prs, ...closedPRs],
+            currentBranch: currentBranch(directory),
+            viewerLogin: open.viewerLogin ?? closed?.viewerLogin ?? null,
+            closedLoaded: closed !== null || keptClosed,
+            truncated: {
+              open: open.listingTruncated,
+              closed: closed ? closed.listingTruncated : keptClosed && s.truncated.closed,
+            },
+            error: undefined,
+            errorKind: undefined,
+            fetchedAt: Date.now(),
+          }
+        })
       } catch (e: unknown) {
         if (isStale()) return
         const rl = parseRateLimitError(e)
@@ -112,7 +140,8 @@ export function useDashboard(
           status: DashboardStatus.Error,
           repo: s.repo,
           prs: rl.isRateLimit ? s.prs : [],
-          listingTruncated: rl.isRateLimit ? s.listingTruncated : false,
+          closedLoaded: rl.isRateLimit ? s.closedLoaded : false,
+          truncated: rl.isRateLimit ? s.truncated : { open: false, closed: false },
           error: rl.message ?? prListErrorMessage(e),
           errorKind: rl.isRateLimit ? "rate-limit" : prListErrorKind(e),
           fetchedAt: Date.now(),
@@ -121,6 +150,7 @@ export function useDashboard(
     })()
     currentRefreshToken = token
     inFlight = promise
+    inFlightIncludesClosed = wantClosed
     promise.finally(release)
     return inFlight
   }

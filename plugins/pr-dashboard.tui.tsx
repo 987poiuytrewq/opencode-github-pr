@@ -31,7 +31,8 @@ async function setup(api: TuiPluginContext) {
     currentBranch: null,
     viewerLogin: null,
     fetchedAt: null,
-    listingTruncated: false,
+    closedLoaded: false,
+    truncated: { open: false, closed: false },
   })
   const demoMode = process.env.OPENCODE_GITHUB_PR_DEMO === "1"
   if (demoMode) {
@@ -50,11 +51,20 @@ async function setup(api: TuiPluginContext) {
   const cycleStatus = () => {
     setStatusFilter(nextPRStatusFilter(statusFilter()))
     setSelectedIdx(0)
+    // Closed PRs load on demand; fetch them (or refresh a cached copy).
+    if (statusFilter() !== "open") void dash.refresh()
   }
 
   const dash = demoMode
     ? { refresh: async () => {}, refreshOne: async () => {} }
-    : useDashboard(api, state, setState, options.requestTimeoutMs, options.maxPRPages)
+    : useDashboard(
+        api,
+        state,
+        setState,
+        options.requestTimeoutMs,
+        options.maxPRPages,
+        () => statusFilter() !== "open",
+      )
   const dashboard: DashboardContext = {
     state,
     refresh: dash.refresh,

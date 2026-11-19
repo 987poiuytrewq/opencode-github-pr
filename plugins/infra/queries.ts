@@ -4,13 +4,13 @@
 // (scope requirements, field selection) without scrolling through the
 // orchestration code.
 
-// PRs for a repository (or one head branch), including every GitHub state.
-export const PULL_REQUESTS_QUERY = `query PullRequests($owner: String!, $name: String!, $head: String, $after: String) {
+// PRs for a repository (or one head branch) in the given GitHub states.
+export const PULL_REQUESTS_QUERY = `query PullRequests($owner: String!, $name: String!, $states: [PullRequestState!]!, $head: String, $after: String) {
   viewer {
     login
   }
   repository(owner: $owner, name: $name) {
-    pullRequests(first: 100, after: $after, states: [OPEN, CLOSED, MERGED], headRefName: $head, orderBy: {field: UPDATED_AT, direction: DESC}) {
+    pullRequests(first: 100, after: $after, states: $states, headRefName: $head, orderBy: {field: UPDATED_AT, direction: DESC}) {
       pageInfo {
         hasNextPage
         endCursor

@@ -127,8 +127,11 @@ These commands are available as slash commands and in the command palette, under
 The list refreshes when OpenCode starts, each time a session goes idle (for example after the agent finishes a task),
 and every 60 seconds while a session is open. Use `/pr-refresh` to reload it on demand.
 
-The dashboard loads the 300 most recently updated PRs in the repository. If there are more, it says so at the top of
-the list. Raise [`maxPRPages`](#configuration) to load more.
+The dashboard loads the 100 most recently updated open PRs in the repository. Closed and merged PRs are loaded
+separately, the first time you switch the status filter to `closed` or `all`, and then kept so switching back is
+instant. Loading them separately means a backlog of closed PRs can't push open ones out of the list.
+
+If a repository has more PRs than were loaded, the panel says so. Raise [`maxPRPages`](#configuration) to load more.
 
 ## Configuration
 
@@ -155,7 +158,7 @@ Pass options in the plugin entry's `options` object. Every option is optional:
 | --- | --- | --- |
 | `enabled` | `true` | Set to `false` to turn the dashboard off without uninstalling it. |
 | `pageSize` | `5` | PRs shown per page. |
-| `maxPRPages` | `3` | Pages of 100 PRs to load from GitHub, so `3` loads up to 300. Higher values use more API quota. |
+| `maxPRPages` | `1` | Pages of 100 PRs to load from GitHub for open PRs, and again for closed PRs when shown. `2` loads up to 200 of each. Higher values use more API quota. |
 | `refreshIntervalMs` | `60000` | How often the list refreshes while a session is open, in milliseconds. |
 | `requestTimeoutMs` | `15000` | How long to wait for a GitHub request before giving up, in milliseconds. |
 | `defaultScope` | `"author"` | Scope filter at startup: `branch`, `author`, `assignee` or `all`. |
