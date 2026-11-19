@@ -127,6 +127,35 @@ describe("detectRepo", () => {
     }
   })
 
+  test("detects a sibling .bare repository without treating its HEAD as the worktree branch", () => {
+    const root = mkdtempSync(join(tmpdir(), "pr-dash-bare-"))
+    const bareDir = join(root, ".bare")
+    mkdirSync(join(bareDir, "objects"), { recursive: true })
+    writeFileSync(
+      join(bareDir, "config"),
+      `[core]\n\tbare = true\n[remote "origin"]\n\turl = git@github.com:foo/bar.git\n`,
+    )
+    writeFileSync(join(bareDir, "HEAD"), "ref: refs/heads/main\n")
+
+    expect(detectRepo(root)).toEqual({ owner: "foo", repo: "bar" })
+    expect(currentBranch(root)).toBeNull()
+    rmSync(root, { recursive: true, force: true })
+  })
+
+  test("detects a bare repository when opened directly", () => {
+    const root = mkdtempSync(join(tmpdir(), "pr-dash-bare-direct-"))
+    mkdirSync(join(root, "objects"))
+    writeFileSync(
+      join(root, "config"),
+      `[core]\n\tbare = true\n[remote "origin"]\n\turl = git@github.com:foo/bar.git\n`,
+    )
+    writeFileSync(join(root, "HEAD"), "ref: refs/heads/main\n")
+
+    expect(detectRepo(root)).toEqual({ owner: "foo", repo: "bar" })
+    expect(currentBranch(root)).toBe("main")
+    rmSync(root, { recursive: true, force: true })
+  })
+
   test("returns null when no .git/config exists", () => {
     const dir = mkdtempSync(join(tmpdir(), "pr-dash-"))
     try {
