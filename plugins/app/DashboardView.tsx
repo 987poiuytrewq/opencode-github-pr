@@ -145,7 +145,6 @@ export function DashboardView(props: {
       paddingBottom={1}
       gap={0}
       width="100%"
-      backgroundColor={sk.panel}
     >
       <box
         flexDirection="row"
