@@ -163,6 +163,7 @@ Pass options in the plugin entry's `options` object. Every option is optional:
 | `requestTimeoutMs` | `15000` | How long to wait for a GitHub request before giving up, in milliseconds. |
 | `defaultScope` | `"author"` | Scope filter at startup: `branch`, `author`, `assignee` or `all`. |
 | `defaultStatusFilter` | `"open"` | Status filter at startup: `open`, `closed` or `all`. |
+| `iconStyle` | `"nerd"` | Icon set to use: `"nerd"` or `"unicode"`. |
 | `colors` | Theme | Colour overrides. See [Colours](#colours). |
 | `icons` | Nerd Font glyphs | Icon overrides. See [Icons](#icons). |
 
@@ -220,10 +221,38 @@ Every icon can be replaced with any non-empty string. The defaults are [Nerd Fon
 | `previousPage` | `U+EB6F` | Previous page arrow |
 | `nextPage` | `U+EB70` | Next page arrow |
 
+#### Unicode icons
+
+If your terminal font does not include Nerd Font glyphs, set `iconStyle` to `"unicode"` to use standard Unicode symbols:
+
+```json
+{
+  "options": {
+    "iconStyle": "unicode"
+  }
+}
+```
+
+| Key | Unicode symbol |
+| --- | --- |
+| `openPR` | `○` |
+| `mergedPR` | `✓` |
+| `review` | `✓` |
+| `openComment` | `◌` |
+| `check` | `●` |
+| `scope` | `⌖` |
+| `status` | `◷` |
+| `loading` | `…` |
+| `info` | `ℹ` |
+| `error` | `!` |
+| `previousPage` | `‹` |
+| `nextPage` | `›` |
+
+Explicit values in `icons` override the selected style.
+
 #### Plain-text icons
 
-If your terminal font has no Nerd Font glyphs, the default icons show as empty boxes. Replace them with plain
-characters:
+You can also replace individual icons or the full icon set with ASCII characters:
 
 ```json
 {
@@ -263,7 +292,7 @@ unset for GitHub.com.
 | You see | What to do |
 | --- | --- |
 | No **Pull Requests** panel | Check that the plugin is in `opencode.json` (not `cli.json`), that `bun install` has run in the clone, and that `enabled` isn't `false`. Restart OpenCode. Plugin load errors are written to `~/.local/share/opencode/log/opencode.log`. |
-| Icons show as boxes or question marks | Your font has no Nerd Font glyphs. Install one, or use [plain-text icons](#plain-text-icons). |
+| Icons show as boxes or question marks | Your font has no Nerd Font glyphs. Install one, set `iconStyle` to `"unicode"`, or use [plain-text icons](#plain-text-icons). |
 | **No GitHub repo** | The session's directory isn't a Git repository with a GitHub remote. Add a remote, or open a session in the right project. For Enterprise, check `GITHUB_ENTERPRISE_URL`. |
 | **GitHub sign-in failed** | No valid token was found. Run `gh auth login`, or set `GITHUB_TOKEN` where the OpenCode server starts. |
 | **Permission denied** or **Repo not found** | Your token can't read this repository. Check its scopes or fine-grained permissions, and SSO authorisation for organisation repositories. |

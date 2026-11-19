@@ -16,6 +16,23 @@ export const DEFAULT_ICONS = {
   nextPage: "",
 }
 
+export const UNICODE_ICONS = {
+  openPR: "○",
+  mergedPR: "✓",
+  review: "✓",
+  openComment: "◌",
+  check: "●",
+  scope: "⌖",
+  status: "◷",
+  loading: "…",
+  info: "ℹ",
+  error: "!",
+  previousPage: "‹",
+  nextPage: "›",
+}
+
+export type IconStyle = "nerd" | "unicode"
+
 export type DashboardIcons = Record<keyof typeof DEFAULT_ICONS, string>
 
 export type DashboardOptions = {
@@ -26,6 +43,7 @@ export type DashboardOptions = {
   requestTimeoutMs: number
   defaultScope: PRScope
   defaultStatusFilter: PRStatusFilter
+  iconStyle: IconStyle
   colors: Partial<Skin>
   icons: DashboardIcons
 }
@@ -38,6 +56,7 @@ type DashboardOptionsInput = {
   requestTimeoutMs?: unknown
   defaultScope?: unknown
   defaultStatusFilter?: unknown
+  iconStyle?: unknown
   colors?: unknown
   icons?: unknown
 }
@@ -69,6 +88,9 @@ function mergeStrings<T extends Record<string, string>>(defaults: T, input: unkn
 }
 
 export function dashboardOptions(input: DashboardOptionsInput = {}): DashboardOptions {
+  const iconStyle: IconStyle = input.iconStyle === "unicode" ? "unicode" : "nerd"
+  const defaultIcons = iconStyle === "unicode" ? UNICODE_ICONS : DEFAULT_ICONS
+
   return {
     enabled: input.enabled !== false,
     pageSize: positiveNumber(input.pageSize, DEFAULT_PAGE_SIZE),
@@ -79,7 +101,8 @@ export function dashboardOptions(input: DashboardOptionsInput = {}): DashboardOp
     defaultStatusFilter: statusFilters.includes(input.defaultStatusFilter as PRStatusFilter)
       ? (input.defaultStatusFilter as PRStatusFilter)
       : "open",
+    iconStyle,
     colors: stringOverrides(DEFAULT_SKIN, input.colors),
-    icons: mergeStrings(DEFAULT_ICONS, input.icons),
+    icons: mergeStrings(defaultIcons, input.icons),
   }
 }
