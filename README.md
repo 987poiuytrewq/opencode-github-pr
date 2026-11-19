@@ -208,8 +208,8 @@ Every icon can be replaced with any non-empty string. The defaults are [Nerd Fon
 
 | Key | Default | Used for |
 | --- | --- | --- |
-| `openPR` | `U+E726` | Open, draft and closed PRs |
-| `mergedPR` | `U+E727` | Merged PRs |
+| `openPR` | `U+EA64` | Open, draft and closed PRs |
+| `mergedPR` | `U+EAFE` | Merged PRs |
 | `review` | `U+F4FF` | Review status |
 | `openComment` | `U+F017A` | Unresolved review threads |
 | `check` | `●` | CI check status |

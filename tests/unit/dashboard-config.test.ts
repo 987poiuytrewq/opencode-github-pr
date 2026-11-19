@@ -3,6 +3,12 @@ import { dashboardOptions, DEFAULT_ICONS, UNICODE_ICONS } from "../../plugins/ap
 import { DEFAULT_SKIN } from "../../plugins/app/theme"
 
 describe("dashboard options", () => {
+  test("uses Nerd Font Codicons for PR marks by default", () => {
+    expect(DEFAULT_ICONS.openPR).toBe("")
+    expect(DEFAULT_ICONS.mergedPR).toBe("")
+    expect(dashboardOptions().iconStyle).toBe("nerd")
+  })
+
   test("preserves the existing dashboard defaults", () => {
     expect(dashboardOptions()).toEqual({
       enabled: true,
