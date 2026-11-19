@@ -17,6 +17,9 @@ import { errorMessages } from "../domain/messages"
 import { PRRow } from "./PRRow"
 import type { DashboardIcons } from "./config"
 
+// GitHub returns up to 100 PRs per GraphQL page (see PULL_REQUESTS_QUERY).
+const PRS_PER_PAGE = 100
+
 export function DashboardView(props: {
   theme: ResolvedTheme
   state: DashboardState
@@ -175,7 +178,7 @@ export function DashboardView(props: {
 
       <Show when={props.state.listingTruncated}>
         <box paddingLeft={1}>
-          <text fg={sk.warning}>Showing first 300 PRs; more are available</text>
+          <text fg={sk.warning}>{`Showing first ${props.maxPRPages * PRS_PER_PAGE} PRs; more are available`}</text>
         </box>
       </Show>
 

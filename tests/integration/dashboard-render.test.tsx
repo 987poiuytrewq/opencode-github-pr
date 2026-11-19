@@ -97,6 +97,12 @@ describe("DashboardView render", () => {
     expect(captureFrame(r)).toContain("Showing first 300 PRs; more are available")
   })
 
+  test("truncation notice reflects the configured page limit", async () => {
+    const r = await renderState(okState({ listingTruncated: true }), { options: { maxPRPages: 5 } })
+    await r.flush()
+    expect(captureFrame(r)).toContain("Showing first 500 PRs; more are available")
+  })
+
   test("merged PR uses the merged icon and displays change totals", async () => {
     const r = await renderState(okState({
       prs: [makeTUIPR({
