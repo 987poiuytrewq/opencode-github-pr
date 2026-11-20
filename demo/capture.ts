@@ -180,6 +180,24 @@ async function waitForText(
   );
 }
 
+async function waitForAnyText(
+  socket: string,
+  session: string,
+  texts: string[],
+  timeoutMs = UI_TIMEOUT_MS,
+): Promise<string> {
+  const deadline = Date.now() + timeoutMs;
+  let last = "";
+  while (Date.now() < deadline) {
+    last = await capturePane(socket, session);
+    if (texts.some((text) => last.includes(text))) return last;
+    await Bun.sleep(150);
+  }
+  fail(
+    `Timed out waiting for any of ${texts.map((text) => JSON.stringify(text)).join(", ")}. Last TUI frame:\n${last}`,
+  );
+}
+
 async function clickCell(
   socket: string,
   session: string,
@@ -466,20 +484,31 @@ async function main(): Promise<void> {
       "Build · Big Pickle OpenCode",
       START_TIMEOUT_MS,
     );
-    if (!readyScreen.includes("Pull Requests")) {
+    if (readyScreen.includes("Getting started")) {
+      await clickText(socket, session, "✕");
+      await Bun.sleep(400);
+    }
+    const screenAfterStartup = await capturePane(socket, session);
+    if (!screenAfterStartup.includes("Pull Requests")) {
       await tmux(socket, ["send-keys", "-t", session, "C-x"]);
       await Bun.sleep(100);
       await tmux(socket, ["send-keys", "-t", session, "b"]);
     }
-    const initialScreen = await waitForText(
+    const initialScreen = await waitForAnyText(
       socket,
       session,
-      "Add passkey sign-in",
+      ["Add passkey sign-in", "Getting started"],
       START_TIMEOUT_MS,
     );
     if (initialScreen.includes("Getting started")) {
       await clickText(socket, session, "✕");
       await Bun.sleep(400);
+      await waitForText(
+        socket,
+        session,
+        "Add passkey sign-in",
+        START_TIMEOUT_MS,
+      );
     }
 
     const attachCommand = `${shellQuote(tmuxBin)} -L ${shellQuote(socket)} attach-session -t ${shellQuote(session)}`;
