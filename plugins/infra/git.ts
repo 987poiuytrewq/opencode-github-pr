@@ -75,6 +75,8 @@ function unquoteConfigValue(value: string): string {
 type GitPaths = { gitDir: string; commonDir: string; branchDir: string | null }
 
 function gitPaths(cwd: string): GitPaths | null {
+  // Session directories may be nested below a checkout. Walk upward and stop
+  // at the first Git marker so nested repositories take precedence over parents.
   let directory = resolve(cwd)
   while (true) {
     try {
