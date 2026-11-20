@@ -10,6 +10,7 @@ import {
   repositoryPRs,
   fetchOnePR,
 } from "../../plugins/infra/loader";
+import { createOctokit, setOctokit } from "../../plugins/infra/octokit";
 
 installOctokitMock();
 
@@ -187,6 +188,40 @@ describe("repositoryPRs", () => {
     expect(firsts).toEqual([100, 20]);
     expect(result.prs).toHaveLength(120);
     expect(result.fetchedPages).toBe(2);
+  });
+
+  test("bounds a large PR batch to the requested records across 100-item pages", async () => {
+    const firsts: number[] = [];
+    let offset = 0;
+    mockOctokitDefault((op, params) => {
+      if (op !== "graphql") return null;
+      const first = params.params.first;
+      firsts.push(first);
+      const start = offset + 1;
+      offset += first;
+      return {
+        repository: {
+          pullRequests: {
+            pageInfo: {
+              hasNextPage: true,
+              endCursor: `cursor-${offset}`,
+            },
+            nodes: Array.from({ length: first }, (_, i) => ({
+              number: start + i,
+              title: `PR ${start + i}`,
+              state: "OPEN",
+            })),
+          },
+        },
+      };
+    });
+
+    const result = await repositoryPRs({ owner: "foo", repo: "bar" }, 250);
+
+    expect(firsts).toEqual([100, 100, 50]);
+    expect(result.prs).toHaveLength(250);
+    expect(result.fetchedPages).toBe(3);
+    expect(result.hasMore).toBe(true);
   });
 
   test("requests closed and merged PRs for the closed listing", async () => {
@@ -644,6 +679,60 @@ describe("repositoryPRs", () => {
     await expect(repositoryPRs({ owner: "foo", repo: "bar" })).rejects.toThrow(
       "invalid or repeated pull request pagination cursor",
     );
+  });
+
+  test("propagates a pagination request failure instead of returning a partial listing", async () => {
+    let calls = 0;
+    mockOctokitDefault((op, params) => {
+      if (op !== "graphql") return null;
+      calls++;
+      if (calls === 2) throw new Error("GitHub request failed");
+      return {
+        repository: {
+          pullRequests: {
+            pageInfo: { hasNextPage: true, endCursor: "cursor-1" },
+            nodes: [{ number: 1, title: "PR 1", state: "OPEN" }],
+          },
+        },
+      };
+    });
+
+    await expect(
+      repositoryPRs({ owner: "foo", repo: "bar" }, 2),
+    ).rejects.toThrow("GitHub request failed");
+    expect(calls).toBe(2);
+  });
+
+  test("surfaces a secondary rate limit without advancing pagination", async () => {
+    let calls = 0;
+    const fetchWithRateLimit: typeof fetch = Object.assign(
+      async () => {
+        calls++;
+        return new Response(
+          JSON.stringify({
+            message: "You have exceeded a secondary rate limit. Please wait.",
+            documentation_url:
+              "https://docs.github.com/rest/overview/resources-in-the-rest-api#secondary-rate-limits",
+          }),
+          {
+            status: 403,
+            headers: {
+              "content-type": "application/json",
+              "retry-after": "0",
+            },
+          },
+        );
+      },
+      { preconnect: () => {} },
+    );
+    setOctokit(
+      createOctokit({ token: "test-token", fetch: fetchWithRateLimit }),
+    );
+
+    await expect(
+      repositoryPRs({ owner: "foo", repo: "bar" }, 2),
+    ).rejects.toThrow("secondary rate limit");
+    expect(calls).toBe(1);
   });
 });
 
