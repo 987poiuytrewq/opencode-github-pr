@@ -235,8 +235,8 @@ Set `iconStyle` to `"nerd"` to use Nerd Font glyphs:
 
 | Key | Nerd Font glyph | Code point |
 | --- | --- | --- |
-| `openPR` | `` | `U+EA64` |
-| `mergedPR` | `` | `U+EAFE` |
+| `openPR` | `` | `U+E726` |
+| `mergedPR` | `` | `U+E727` |
 | `review` | `` | `U+F4FF` |
 | `openComment` | `󰅺` | `U+F017A` |
 | `check` | `●` | — |
