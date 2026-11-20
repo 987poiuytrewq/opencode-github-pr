@@ -10,33 +10,37 @@ import type { Octokit as CoreOctokit } from "@octokit/core"
 import type { EndpointDefaults } from "@octokit/types"
 import { throttling } from "@octokit/plugin-throttling"
 import { retry } from "@octokit/plugin-retry"
-import { execFileSync } from "node:child_process"
+import { execFile } from "node:child_process"
 import { errorMessages } from "../domain/messages"
 import { enterpriseApiBaseUrl, enterpriseHostname } from "./github-enterprise"
 const OctokitWithPlugins = Octokit.plugin(throttling, retry)
 
-function readGhAuthToken(hostname?: string): string | undefined {
-  try {
+function readGhAuthToken(hostname?: string): Promise<string | undefined> {
+  return new Promise((resolve) => {
     const args = ["auth", "token"]
     if (hostname) args.push("--hostname", hostname)
-    const token = execFileSync("gh", args, {
+    execFile("gh", args, {
       encoding: "utf8",
-      stdio: ["ignore", "pipe", "ignore"],
+      windowsHide: true,
       timeout: 5_000,
-    }).trim()
-    return token || undefined
-  } catch {
-    return undefined
-  }
+    }, (error, stdout) => {
+      if (error) {
+        resolve(undefined)
+        return
+      }
+      const token = stdout.trim()
+      resolve(token || undefined)
+    })
+  })
 }
 
-export function getAuthToken(
+export async function getAuthToken(
   env: Record<string, string | undefined> = process.env,
-  ghAuthToken: (hostname?: string) => string | undefined = readGhAuthToken,
-): string {
+  ghAuthToken: (hostname?: string) => string | undefined | Promise<string | undefined> = readGhAuthToken,
+): Promise<string> {
   const token = env.GITHUB_TOKEN || env.GH_TOKEN || env.GITHUB_PERSONAL_ACCESS_TOKEN
   if (token) return token
-  const ghToken = ghAuthToken(enterpriseHostname(env.GITHUB_ENTERPRISE_URL) ?? undefined)
+  const ghToken = await ghAuthToken(enterpriseHostname(env.GITHUB_ENTERPRISE_URL) ?? undefined)
   if (ghToken) return ghToken
   throw new Error(errorMessages.noAuthToken)
 }
@@ -97,16 +101,25 @@ let cached: {
   client: Octokit
 } | null = null
 
-export function getOctokit(requestTimeoutMs = 15_000): Octokit {
+export async function getOctokit(
+  requestTimeoutMs = 15_000,
+  resolveToken: () => Promise<string> = getAuthToken,
+): Promise<Octokit> {
   const enterpriseUrl = process.env.GITHUB_ENTERPRISE_URL
   const baseUrl = enterpriseApiBaseUrl(enterpriseUrl)
   if (cached?.baseUrl === baseUrl && cached.requestTimeoutMs === requestTimeoutMs) {
     return cached.client
   }
-  const token = cached?.token ?? getAuthToken()
+  // A token selected for github.com must not be carried across a host change:
+  // gh may have a distinct credential for the enterprise hostname.
+  const token = cached?.baseUrl === baseUrl ? cached.token : await resolveToken()
   const client = createOctokit({ token, requestTimeoutMs, enterpriseUrl })
   cached = { token, requestTimeoutMs, baseUrl, client }
   return client
+}
+
+export function invalidateOctokit(client: Octokit): void {
+  if (cached?.client === client) cached = null
 }
 
 export function setOctokit(client: Octokit | null): void {

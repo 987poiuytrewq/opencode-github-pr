@@ -12,6 +12,7 @@ export type PR = {
   isMerged: boolean
   isClosed: boolean
   headRefName: string
+  headRepositoryOwnerLogin?: string
   authorLogin: string
   assigneeLogins: string[]
   additions: number
@@ -23,6 +24,7 @@ export type PR = {
   statusCheckRollup: { state: string } | null
   checkStatuses: string[] | null
   reviewThreads: Array<{ isResolved: boolean }> | null
+  reviewThreadsTruncated?: boolean
   reviewRequests: Array<
     | { type: "user"; login: string }
     | { type: "team"; slug: string }

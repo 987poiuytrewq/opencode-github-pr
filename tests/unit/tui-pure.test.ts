@@ -68,7 +68,11 @@ describe("status groups", () => {
   test("counts open and resolved review threads", () => {
     expect(commentThreadCounts(makeTUIPR({
       reviewThreads: [{ isResolved: false }, { isResolved: true }, { isResolved: false }],
-    }))).toEqual({ open: 2, resolved: 1 })
+    }))).toEqual({ open: 2, resolved: 1, truncated: false })
+    expect(commentThreadCounts(makeTUIPR({
+      reviewThreads: [{ isResolved: false }],
+      reviewThreadsTruncated: true,
+    }))).toEqual({ open: 1, resolved: 0, truncated: true })
     expect(commentThreadCounts(makeTUIPR({ reviewThreads: null }))).toBeNull()
   })
 })

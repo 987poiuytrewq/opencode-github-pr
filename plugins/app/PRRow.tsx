@@ -56,7 +56,7 @@ function ClickableText(props: {
 
 function ClickableComment(props: {
   icon: string
-  count: number
+  count: number | string
   color: string
   onClick: (target: PRLinkTarget) => void
 }) {
@@ -129,7 +129,8 @@ export function PRRow(props: {
   const comments = () => commentThreadCounts(props.pr)
   const commentStatuses = () => {
     const open = comments()?.open
-    return open ? [{ icon: props.icons.openComment, count: open }] : []
+    const truncated = comments()?.truncated
+    return open ? [{ icon: props.icons.openComment, count: `${open}${truncated ? "+" : ""}` }] : []
   }
 
   return (

@@ -10,7 +10,11 @@ import {
 } from "../../plugins/infra/loader";
 import * as loader from "../../plugins/infra/loader";
 import * as mappers from "../../plugins/infra/mappers";
-import { createOctokit, setOctokit } from "../../plugins/infra/octokit";
+import {
+  createOctokit,
+  getOctokit,
+  setOctokit,
+} from "../../plugins/infra/octokit";
 
 installOctokitMock();
 
@@ -492,6 +496,14 @@ describe("repositoryPRs", () => {
                 title: "Branch PR",
                 state: "OPEN",
                 headRefName: "feature/x",
+                headRepositoryOwner: { login: "foo" },
+              },
+              {
+                number: 9,
+                title: "Fork PR with same branch",
+                state: "OPEN",
+                headRefName: "feature/x",
+                headRepositoryOwner: { login: "contributor" },
               },
             ],
           },
@@ -515,6 +527,72 @@ describe("repositoryPRs", () => {
     });
     expect(captured.query).toContain("headRefName: $head");
     expect(result.prs.map(({ number }) => number)).toEqual([8]);
+  });
+
+  test("invalidates a cached client after a 401 so the next refresh creates a fresh client", async () => {
+    const previousToken = process.env.GITHUB_TOKEN;
+    process.env.GITHUB_TOKEN = "test-refresh-token";
+    const staleClient = {
+      graphql: async () => {
+        throw Object.assign(new Error("Unauthorized"), { status: 401 });
+      },
+    } as any;
+    setOctokit(staleClient);
+
+    try {
+      await expect(
+        repositoryPRs({ owner: "foo", repo: "bar" }, 1),
+      ).rejects.toThrow("Unauthorized");
+      const refreshedClient = await getOctokit();
+      expect(refreshedClient).not.toBe(staleClient);
+    } finally {
+      if (previousToken === undefined) delete process.env.GITHUB_TOKEN;
+      else process.env.GITHUB_TOKEN = previousToken;
+    }
+  });
+
+  test("uses rollup state for truncated contexts and marks truncated review counts", async () => {
+    mockOctokitDefault((op) => {
+      if (op !== "graphql") return null;
+      return {
+        repository: {
+          pullRequests: {
+            pageInfo: { hasNextPage: false },
+            nodes: [
+              {
+                number: 11,
+                title: "Many checks and reviews",
+                state: "OPEN",
+                statusCheckRollup: {
+                  state: "SUCCESS",
+                  contexts: {
+                    totalCount: 101,
+                    nodes: Array.from({ length: 100 }, () => ({
+                      __typename: "CheckRun",
+                      conclusion: "SUCCESS",
+                    })),
+                  },
+                },
+                reviewThreads: {
+                  totalCount: 101,
+                  nodes: Array.from({ length: 100 }, () => ({
+                    isResolved: false,
+                  })),
+                },
+              },
+            ],
+          },
+        },
+      };
+    });
+
+    const result = await repositoryPRs({ owner: "foo", repo: "bar" }, 1);
+    expect(result.prs[0]).toMatchObject({
+      checkStatuses: null,
+      statusCheckRollup: { state: "SUCCESS" },
+      reviewThreadsTruncated: true,
+    });
+    expect(result.prs[0].reviewThreads).toHaveLength(100);
   });
 
   test("stops search-backed listings at GitHub's 1,000-result limit", async () => {
