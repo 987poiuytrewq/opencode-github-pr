@@ -2,7 +2,7 @@
 // Backed by Octokit (REST + GraphQL), which gives us built-in throttling,
 // retry, and timeouts.
 
-import { getOctokit } from "./octokit"
+import { getOctokit, invalidateOctokit } from "./octokit"
 import { type Repo, type PR, type PRScope, type PRStatusFilter } from "../domain/types"
 import { mapPullFromGraphQL } from "./mappers"
 import {
@@ -102,9 +102,11 @@ async function graphqlPartial(
     onLegacyFallback?: () => void
   },
 ): Promise<unknown> {
+  const octokit = await getOctokit(requestTimeoutMs)
   try {
-    return await getOctokit(requestTimeoutMs).graphql(query, vars)
+    return await octokit.graphql(query, vars)
   } catch (e: unknown) {
+    if (isRecord(e) && e.status === 401) invalidateOctokit(octokit)
     if (isRecord(e) && options.fallbackQuery && reportsUnknownPullRequestStatusFields(e)) {
       options.onLegacyFallback?.()
       return graphqlPartial(
@@ -305,7 +307,12 @@ export async function repositoryPRs(
     cursor = nextCursor
     if (consecutiveEmptyPages >= 3) break
   } while (hasNextPage && remainingRecords > 0)
-  const searchPRs = nodes.map(mapPullFromGraphQL)
+  const mappedPRs = nodes.map(mapPullFromGraphQL)
+  const searchPRs = scope === "branch"
+    ? mappedPRs.filter(
+        (pr) => !pr.headRepositoryOwnerLogin || pr.headRepositoryOwnerLogin.toLowerCase() === repo.owner.toLowerCase(),
+      )
+    : mappedPRs
   let supplementalPRs: PR[] = []
   if (isSearch && recentNodes.length > 0 && viewerLogin) {
     const knownNumbers = new Set(searchPRs.map((pr) => pr.number))

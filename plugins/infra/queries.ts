@@ -11,6 +11,7 @@ const PULL_REQUEST_FIELDS_BASE = `fragment DashboardPullRequestFields on PullReq
   isDraft
   state
   headRefName
+  headRepositoryOwner { login }
   author { login }
   assignees(first: 100) {
     nodes { login }
@@ -22,6 +23,7 @@ const PULL_REQUEST_FIELDS_BASE = `fragment DashboardPullRequestFields on PullReq
   statusCheckRollup {
     state
     contexts(first: 100) {
+      totalCount
       nodes {
         __typename
         ... on CheckRun {
@@ -35,6 +37,7 @@ const PULL_REQUEST_FIELDS_BASE = `fragment DashboardPullRequestFields on PullReq
     }
   }
   reviewThreads(first: 100) {
+    totalCount
     nodes {
       isResolved
     }

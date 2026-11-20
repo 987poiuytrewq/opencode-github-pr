@@ -27,7 +27,11 @@ export function mapPullFromGraphQL(value: unknown): PR {
   const assignees = record(p.assignees)
   const rollup = p.statusCheckRollup == null ? null : record(p.statusCheckRollup)
   const contexts = rollup ? record(rollup.contexts) : {}
+  const contextNodes = array(contexts.nodes)
+  const contextTotalCount = number(contexts.totalCount, contextNodes.length)
   const reviewThreads = record(p.reviewThreads)
+  const reviewThreadNodes = array(reviewThreads.nodes)
+  const reviewThreadTotalCount = number(reviewThreads.totalCount, reviewThreadNodes.length)
   const reviewRequests = record(p.reviewRequests)
   const latestReviews = record(p.latestReviews)
   return {
@@ -38,6 +42,7 @@ export function mapPullFromGraphQL(value: unknown): PR {
     isMerged: p.state === "MERGED" || p.merged === true,
     isClosed: p.state === "CLOSED" || p.state === "MERGED" || p.merged === true,
     headRefName: string(p.headRefName),
+    headRepositoryOwnerLogin: string(record(p.headRepositoryOwner).login),
     authorLogin: string(author.login),
     assigneeLogins: array(assignees.nodes)
       .map((assignee) => string(record(assignee).login))
@@ -51,8 +56,12 @@ export function mapPullFromGraphQL(value: unknown): PR {
       ? null
       : string(p.reviewDecision, "UNKNOWN").toUpperCase(),
     statusCheckRollup: rollup ? { state: string(rollup.state, "UNKNOWN") } : null,
-    checkStatuses: Array.isArray(contexts.nodes)
-      ? contexts.nodes
+    // The rollup still captures aggregate CI state when contexts are
+    // truncated, without pretending the first 100 are all of it.
+    checkStatuses: contextTotalCount > contextNodes.length
+      ? null
+      : Array.isArray(contexts.nodes)
+      ? contextNodes
           .map((value) => {
             const context = record(value)
             return context.__typename === "CheckRun"
@@ -62,8 +71,9 @@ export function mapPullFromGraphQL(value: unknown): PR {
           .filter(Boolean)
       : null,
     reviewThreads: Array.isArray(reviewThreads.nodes)
-      ? reviewThreads.nodes.map((thread) => ({ isResolved: record(thread).isResolved === true }))
+      ? reviewThreadNodes.map((thread) => ({ isResolved: record(thread).isResolved === true }))
       : null,
+    reviewThreadsTruncated: reviewThreadTotalCount > reviewThreadNodes.length,
     reviewRequests: array(reviewRequests.nodes)
       .map((node) => record(record(node).requestedReviewer))
       .flatMap<NonNullable<PR["reviewRequests"]>[number]>((reviewer) => {

@@ -50,9 +50,9 @@ describe("GitHub Enterprise configuration", () => {
     )
   })
 
-  test("requests the GitHub CLI token for the configured enterprise host", () => {
+  test("requests the GitHub CLI token for the configured enterprise host", async () => {
     let requestedHostname: string | undefined
-    const token = getAuthToken({ GITHUB_ENTERPRISE_URL: "https://github.example.test" }, (hostname) => {
+    const token = await getAuthToken({ GITHUB_ENTERPRISE_URL: "https://github.example.test" }, (hostname) => {
       requestedHostname = hostname
       return "enterprise-token"
     })

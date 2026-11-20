@@ -14,6 +14,9 @@ describe("GitHub response mappers", () => {
       expect(query).toContain("reviewDecision")
       expect(query).toContain("reviewRequests(first: 100)")
       expect(query).toContain("... on Team { slug }")
+      expect(query).toContain("headRepositoryOwner { login }")
+      expect(query).toContain("contexts(first: 100) {\n      totalCount")
+      expect(query).toContain("reviewThreads(first: 100) {\n    totalCount")
     }
     for (const query of [PULL_REQUESTS_QUERY_LEGACY, PULL_REQUESTS_SEARCH_QUERY_LEGACY]) {
       expect(query).not.toContain("mergeStateStatus")
@@ -28,15 +31,20 @@ describe("GitHub response mappers", () => {
       url: "https://github.com/acme/widgets/pull/12",
       state: "OPEN",
       isDraft: true,
+      headRefName: "feature",
+      headRepositoryOwner: { login: "octocat" },
       author: { login: "octocat" },
       assignees: { nodes: [{ login: "alice" }, {}] },
       mergeStateStatus: "CLEAN",
       reviewDecision: "APPROVED",
       statusCheckRollup: {
         state: "SUCCESS",
-        contexts: { nodes: [{ __typename: "CheckRun", conclusion: "SUCCESS" }] },
+        contexts: {
+          totalCount: 1,
+          nodes: [{ __typename: "CheckRun", conclusion: "SUCCESS" }],
+        },
       },
-      reviewThreads: { nodes: [{ isResolved: false }] },
+      reviewThreads: { totalCount: 1, nodes: [{ isResolved: false }] },
       reviewRequests: { nodes: [
         { requestedReviewer: { login: "bob" } },
         { requestedReviewer: { slug: "frontend" } },
@@ -49,6 +57,7 @@ describe("GitHub response mappers", () => {
       title: "Update widgets",
       isDraft: true,
       authorLogin: "octocat",
+      headRepositoryOwnerLogin: "octocat",
       assigneeLogins: ["alice"],
       mergeStateStatus: "CLEAN",
       reviewDecision: "APPROVED",
@@ -57,6 +66,30 @@ describe("GitHub response mappers", () => {
       reviewRequests: [{ type: "user", login: "bob" }, { type: "team", slug: "frontend" }],
       latestReviews: [{ author: { login: "carol" }, state: "APPROVED" }],
     })
+  })
+
+  test("falls back to rollup checks and marks truncated review thread counts", () => {
+    const pr = mapPullFromGraphQL({
+      statusCheckRollup: {
+        state: "SUCCESS",
+        contexts: {
+          totalCount: 101,
+          nodes: Array.from({ length: 100 }, () => ({
+            __typename: "CheckRun",
+            conclusion: "SUCCESS",
+          })),
+        },
+      },
+      reviewThreads: {
+        totalCount: 101,
+        nodes: Array.from({ length: 100 }, (_, index) => ({ isResolved: index % 2 === 0 })),
+      },
+    })
+
+    expect(pr.checkStatuses).toBeNull()
+    expect(pr.statusCheckRollup).toEqual({ state: "SUCCESS" })
+    expect(pr.reviewThreads).toHaveLength(100)
+    expect(pr.reviewThreadsTruncated).toBe(true)
   })
 
   test("treats malformed external payloads as absent optional data", () => {
@@ -70,6 +103,7 @@ describe("GitHub response mappers", () => {
       assigneeLogins: [],
       checkStatuses: null,
       reviewThreads: null,
+      reviewThreadsTruncated: false,
       reviewRequests: [],
       latestReviews: [],
     })

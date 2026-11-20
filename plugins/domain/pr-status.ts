@@ -82,7 +82,7 @@ export function reviewStatusGroups(pr: PR): StatusGroup[] {
   ]))
 }
 
-export function commentThreadCounts(pr: PR): { open: number; resolved: number } | null {
+export function commentThreadCounts(pr: PR): { open: number; resolved: number; truncated: boolean } | null {
   if (pr.reviewThreads === null) return null
   return pr.reviewThreads.reduce(
     (counts, thread) => {
@@ -90,7 +90,7 @@ export function commentThreadCounts(pr: PR): { open: number; resolved: number } 
       else counts.open++
       return counts
     },
-    { open: 0, resolved: 0 },
+    { open: 0, resolved: 0, truncated: pr.reviewThreadsTruncated === true },
   )
 }
 
