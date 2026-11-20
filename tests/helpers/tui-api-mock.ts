@@ -12,7 +12,11 @@ function color(hex: string) {
 }
 
 const TEST_THEME = {
-  background: { base: color("#161616"), raised: { base: color("#1d1d1d") } },
+  background: {
+    base: color("#161616"),
+    raised: { base: color("#1d1d1d") },
+    action: { primary: { base: color("#a371f7") } },
+  },
   border: { base: color("#3a3a3a") },
   text: {
     base: color("#e5e5e5"),

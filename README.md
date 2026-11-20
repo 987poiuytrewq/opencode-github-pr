@@ -187,7 +187,7 @@ By default, colours come from your active OpenCode theme. Override any of them w
 | `warning` | Pending checks, requested reviews, warnings | Warning text |
 | `error` | Failing checks, requested changes, conflicts, deletions, errors | Error text |
 | `draft` | Draft PR icon | Muted text |
-| `merged` | Merged PR icon | Primary action text |
+| `merged` | Merged PR icon | Primary action background |
 
 Colour and icon overrides go inside the plugin entry's `options`, next to the other options:
 

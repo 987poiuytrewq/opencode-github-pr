@@ -56,7 +56,7 @@ export function skin(t: ResolvedTheme, overrides: Partial<Skin> = {}): Skin {
     warning: toHex(t.text.feedback.warning.base),
     error: toHex(t.text.feedback.error.base),
     draft: toHex(t.text.muted),
-    merged: toHex(t.text.action.primary.base),
+    merged: toHex(t.background.action.primary.base),
     ...overrides,
   }
 }
