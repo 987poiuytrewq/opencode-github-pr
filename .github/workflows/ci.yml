@@ -43,3 +43,32 @@ jobs:
       - name: Show OpenCode plugin diagnostics
         if: failure()
         run: make ci-debug
+
+  packed-install:
+    name: Test packed npm installation
+    runs-on: ubuntu-latest
+    env:
+      OPENCODE_VERSION: "2.3.2"
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Set up Bun
+        uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: 1.4.4
+
+      - name: Install package dependencies
+        run: make install
+
+      - name: Install E2E system tools
+        run: make ci-tools
+
+      - name: Verify OpenCode version
+        run: |
+          version="$(opencode --version)"
+          echo "$version"
+          [[ "$version" == *"$OPENCODE_VERSION"* ]]
+
+      - name: Run packed-install E2E
+        run: make test-e2e-packed

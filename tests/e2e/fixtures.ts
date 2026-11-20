@@ -67,6 +67,13 @@ export async function makeTempRepo(opts: {
 export async function startOpenCodeE2ESession(
   repo: TempRepo,
   name: string,
+  options: {
+    cwd?: string
+    demo?: boolean
+    homeDir?: string
+    nodePath?: string
+    registryUrl?: string
+  } = {},
 ): Promise<OpenCodeE2ESession> {
   const portProbe = createServer()
   await new Promise<void>((resolve, reject) => {
@@ -80,7 +87,7 @@ export async function startOpenCodeE2ESession(
 
   const serverUrl = `http://127.0.0.1:${port}`
   const serverPassword = "e2e-local-only"
-  const e2eHome = mkdtempSync(join(tmpdir(), "opencode-e2e-home-"))
+  const e2eHome = options.homeDir ?? mkdtempSync(join(tmpdir(), "opencode-e2e-home-"))
   const e2eEnvironment = {
     // Do not pass a developer's credentials into test processes. If the
     // GitHub API boundary is crossed unexpectedly, auth fails closed.
@@ -89,16 +96,25 @@ export async function startOpenCodeE2ESession(
     GITHUB_PERSONAL_ACCESS_TOKEN: "",
     HOME: e2eHome,
     XDG_CONFIG_HOME: join(e2eHome, ".config"),
+    OPENCODE_DISABLE_UPDATE: "1",
+    ...(options.demo ? { OPENCODE_GITHUB_PR_DEMO: "1" } : {}),
+    ...(options.registryUrl
+      ? {
+          npm_config_registry: options.registryUrl,
+          npm_config_legacy_peer_deps: "true",
+          BUN_CONFIG_REGISTRY: options.registryUrl,
+          ...(options.nodePath ? { NODE_PATH: options.nodePath } : {}),
+        }
+      : {}),
   }
   const serverEnv = {
     ...process.env,
     ...e2eEnvironment,
-    OPENCODE_DISABLE_UPDATE: "1",
     OPENCODE_PASSWORD: serverPassword,
     OPENCODE_SERVER_PASSWORD: serverPassword,
   }
   const server = spawn([OPENCODE_BIN, "serve", "--log-level", "debug", "--hostname", "127.0.0.1", "--port", String(port)], {
-    cwd: resolve(import.meta.dir, "../.."),
+    cwd: options.cwd ?? resolve(import.meta.dir, "../.."),
     env: serverEnv,
     stdout: "ignore",
     stderr: "ignore",
@@ -155,13 +171,12 @@ export async function startOpenCodeE2ESession(
       name,
       cols: 140,
       rows: 40,
-      cwd: resolve(import.meta.dir, "../.."),
+      cwd: options.cwd ?? resolve(import.meta.dir, "../.."),
       env: {
         OPENCODE_PASSWORD: serverPassword,
         OPENCODE_SERVER_PASSWORD: serverPassword,
         TERM: "xterm-256color",
         NO_COLOR: "1",
-        OPENCODE_DISABLE_UPDATE: "1",
         ...e2eEnvironment,
       },
       command: [OPENCODE_BIN, "--server", serverUrl, "--session", sessionID],
