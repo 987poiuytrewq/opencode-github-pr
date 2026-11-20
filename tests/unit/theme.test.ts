@@ -14,9 +14,10 @@ function color(hex: string) {
 }
 
 describe("skin", () => {
-  test("uses the primary interactive hue for merged PRs", () => {
+  test("uses the theme's info colour for merged PRs", () => {
     const primaryText = "#123abc"
     const primaryHue = "#5ea8f5"
+    const infoText = "#56b6c2"
     const theme = {
       hue: {
         interactive: { 200: color(primaryHue) },
@@ -35,10 +36,12 @@ describe("skin", () => {
           success: { base: color("#5fbf5f") },
           warning: { base: color("#d8a657") },
           error: { base: color("#d86565") },
+          info: { base: color(infoText) },
         },
       },
     } as ResolvedTheme
 
-    expect(skin(theme).merged).toBe(primaryHue)
+    expect(skin(theme).merged).toBe(infoText)
+    expect(skin(theme, { merged: "#8250df" }).merged).toBe("#8250df")
   })
 })

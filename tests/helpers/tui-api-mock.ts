@@ -29,6 +29,7 @@ const TEST_THEME = {
       success: { base: color("#5fbf5f") },
       warning: { base: color("#d8a657") },
       error: { base: color("#d86565") },
+      info: { base: color("#56b6c2") },
     },
   },
 }

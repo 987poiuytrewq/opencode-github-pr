@@ -199,7 +199,7 @@ describe("DashboardView render", () => {
     expect(frame).toContain(`${icons.mergedPR} Merged feature`)
     const mergedIcon = r.captureSpans().lines.flatMap((line) => line.spans)
       .find((span) => span.text.includes(icons.mergedPR))
-    expect(mergedIcon?.fg?.toInts()).toEqual([94, 168, 245, 255])
+    expect(mergedIcon?.fg?.toInts()).toEqual([86, 182, 194, 255])
     expect(frame).toContain("#42 +17 -4")
     expect(frame).toContain(icons.check)
     expect(frame).not.toContain(`${icons.openComment}0`)
