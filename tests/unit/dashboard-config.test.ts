@@ -3,9 +3,9 @@ import { dashboardOptions, DEFAULT_ICONS, UNICODE_ICONS } from "../../plugins/ap
 import { DEFAULT_SKIN } from "../../plugins/app/theme"
 
 describe("dashboard options", () => {
-  test("uses Nerd Font Codicons when Nerd Font style is selected", () => {
-    expect(DEFAULT_ICONS.openPR).toBe("")
-    expect(DEFAULT_ICONS.mergedPR).toBe("")
+  test("uses distinct Nerd Font PR icons when Nerd Font style is selected", () => {
+    expect(DEFAULT_ICONS.openPR).toBe("")
+    expect(DEFAULT_ICONS.mergedPR).toBe("")
     expect(dashboardOptions({ iconStyle: "nerd" }).iconStyle).toBe("nerd")
   })
 
