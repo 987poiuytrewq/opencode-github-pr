@@ -52,6 +52,37 @@ describe("V2 TUI plugin setup", () => {
     cleanup?.()
   })
 
+  test("registers one keymap across app slot renders and disposes it on reload", async () => {
+    const { api, registry } = createMockTuiApi()
+    let keymapDisposals = 0
+    ;(api as any).keymap.layer = (factory: () => unknown) => {
+      const layer = factory()
+      registry.keymaps.push(layer)
+      return () => {
+        keymapDisposals++
+        const index = registry.keymaps.indexOf(layer)
+        if (index >= 0) registry.keymaps.splice(index, 1)
+      }
+    }
+
+    for (let reload = 0; reload < 2; reload++) {
+      const cleanup = await plugin.setup(api)
+      const appSlot = registry.slots.find((slot) => slot.append === "app")
+      appSlot.render({})
+      appSlot.render({})
+      appSlot.render({})
+
+      expect(registry.keymaps).toHaveLength(1)
+      expect(registry.events).toHaveLength(1)
+      cleanup?.()
+      expect(registry.keymaps).toHaveLength(0)
+      expect(registry.events).toHaveLength(0)
+      expect(registry.slots).toHaveLength(0)
+    }
+
+    expect(keymapDisposals).toBe(2)
+  })
+
   test("subscribes to session idle and cleans up its subscription", async () => {
     const { api, registry } = createMockTuiApi()
     const cleanup = await plugin.setup(api)

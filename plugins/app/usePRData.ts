@@ -168,8 +168,16 @@ export function useDashboard(
           }))
           return
         }
-        const result = await timeoutRace(requestTimeoutMs, () =>
-          repositoryPRs(repo, pageBatchSize, requestTimeoutMs, listing, null, scope, scopeValue, 0, recentPRsLimit),
+        const result = await repositoryPRs(
+          repo,
+          pageBatchSize,
+          requestTimeoutMs,
+          listing,
+          null,
+          scope,
+          scopeValue,
+          0,
+          recentPRsLimit,
         )
         if (isStale()) return
         setState((s) => ({
@@ -266,18 +274,16 @@ export function useDashboard(
 
     const promise = (async () => {
       try {
-        const result = await timeoutRace(requestTimeoutMs, () =>
-          repositoryPRs(
-            repo,
-            pageBatchSize,
-            requestTimeoutMs,
-            listing,
-            cursor,
-            scope,
-            scopeValue,
-            before.pagination.searchResultsFetched,
-            recentPRsLimit,
-          ),
+        const result = await repositoryPRs(
+          repo,
+          pageBatchSize,
+          requestTimeoutMs,
+          listing,
+          cursor,
+          scope,
+          scopeValue,
+          before.pagination.searchResultsFetched,
+          recentPRsLimit,
         )
         setState((s) => {
           const sameRepo = s.repo?.owner === repo.owner && s.repo.repo === repo.repo
@@ -341,16 +347,4 @@ export function useDashboard(
   }
 
   return { refresh, loadMore }
-}
-
-function timeoutRace<T>(ms: number, fn: () => Promise<T>): Promise<T> {
-  return new Promise<T>((resolve, reject) => {
-    const timer = setTimeout(() => {
-      reject(new Error(`Operation timed out after ${ms / 1000}s`))
-    }, ms)
-    fn().then(
-      (val) => { clearTimeout(timer); resolve(val) },
-      (err) => { clearTimeout(timer); reject(err) },
-    )
-  })
 }

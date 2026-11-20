@@ -12,7 +12,9 @@ import {
 } from "../helpers/graphql-mock"
 import { createMockTuiApi } from "../helpers/tui-api-mock"
 import { createDashboard } from "../helpers/dashboard-fixture"
-import { DashboardStatus } from "../../plugins/domain/types"
+import { createSignal } from "solid-js"
+import { DashboardStatus, type DashboardState } from "../../plugins/domain/types"
+import { useDashboard } from "../../plugins/app/usePRData"
 
 describe("useDashboard reentrancy and cancellation", () => {
   beforeEach(() => {
@@ -58,22 +60,20 @@ describe("useDashboard reentrancy and cancellation", () => {
     }
   })
 
-  test("a slow first refresh that errors does not clobber a fast successful second refresh", async () => {
+  test("a per-request timeout does not clobber a successful subsequent refresh", async () => {
     const cwd = makeFakeRepo()
     const origCwd = process.cwd()
     process.chdir(cwd)
     try {
       let callIndex = 0
-      // First PR-search call hangs forever (will time out). Once it times
-      // out, the reentrancy guard releases and any subsequent refresh sees
-      // a fresh attempt. We then verify that the second refresh succeeds and
-      // lands the state in "ok".
       mockOctokitOp("graphql", async (params) => {
         const query: string = params?.query ?? ""
-        if (query.includes("query Viewer")) return { viewer: { login: "octocat" } }
         if (query.includes("pullRequests(")) {
           callIndex++
-          if (callIndex === 1) return new Promise(() => {})
+          if (callIndex === 1) {
+            await new Promise((resolve) => setTimeout(resolve, 10))
+            throw Object.assign(new Error("Request timed out"), { status: 408 })
+          }
           return makeSearchResponse(1)
         }
         return makeThreadCountResponse()
@@ -81,20 +81,79 @@ describe("useDashboard reentrancy and cancellation", () => {
       const { api } = createMockTuiApi()
       const { state, refresh } = createDashboard(api)
 
-      // Wait for the first refresh to time out. timeoutRace is 15s; with
-      // a tick or two of buffer, the in-flight promise resolves with error.
-      for (let i = 0; i < 1700; i++) {
-        if (state().status === DashboardStatus.Error) break
+      for (let i = 0; i < 50 && state().status !== DashboardStatus.Error; i++) {
         await new Promise((r) => setTimeout(r, 10))
       }
       expect(state().status).toBe(DashboardStatus.Error)
 
-      // Now a fresh refresh should run (call #2) and succeed.
       await refresh()
       expect(state().status).toBe(DashboardStatus.Ok)
       expect(state().prs.length).toBe(1)
+      expect(callIndex).toBe(2)
     } finally {
       process.chdir(origCwd)
     }
-  }, 25_000)
+  })
+
+  test("a multi-page batch can exceed the per-request timeout in aggregate", async () => {
+    const cwd = makeFakeRepo()
+    const originalCwd = process.cwd()
+    process.chdir(cwd)
+    try {
+      let pageCalls = 0
+      const requestDurations: number[] = []
+      mockOctokitOp("graphql", async (request) => {
+        const query: string = request?.query ?? ""
+        if (!query.includes("pullRequests(")) return makeThreadCountResponse()
+
+        pageCalls++
+        const startedAt = Date.now()
+        await new Promise((resolve) => setTimeout(resolve, 3_900))
+        requestDurations.push(Date.now() - startedAt)
+        const response: any = makeSearchResponse(1)
+        response.repository.pullRequests.nodes[0].number = pageCalls
+        response.repository.pullRequests.pageInfo = {
+          hasNextPage: pageCalls < 4,
+          endCursor: `cursor-${pageCalls}`,
+        }
+        return response
+      })
+
+      const { api } = createMockTuiApi()
+      const [state, setState] = createSignal<DashboardState>({
+        status: DashboardStatus.Loading,
+        repo: null,
+        prs: [],
+        currentBranch: null,
+        viewerLogin: null,
+        fetchedAt: null,
+        pagination: {
+          listing: "open",
+          scope: "all",
+          scopeValue: null,
+          cursor: null,
+          hasMore: false,
+          totalCount: null,
+          pagesLoaded: 0,
+          searchResultsFetched: 0,
+          supplementalPRCount: 0,
+          loading: false,
+          limitReached: false,
+        },
+      })
+      const dashboard = useDashboard(api, state, setState, 15_000, 4, () => "open", () => "all", 1)
+      const startedAt = Date.now()
+      await dashboard.refresh()
+
+      expect(Date.now() - startedAt).toBeGreaterThanOrEqual(15_000)
+      expect(requestDurations).toHaveLength(4)
+      expect(requestDurations.every((duration) => duration < 15_000)).toBe(true)
+      expect(pageCalls).toBe(4)
+      expect(state().status).toBe(DashboardStatus.Ok)
+      expect(state().prs.map((pr) => pr.number)).toEqual([1, 2, 3, 4])
+      expect(state().pagination.pagesLoaded).toBe(4)
+    } finally {
+      process.chdir(originalCwd)
+    }
+  }, 20_000)
 })

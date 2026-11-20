@@ -127,14 +127,14 @@ describe("useDashboard initialization", () => {
     }
   })
 
-  test("transitions to error on timeout when fetchPRs hangs", async () => {
+  test("transitions to error when Octokit reports a per-request timeout", async () => {
     const cwd = makeFakeRepo()
     const origCwd = process.cwd()
     process.chdir(cwd)
     try {
       mockOctokitDefault((op) => {
         if (op === "graphql") {
-          return new Promise(() => {})
+          throw Object.assign(new Error("Request timed out"), { status: 408 })
         }
         return null
       })
@@ -149,8 +149,9 @@ describe("useDashboard initialization", () => {
 
       expect(state().status).toBe(DashboardStatus.Error)
       expect(state().error).toMatch(/timed out/i)
+      expect(state().errorKind).toBe("timeout")
     } finally {
       process.chdir(origCwd)
     }
-  }, 20_000)
+  })
 })

@@ -152,47 +152,51 @@ async function setup(api: TuiPluginContext) {
   // OpenCode 2.0 provides Keymap.Provider through the TUI's Solid render
   // context. Register this from a slot render rather than setup so the
   // provider is present on early V2 host releases as well.
+  let unregisterKeymap: (() => void) | undefined
   const unregisterKeymapSlot = api.ui.slot({
     append: "app",
     render: () => {
-      api.keymap.layer(() => ({
-        mode: "global",
-        commands: [
-          {
-            id: command.refresh,
-            title: "PRs: Refresh dashboard",
-            group: "PR Dashboard",
-            palette: true,
-            slash: { name: "pr-refresh" },
-            run() {
-              void dash.refresh().then(() => {
-                const current = state()
-                if (current.errorKind === "rate-limit") {
-                  api.ui.toast.show({
-                    variant: "info",
-                    message: `PR refresh paused: ${current.error ?? "rate limit active"}`,
-                    duration: 5000,
-                  })
-                  return
-                }
-                api.ui.toast.show({ variant: "info", message: "Refreshing PRs…", duration: 1200 })
-              })
+      if (!unregisterKeymap) {
+        const keymapLayer = api.keymap.layer(() => ({
+          mode: "global",
+          commands: [
+            {
+              id: command.refresh,
+              title: "PRs: Refresh dashboard",
+              group: "PR Dashboard",
+              palette: true,
+              slash: { name: "pr-refresh" },
+              run() {
+                void dash.refresh().then(() => {
+                  const current = state()
+                  if (current.errorKind === "rate-limit") {
+                    api.ui.toast.show({
+                      variant: "info",
+                      message: `PR refresh paused: ${current.error ?? "rate limit active"}`,
+                      duration: 5000,
+                    })
+                    return
+                  }
+                  api.ui.toast.show({ variant: "info", message: "Refreshing PRs…", duration: 1200 })
+                })
+              },
             },
-          },
-          {
-            id: command.open,
-            title: "PRs: Open selected in browser",
-            group: "PR Dashboard",
-            palette: true,
-            slash: { name: "pr-open" },
-            enabled: () => visiblePRs().length > 0,
-            run() {
-              const pr = visiblePRs()[selectedIdx()]
-              if (pr) void actions.openPR(pr.number)
+            {
+              id: command.open,
+              title: "PRs: Open selected in browser",
+              group: "PR Dashboard",
+              palette: true,
+              slash: { name: "pr-open" },
+              enabled: () => visiblePRs().length > 0,
+              run() {
+                const pr = visiblePRs()[selectedIdx()]
+                if (pr) void actions.openPR(pr.number)
+              },
             },
-          },
-        ],
-      }))
+          ],
+        }))
+        if (typeof keymapLayer === "function") unregisterKeymap = keymapLayer
+      }
       return null
     },
   })
@@ -209,6 +213,7 @@ async function setup(api: TuiPluginContext) {
     stopOnIdle()
     unregisterSlot()
     unregisterKeymapSlot()
+    unregisterKeymap?.()
   }
 }
 
