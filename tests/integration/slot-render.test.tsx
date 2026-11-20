@@ -7,13 +7,28 @@ import { createMockTuiApi } from "../helpers/tui-api-mock"
 const plugin_mod = await import("../../plugins/pr-dashboard.tui")
 const plugin = plugin_mod.default
 
+const renderers: Array<Awaited<ReturnType<typeof testRender>>> = []
+const pluginCleanups: Array<() => void> = []
+
+async function trackedTestRender(...args: Parameters<typeof testRender>) {
+  const renderer = await testRender(...args)
+  renderers.push(renderer)
+  return renderer
+}
+
 describe("slot render: sidebar_content produces visible output", () => {
   beforeEach(() => {
     installOctokitMock()
   })
 
-  afterEach(() => {
-    clearOctokitMocks()
+  afterEach(async () => {
+    const mountedRenderers = renderers.splice(0)
+    try {
+      await Promise.all(mountedRenderers.map((renderer) => renderer.dispose()))
+    } finally {
+      for (const cleanup of pluginCleanups.splice(0)) cleanup()
+      clearOctokitMocks()
+    }
   })
 
   test("slot renders Pull Requests header with current branch data", async () => {
@@ -32,6 +47,7 @@ describe("slot render: sidebar_content produces visible output", () => {
 
       const { api, registry } = createMockTuiApi()
       const cleanup = await plugin.setup(api)
+      if (cleanup) pluginCleanups.push(cleanup)
 
       expect(registry.slots.some((slot) => slot.append === "sidebar.content")).toBe(true)
       expect(registry.slots[0].append).toBe("sidebar.content")
@@ -41,7 +57,7 @@ describe("slot render: sidebar_content produces visible output", () => {
       const ctx = { theme: api.theme }
       const props = { session_id: "test-session" }
 
-      const r = await testRender(
+      const r = await trackedTestRender(
         () => slotFn(ctx, props),
         { width: 50, height: 20 },
       )
@@ -49,7 +65,6 @@ describe("slot render: sidebar_content produces visible output", () => {
       await r.flush()
       const frame = r.captureCharFrame()
       expect(frame).toContain("Pull Requests")
-      cleanup?.()
     } finally {
       process.chdir(origCwd)
     }
@@ -58,19 +73,19 @@ describe("slot render: sidebar_content produces visible output", () => {
   test("slot renders Pull Requests header even with NoRepo", async () => {
     const { api, registry } = createMockTuiApi()
     const cleanup = await plugin.setup(api)
+    if (cleanup) pluginCleanups.push(cleanup)
 
     const slotFn = registry.slots[0].slots.sidebar_content
     const ctx = { theme: api.theme }
     const props = { session_id: "test-session" }
 
-    const r = await testRender(
+    const r = await trackedTestRender(
       () => slotFn(ctx, props),
       { width: 50, height: 20 },
     )
     await r.flush()
     const frame = r.captureCharFrame()
     expect(frame).toContain("Pull Requests")
-    cleanup?.()
   })
 
   test("slot does not render a filter label", async () => {
@@ -89,19 +104,19 @@ describe("slot render: sidebar_content produces visible output", () => {
 
       const { api, registry } = createMockTuiApi()
       const cleanup = await plugin.setup(api)
+      if (cleanup) pluginCleanups.push(cleanup)
 
       const slotFn = registry.slots[0].slots.sidebar_content
       const ctx = { theme: api.theme }
       const props = { session_id: "test-session" }
 
-      const r = await testRender(
+      const r = await trackedTestRender(
         () => slotFn(ctx, props),
         { width: 50, height: 20 },
       )
       await r.flush()
       const frame = r.captureCharFrame()
       expect(frame).not.toContain("author:@me")
-      cleanup?.()
     } finally {
       process.chdir(origCwd)
     }

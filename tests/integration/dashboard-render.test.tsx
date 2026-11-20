@@ -1,13 +1,27 @@
 /** @jsxImportSource @opentui/solid */
-import { describe, expect, test } from "bun:test"
+import { afterEach, describe, expect, test } from "bun:test"
 import { createSignal } from "solid-js"
-import { testRender } from "@opentui/solid"
+import { testRender as createTestRenderer } from "@opentui/solid"
 import type { DashboardState, PRScope, PRStatusFilter, PRLinkTarget } from "../../plugins/domain/types"
 import { DashboardView } from "../../plugins/app/DashboardView"
 import { dashboardOptions } from "../../plugins/app/config"
 import { makeTUIPR } from "../helpers/tui-fixtures"
 import { createMockTuiApi } from "../helpers/tui-api-mock"
 import { loadingState, okState, noRepoState, errorState } from "../helpers/state-fixtures"
+
+const renderers: Array<Awaited<ReturnType<typeof createTestRenderer>>> = []
+
+async function testRender(...args: Parameters<typeof createTestRenderer>) {
+  const renderer = await createTestRenderer(...args)
+  renderers.push(renderer)
+  return renderer
+}
+
+afterEach(async () => {
+  const mountedRenderers = renderers.splice(0)
+  await Promise.all(mountedRenderers.map((renderer) => renderer.dispose()))
+})
+
 async function renderState(state: DashboardState, handlers: Partial<{
   onOpen: (n: number, target?: PRLinkTarget) => void
   onCycleScope: () => void
@@ -249,7 +263,6 @@ describe("DashboardView render", () => {
 
     expect(captureFrame(r)).toContain("Loading all PRs")
     expect(captureFrame(r)).not.toContain("Loading open PRs")
-    await r.dispose()
   })
 
   test("resets to the first page when scope changes", async () => {
@@ -305,7 +318,6 @@ describe("DashboardView render", () => {
     expect(pagerY).toBeGreaterThanOrEqual(0)
     expect(frame).toContain("First PR")
     expect(frame).not.toContain("Second PR")
-    await r.dispose()
   })
 
   test("updates theme-derived colors without recreating the dashboard", async () => {
@@ -345,7 +357,6 @@ describe("DashboardView render", () => {
 
     expect(headingBefore?.fg?.toInts()).toEqual([229, 229, 229, 255])
     expect(headingAfter?.fg?.toInts()).toEqual([136, 136, 136, 255])
-    await r.dispose()
   })
 
   test("updates PR-row icon colors when the theme changes", async () => {
@@ -390,7 +401,6 @@ describe("DashboardView render", () => {
     await r.flush()
 
     expect(iconColor()).toEqual([216, 101, 101, 255])
-    await r.dispose()
   })
 
   test("merged PR uses the merged icon and displays change totals", async () => {
@@ -484,7 +494,6 @@ describe("DashboardView render", () => {
 
     expect(titleLine).toContain("A very long pull…")
     expect(titleLine?.length).toBeLessThanOrEqual(24)
-    await r.dispose()
   })
 
   test("updates title width on terminal resize", async () => {
