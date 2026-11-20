@@ -19,6 +19,8 @@ const PULL_REQUEST_FIELDS = `fragment DashboardPullRequestFields on PullRequest 
   deletions
   baseRefName
   mergeable
+  mergeStateStatus
+  reviewDecision
   statusCheckRollup {
     state
     contexts(first: 100) {
@@ -39,7 +41,7 @@ const PULL_REQUEST_FIELDS = `fragment DashboardPullRequestFields on PullRequest 
       isResolved
     }
   }
-  reviewRequests(first: 5) {
+  reviewRequests(first: 100) {
     nodes {
       requestedReviewer {
         ... on User { login }

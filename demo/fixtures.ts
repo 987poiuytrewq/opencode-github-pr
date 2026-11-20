@@ -21,6 +21,8 @@ function demoPR(overrides: Partial<PR> & Pick<PR, "number" | "title">): PR {
     deletions: 18,
     baseRefName: "main",
     mergeable: "MERGEABLE",
+    mergeStateStatus: "CLEAN",
+    reviewDecision: null,
     statusCheckRollup: { state: "SUCCESS" },
     checkStatuses: ["SUCCESS"],
     reviewThreads: [],

@@ -48,6 +48,10 @@ export function mapPullFromGraphQL(value: unknown): PR {
     deletions: number(p.deletions),
     baseRefName: string(p.baseRefName),
     mergeable: string(p.mergeable, "UNKNOWN").toUpperCase(),
+    mergeStateStatus: string(p.mergeStateStatus, "UNKNOWN").toUpperCase(),
+    reviewDecision: p.reviewDecision === null
+      ? null
+      : string(p.reviewDecision, "UNKNOWN").toUpperCase(),
     statusCheckRollup: rollup ? { state: string(rollup.state, "UNKNOWN") } : null,
     checkStatuses: Array.isArray(contexts.nodes)
       ? contexts.nodes
@@ -99,6 +103,8 @@ export function mapPullFromREST(value: unknown): PR {
     deletions: number(p.deletions),
     baseRefName: string(base.ref),
     mergeable: p.mergeable === true ? "MERGEABLE" : p.mergeable === false ? "CONFLICTING" : "UNKNOWN",
+    mergeStateStatus: "UNKNOWN",
+    reviewDecision: null,
     statusCheckRollup: null,
     checkStatuses: null,
     reviewThreads: null,

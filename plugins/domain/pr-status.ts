@@ -6,15 +6,17 @@ import type { PR } from "./types"
 export type StatusCategory = "pass" | "fail" | "pending" | "neutral" | "none"
 export type StatusGroup = { status: StatusCategory; count: number }
 
-// Row color: draft → grey, merge conflict → red, ready to merge → green,
-// otherwise → "default" (white/text).
-export function classifyRowState(pr: PR): "draft" | "blocked" | "ready" | "default" {
-  if (pr.isDraft) return "draft"
-  if (pr.mergeable === "CONFLICTING") return "blocked"
-  const ci = classifyCI(pr)
-  const r = reviewSummary(pr)
-  if (ci === "pass" && r.changes === 0) return "ready"
-  return "default"
+export function mergeReadiness(pr: PR): StatusCategory {
+  if (pr.mergeStateStatus === "DIRTY") return "fail"
+  if (pr.mergeStateStatus === "CLEAN") {
+    if (pr.reviewDecision === null || pr.reviewDecision === "APPROVED") return "pass"
+    if (pr.reviewDecision === "REVIEW_REQUIRED" || pr.reviewDecision === "CHANGES_REQUESTED") {
+      return "pending"
+    }
+    return "neutral"
+  }
+  if (["BLOCKED", "BEHIND", "UNSTABLE"].includes(pr.mergeStateStatus)) return "pending"
+  return "none"
 }
 
 export function classifyCI(pr: PR): "pass" | "fail" | "pending" | "none" {
@@ -98,30 +100,24 @@ export function reviewSummary(pr: PR): {
   changes: number
   pending: number
   commented: number
-  approvedLogins: string[]
-  changesLogins: string[]
-  pendingLogins: string[]
-  commentedLogins: string[]
 } {
+  const pendingLogins = new Set(
+    (pr.reviewRequests ?? []).map((r) => r.login.toLowerCase()).filter(Boolean),
+  )
   const approved = new Set<string>()
   const changes = new Set<string>()
   const commented = new Set<string>()
   for (const r of pr.latestReviews ?? []) {
     const login = r.author?.login
-    if (!login) continue
+    if (!login || pendingLogins.has(login.toLowerCase())) continue
     if (r.state === "APPROVED") approved.add(login)
     else if (r.state === "CHANGES_REQUESTED") changes.add(login)
     else if (r.state === "COMMENTED") commented.add(login)
   }
-  const pendingLogins = (pr.reviewRequests ?? []).map((r) => r.login).filter(Boolean)
   return {
     approved: approved.size,
     changes: changes.size,
-    pending: pendingLogins.length,
+    pending: pendingLogins.size,
     commented: commented.size,
-    approvedLogins: Array.from(approved),
-    changesLogins: Array.from(changes),
-    pendingLogins,
-    commentedLogins: Array.from(commented),
   }
 }

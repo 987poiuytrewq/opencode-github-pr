@@ -18,6 +18,8 @@ export type PR = {
   deletions: number
   baseRefName: string
   mergeable: string
+  mergeStateStatus: string
+  reviewDecision: string | null
   statusCheckRollup: { state: string } | null
   checkStatuses: string[] | null
   reviewThreads: Array<{ isResolved: boolean }> | null

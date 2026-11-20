@@ -15,6 +15,8 @@ export function makeTUIPR(overrides: Partial<PR> = {}): PR {
     deletions: 8,
     baseRefName: "main",
     mergeable: "MERGEABLE",
+    mergeStateStatus: "CLEAN",
+    reviewDecision: null,
     statusCheckRollup: null,
     checkStatuses: null,
     reviewThreads: [],
