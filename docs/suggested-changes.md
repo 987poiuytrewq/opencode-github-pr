@@ -1,105 +1,96 @@
 # Suggested changes
 
-These findings come from a review of v0.2.0, based on commit `3d40978`. They are listed with the most important
-first.
+These findings come from a review of v0.2.0, based on commit `5c96e59`. That commit includes the fixes from
+`opencode-github-pr#59`, `#60` and `#61`. When the review was done, typecheck passed, along with 91 unit tests and
+99 integration tests. The end-to-end tests weren't run.
 
-## 1. Report errors for inaccessible repositories instead of an empty list
+## Fixed since the previous review
 
-**Where:** `plugins/infra/loader.ts`, `graphqlPartial`
+- **Inaccessible repositories now show an error.** They used to show an empty list. `graphqlPartial` now rethrows
+  root-level `NOT_FOUND`, `FORBIDDEN` and `RATE_LIMITED` errors.
+- **Long primary rate limits now reach the dashboard.** The throttling plugin only retries waits of 5 seconds or
+  less, and scheduled refreshes stop until the limit resets.
+- **The secondary rate-limit message uses the right time.** It now comes from `retry-after`.
+- **The PR icon colour comes from `mergeStateStatus` and `reviewDecision`.**
+- **Re-requested reviewers are counted once,** and `reviewRequests` is raised to 100.
+- **The palette is reactive.** The page also resets when the scope changes, and the loading and sign-in messages are
+  fixed.
+- **Most of the unused code is removed.**
 
-**Problem:** GitHub's GraphQL API returns HTTP 200 even when the repository can't be read. The response carries
-`data.repository: null` and an error of type `NOT_FOUND` or `FORBIDDEN`, for example when an organisation enforces
-SAML SSO and the token isn't authorised. `graphqlPartial` returns `e.data` whenever it's present, so this is treated
-as a successful, empty page. The panel says **No matching PRs**. The README's **Repo not found** and **Permission
-denied** messages never appear for these cases, because the error classification relies on HTTP status codes that
-GraphQL doesn't use.
+The open items are below, most important first.
 
-This was reproduced by mocking that response and calling `repositoryPRs`. It returned `prs: []` and no error.
+## 1. Filter changes during a rate limit show "Loading" until the limit resets
 
-**Suggested fix:** In `graphqlPartial`, rethrow when `data.repository` is null, or when any error's `path` starts
-with `repository` or `search`. Map the GraphQL error `type` (`NOT_FOUND`, `FORBIDDEN`, `RATE_LIMITED`) in
-`prListErrorKind`. Keep returning partial data only for errors on nested fields. Add an integration test for both
-the `NOT_FOUND` and SAML `FORBIDDEN` responses.
+**Where:** `plugins/app/usePRData.ts` (`refresh` and `loadMore`) and `plugins/pr-dashboard.tui.tsx`
 
-## 2. Don't let the throttling plugin wait out a primary rate limit
+**Problem:** While a primary rate limit is active, `refresh()` returns straight away without changing state. If the
+user then clicks the scope or status filter, the filter changes but the loaded list stays tagged with the old
+filter. `DashboardView` sees that they don't match, so it hides the list and shows **Loading author PRs** (or
+similar) next to the rate-limit error. This can last up to an hour. `/pr-refresh` also shows a "Refreshing PRs…"
+toast but does nothing. This comes from reading the code and hasn't been reproduced.
 
-**Where:** `plugins/infra/octokit.ts` (`onRateLimit`) and `plugins/app/usePRData.ts` (`timeoutRace`)
+**Suggested fix:** When `primaryLimitActive()` is true, still update `pagination.listing`, `scope` and `scopeValue`
+for a filter change. Re-filter the PRs already loaded, or show the rate-limit message in place of the list instead
+of "Loading". Make `/pr-refresh` show a toast that includes the reset time instead of "Refreshing PRs…".
 
-**Problem:** `onRateLimit` returns `true` for the first two hits, which tells `@octokit/plugin-throttling` to wait
-`retryAfter` seconds and retry. For a primary rate limit, that wait can be most of an hour. The outer
-`timeoutRace` gives up after 15 seconds, so the panel shows **Request timed out** instead of **Rate limit
-exceeded**. Meanwhile the waiting request stays queued, and each 60-second refresh adds another. The
-rate-limit message and preserved list in `usePRData.ts` are probably unreachable with throttling on. This comes from
-reading the code and hasn't been reproduced.
+## 2. Back off during secondary rate limits too
 
-**Suggested fix:** In `onRateLimit`, retry only when `retryAfter` is short (a few seconds) and otherwise return
-`false`, so the error reaches `parseRateLimitError`. While the limit lasts, skip scheduled refreshes until
-`resetAt` passes.
+**Where:** `plugins/app/usePRData.ts`, `recordPrimaryRateLimit`
 
-Separately, for secondary rate limits, `parseRateLimitError` reports the time from `x-ratelimit-reset`, which is
-the primary limit's reset time. Use the `retry-after` header when it's present.
+**Problem:** Only primary limits pause refreshing. During a secondary rate limit, the dashboard keeps sending a
+request every 60 seconds, on each `session.idle` and on each page change. GitHub's guidance is to stop until
+`retry-after` has passed, and it can lengthen secondary limits for clients that keep sending requests.
 
-## 3. Make the green PR icon mean "ready to merge"
+**Suggested fix:** Record `resetAt` for secondary limits as well. It already comes from `retry-after`, so it's
+usually short. Rename the guard to something like `rateLimitActive()`.
 
-**Where:** `plugins/app/PRRow.tsx` (`iconColor`) and `plugins/domain/pr-status.ts`
+## 3. Fix the remaining gaps in the merge-readiness colour
 
-**Problem:** The README says a green PR icon means **ready to merge**. The row actually colours it green whenever
-`mergeable === "MERGEABLE"`, which only means there are no merge conflicts. A PR with failing checks, changes
-requested, or required reviews missing still shows green. `classifyRowState` has stricter logic, but nothing calls
-it.
+**Where:** `plugins/domain/pr-status.ts`, `mergeReadiness`, and the README's "Reading a row" table
 
-**Suggested fix:** Fetch `mergeStateStatus` (`CLEAN`, `BLOCKED`, `BEHIND`, `UNSTABLE`, `DIRTY`, ...) and
-`reviewDecision`, and colour the icon from those: green for `CLEAN`, red for `DIRTY`, yellow for
-`BLOCKED`/`BEHIND`/`UNSTABLE`. Then remove `classifyRowState`. Otherwise, change the README to say green means "no
-merge conflicts".
+- **`HAS_HOOKS` shows grey:** this state means the PR can be merged and its pre-receive hooks pass, but it falls
+  through to `"none"`, which is grey. Treat it like `CLEAN`.
+- **Changes requested shows yellow:** `CLEAN` with `reviewDecision: "CHANGES_REQUESTED"` maps to `"pending"`.
+  Red (`"fail"`) would match how the review icon shows requested changes.
+- **The README is out of date:** it still says "Green: ready to merge. Red: merge conflict. Grey: draft, closed or
+  unknown." It doesn't mention yellow for `BLOCKED`, `BEHIND` and `UNSTABLE`, or for reviews still required.
+- **Older Enterprise servers are a risk:** `mergeStateStatus` and `reviewDecision` are now in the shared fragment
+  used by every query. On a GitHub Enterprise Server version that doesn't have one of these fields, the whole query
+  fails and the panel only shows **Invalid request**. This hasn't been checked against specific GHES versions.
+  Confirm the minimum GHES version, document it, or fall back to a query without these fields when a `422` or
+  "Field doesn't exist" error comes back.
 
-## 4. Don't count a re-requested reviewer twice
+## 4. Recolour PR icons when the theme changes
 
-**Where:** `plugins/domain/pr-status.ts`, `reviewSummary`
+**Where:** `plugins/app/PRRow.tsx`
 
-**Problem:** When a reviewer approves or comments and is then asked to review again, they appear in both
-`latestReviews` and `reviewRequests`. They're counted once as approved or commented and again as pending. In the
-row this shows as mixed review states, for example one green and one yellow icon for one person. `reviewRequests` is
-also limited to `first: 5`.
+**Problem:** The `createMemo` in `DashboardView` now makes the palette reactive. But `PRRow` computes `icon`,
+`iconColor`, `checks`, `reviews` and `comments` once, as plain constants in the component body. After a theme change,
+the PR icon keeps its old colour until the next refresh rebuilds the rows. Colours passed directly as JSX attributes
+do update.
 
-**Suggested fix:** Exclude logins that are in `reviewRequests` from the `latestReviews` counts, because a pending
-request supersedes their earlier review. Raise the `reviewRequests` limit, or use its `totalCount`.
+**Suggested fix:** Turn them into accessors, for example `const iconColor = () => ...`, and call them in the JSX.
 
-## 5. Follow theme changes without a reload
+## 5. Check the first title width
 
-**Where:** `plugins/app/DashboardView.tsx`, `const sk = skin(props.theme, props.colors)`
+**Where:** `plugins/app/DashboardView.tsx`, `onMount`
 
-**Problem:** The colour palette is computed once, when the component is created, outside any reactive scope. If
-the user switches OpenCode theme while the plugin is loaded, the panel keeps the old colours until `/reload`. This
-has not been confirmed, and it depends on whether OpenCode re-creates slot content when the theme changes.
+**Problem:** `updateTitleWidth()` now runs once in `onMount` and then only on `resize` events, where before it ran on
+every frame. If the box hasn't been laid out when `onMount` runs, `view.width` is 0 and titles are cut to `…` until
+the first `resize`. Whether that `resize` always arrives after the first layout depends on OpenTUI and hasn't been
+confirmed. An end-to-end test that checks a title on the first frame would settle it.
 
-**Suggested fix:** Make it reactive with `const sk = () => skin(props.theme, props.colors)`, or a `createMemo`, and
-read `sk().text` and so on in the JSX.
+## 6. Small leftovers
 
-## 6. Remove unused code
-
-**Where:** `plugins/domain/` and `plugins/infra/git.ts`
-
-Nothing in `plugins/` uses this code:
-
-- `classifyRowState` in `plugins/domain/pr-status.ts`. See item 3.
-- `formatAge` in `plugins/domain/format.ts`.
-- All of `plugins/domain/login.ts`: `displayLogin`, `ellipsize` and `BOT_ALIASES`.
-- `originRemoteUrl` in `plugins/infra/git.ts`.
-- `errorMessages.failed` in `plugins/domain/messages.ts`.
-- The `*Logins` arrays returned by `reviewSummary`.
-
-**Suggested fix:** Delete it, along with any tests that only cover it.
-
-## 7. Smaller UI issues
-
-- **Page isn't reset when the scope changes:** in `plugins/app/DashboardView.tsx`, the `createEffect` resets the
-  page when the status filter changes but not when the scope changes. Switching scope while on page 3 opens page 3
-  of the new list. The value is clamped, so this is only odd, not broken. Track `props.scope` in the effect as well.
-- **Wrong word in the loading message:** after a scope change, the message reads "Loading open PRs", naming the
-  status filter instead of the scope that changed.
-- **Sign-in error leaves out `gh`:** the **GitHub sign-in failed** description only says "Set GITHUB_TOKEN or
-  GH_TOKEN." It should also mention `gh auth login`, the README's recommended route.
-- **Title width runs on every frame:** `updateTitleWidth` is attached to the renderer's `frame` event, so it runs
-  on every frame. It's cheap and exits early, but listening for `resize` plus a layout or size-change hook on the
-  box would be enough.
+- **Errors on the supplementary query fail the whole search:** in `graphqlPartial`, any `NOT_FOUND` or `FORBIDDEN`
+  error with a path of length 2 or less is fatal, including `["repository", "recentPullRequests"]`. An error on that
+  optional connection fails the whole `author` or `assignee` search, which could still have been shown on its own.
+  Also, the `!query.includes("recentPullRequests:")` check in `hasRootFailure` relies on the query text. Passing an
+  explicit flag would be sturdier.
+- **More unused code:** `refreshOne`, `fetchOnePR` and `mapPullFromREST` are still unused, and #60 gave `refreshOne`
+  rate-limit handling. Remove them, or use them.
+- **Team review requests:** `reviewRequests` still only selects `... on User`, so pending team reviews aren't
+  counted. Add `... on Team { slug }`.
+- **Clock skew:** `primaryLimitActive` compares GitHub's `x-ratelimit-reset`, which uses the server's clock, with
+  the local `Date.now()`. If the local clock is behind, refreshing stays paused after the limit has reset. Adding a
+  few seconds of margin, or using `retryAfter` from the throttling callback, would avoid it.
