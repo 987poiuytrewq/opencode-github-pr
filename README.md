@@ -22,8 +22,7 @@ repository, their CI, review and merge status, and jump straight to the right pa
 - [Bun](https://bun.sh), to install the plugin's dependencies.
 - A GitHub token, or the [GitHub CLI](https://cli.github.com) signed in with `gh auth login`. See
   [Authentication](#authentication).
-- A terminal font with [Nerd Font](https://www.nerdfonts.com) glyphs for the default icons. Without one, use
-  [plain icons](#plain-text-icons).
+- A terminal font that supports the Unicode symbols used by the dashboard. Nerd Fonts are optional.
 
 ## Install
 
@@ -163,9 +162,9 @@ Pass options in the plugin entry's `options` object. Every option is optional:
 | `requestTimeoutMs` | `15000` | How long to wait for a GitHub request before giving up, in milliseconds. |
 | `defaultScope` | `"author"` | Scope filter at startup: `branch`, `author`, `assignee` or `all`. |
 | `defaultStatusFilter` | `"open"` | Status filter at startup: `open`, `closed` or `all`. |
-| `iconStyle` | `"nerd"` | Icon set to use: `"nerd"` or `"unicode"`. |
+| `iconStyle` | `"unicode"` | Icon set to use: `"unicode"` or `"nerd"`. |
 | `colors` | Theme | Colour overrides. See [Colours](#colours). |
-| `icons` | Nerd Font glyphs | Icon overrides. See [Icons](#icons). |
+| `icons` | Unicode symbols | Icon overrides. See [Icons](#icons). |
 
 Numeric options must be positive numbers. Invalid values fall back to the default.
 
@@ -204,51 +203,53 @@ Colour and icon overrides go inside the plugin entry's `options`, next to the ot
 
 ### Icons
 
-Every icon can be replaced with any non-empty string. The defaults are [Nerd Font](https://www.nerdfonts.com) glyphs:
+Every icon can be replaced with a string. An empty string hides the icon; whitespace-only strings are ignored. The
+default Unicode set is:
 
 | Key | Default | Used for |
 | --- | --- | --- |
-| `openPR` | `U+EA64` | Open, draft and closed PRs |
-| `mergedPR` | `U+EAFE` | Merged PRs |
-| `review` | `U+F4FF` | Review status |
-| `openComment` | `U+F017A` | Unresolved review threads |
+| `openPR` | `•` | Open, draft and closed PRs |
+| `mergedPR` | `•` | Merged PRs |
+| `review` | `✓` | Review status |
+| `openComment` | `■` | Unresolved review threads |
 | `check` | `●` | CI check status |
-| `scope` | `U+F4D7` | Scope filter label |
-| `status` | `U+E726` | Status filter label |
-| `loading` | `U+F051F` | Loading message |
-| `info` | `U+F129` | Informational messages |
-| `error` | `U+E654` | Error messages |
-| `previousPage` | `U+EB6F` | Previous page arrow |
-| `nextPage` | `U+EB70` | Next page arrow |
+| `scope` | *(none)* | Shared filter icon; hidden in Unicode style |
+| `status` | *(none)* | No separate status-filter icon |
+| `loading` | `…` | Loading message |
+| `info` | `ℹ` | Informational messages |
+| `error` | `⚠` | Error messages |
+| `previousPage` | `◀` | Previous page arrow |
+| `nextPage` | `▶` | Next page arrow |
 
-#### Unicode icons
+#### Nerd Font icons
 
-If your terminal font does not include Nerd Font glyphs, set `iconStyle` to `"unicode"` to use standard Unicode symbols:
+Set `iconStyle` to `"nerd"` to use Nerd Font glyphs:
 
 ```json
 {
   "options": {
-    "iconStyle": "unicode"
+    "iconStyle": "nerd"
   }
 }
 ```
 
-| Key | Unicode symbol |
-| --- | --- |
-| `openPR` | `○` |
-| `mergedPR` | `✓` |
-| `review` | `✓` |
-| `openComment` | `◌` |
-| `check` | `●` |
-| `scope` | `⌖` |
-| `status` | `◷` |
-| `loading` | `…` |
-| `info` | `ℹ` |
-| `error` | `!` |
-| `previousPage` | `‹` |
-| `nextPage` | `›` |
+| Key | Nerd Font glyph | Code point |
+| --- | --- | --- |
+| `openPR` | `` | `U+EA64` |
+| `mergedPR` | `` | `U+EAFE` |
+| `review` | `` | `U+F4FF` |
+| `openComment` | `󰅺` | `U+F017A` |
+| `check` | `●` | — |
+| `scope` | `` | `U+F4D7` |
+| `status` | *(none)* | — |
+| `loading` | `󰔟` | `U+F051F` |
+| `info` | `` | `U+F129` |
+| `error` | `` | `U+E654` |
+| `previousPage` | `` | `U+EB6F` |
+| `nextPage` | `` | `U+EB70` |
 
-Explicit values in `icons` override the selected style.
+Nerd Font mode uses one shared scope icon before both filters; Unicode mode has no filter icon. Explicit `icons` values
+override the selected style.
 
 #### Plain-text icons
 
@@ -292,7 +293,7 @@ unset for GitHub.com.
 | You see | What to do |
 | --- | --- |
 | No **Pull Requests** panel | Check that the plugin is in `opencode.json` (not `cli.json`), that `bun install` has run in the clone, and that `enabled` isn't `false`. Restart OpenCode. Plugin load errors are written to `~/.local/share/opencode/log/opencode.log`. |
-| Icons show as boxes or question marks | Your font has no Nerd Font glyphs. Install one, set `iconStyle` to `"unicode"`, or use [plain-text icons](#plain-text-icons). |
+| Icons show as boxes or question marks | Your terminal font may not support a symbol. Try a different font, use `iconStyle: "nerd"` with a Nerd Font, or use [plain-text icons](#plain-text-icons). |
 | **No GitHub repo** | The session's directory isn't a Git repository with a GitHub remote. Add a remote, or open a session in the right project. For Enterprise, check `GITHUB_ENTERPRISE_URL`. |
 | **GitHub sign-in failed** | No valid token was found. Run `gh auth login`, or set `GITHUB_TOKEN` where the OpenCode server starts. |
 | **Permission denied** or **Repo not found** | Your token can't read this repository. Check its scopes or fine-grained permissions, and SSO authorisation for organisation repositories. |

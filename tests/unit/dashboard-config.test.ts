@@ -3,10 +3,10 @@ import { dashboardOptions, DEFAULT_ICONS, UNICODE_ICONS } from "../../plugins/ap
 import { DEFAULT_SKIN } from "../../plugins/app/theme"
 
 describe("dashboard options", () => {
-  test("uses Nerd Font Codicons for PR marks by default", () => {
+  test("uses Nerd Font Codicons when Nerd Font style is selected", () => {
     expect(DEFAULT_ICONS.openPR).toBe("")
     expect(DEFAULT_ICONS.mergedPR).toBe("")
-    expect(dashboardOptions().iconStyle).toBe("nerd")
+    expect(dashboardOptions({ iconStyle: "nerd" }).iconStyle).toBe("nerd")
   })
 
   test("preserves the existing dashboard defaults", () => {
@@ -18,9 +18,9 @@ describe("dashboard options", () => {
       requestTimeoutMs: 15_000,
       defaultScope: "author",
       defaultStatusFilter: "open",
-      iconStyle: "nerd",
+      iconStyle: "unicode",
       colors: {},
-      icons: { ...DEFAULT_ICONS },
+      icons: { ...UNICODE_ICONS },
     })
   })
 
@@ -44,13 +44,17 @@ describe("dashboard options", () => {
       requestTimeoutMs: 10_000,
       defaultScope: "assignee",
       defaultStatusFilter: "closed",
-      iconStyle: "nerd",
+      iconStyle: "unicode",
       colors: { accent: "#123456", merged: "magenta" },
-      icons: { ...DEFAULT_ICONS, openPR: "P", nextPage: ">" },
+      icons: { ...UNICODE_ICONS, openPR: "P", nextPage: ">" },
     })
   })
 
   test("uses Unicode icons when selected and lets explicit icon overrides take precedence", () => {
+    expect(dashboardOptions({ iconStyle: "nerd" })).toMatchObject({
+      iconStyle: "nerd",
+      icons: DEFAULT_ICONS,
+    })
     expect(dashboardOptions({ iconStyle: "unicode" })).toMatchObject({
       iconStyle: "unicode",
       icons: UNICODE_ICONS,
@@ -58,6 +62,13 @@ describe("dashboard options", () => {
     expect(dashboardOptions({ iconStyle: "unicode", icons: { openPR: "P" } })).toMatchObject({
       iconStyle: "unicode",
       icons: { ...UNICODE_ICONS, openPR: "P" },
+    })
+  })
+
+  test("allows empty icon overrides to hide individual icons", () => {
+    expect(dashboardOptions({ icons: { scope: "", status: "" } }).icons).toMatchObject({
+      scope: "",
+      status: "",
     })
   })
 
@@ -81,9 +92,9 @@ describe("dashboard options", () => {
       requestTimeoutMs: 15_000,
       defaultScope: "author",
       defaultStatusFilter: "open",
-      iconStyle: "nerd",
+      iconStyle: "unicode",
       colors: {},
-      icons: DEFAULT_ICONS,
+      icons: UNICODE_ICONS,
     })
     expect(Object.keys(DEFAULT_SKIN)).toHaveLength(12)
   })

@@ -8,7 +8,7 @@ export const DEFAULT_ICONS = {
   openComment: "󰅺",
   check: "●",
   scope: "",
-  status: "",
+  status: "",
   loading: "󰔟",
   info: "",
   error: "",
@@ -17,18 +17,18 @@ export const DEFAULT_ICONS = {
 }
 
 export const UNICODE_ICONS = {
-  openPR: "○",
-  mergedPR: "✓",
+  openPR: "•",
+  mergedPR: "•",
   review: "✓",
-  openComment: "◌",
+  openComment: "■",
   check: "●",
-  scope: "⌖",
-  status: "◷",
+  scope: "",
+  status: "",
   loading: "…",
   info: "ℹ",
-  error: "!",
-  previousPage: "‹",
-  nextPage: "›",
+  error: "⚠",
+  previousPage: "◀",
+  nextPage: "▶",
 }
 
 export type IconStyle = "nerd" | "unicode"
@@ -73,22 +73,28 @@ function positiveNumber(value: unknown, fallback: number): number {
   return typeof value === "number" && Number.isFinite(value) && value > 0 ? Math.max(1, Math.floor(value)) : fallback
 }
 
-function stringOverrides<T extends Record<string, string>>(defaults: T, input: unknown): Partial<T> {
+function stringOverrides<T extends Record<string, string>>(
+  defaults: T,
+  input: unknown,
+  allowEmpty = false,
+): Partial<T> {
   if (!input || typeof input !== "object" || Array.isArray(input)) return {}
   const result: Partial<T> = {}
   for (const key of Object.keys(defaults) as Array<keyof T>) {
     const value = (input as Record<string, unknown>)[key as string]
-    if (typeof value === "string" && value.trim()) result[key] = value as T[keyof T]
+    if (typeof value === "string" && (value.trim() || (allowEmpty && value === ""))) {
+      result[key] = value as T[keyof T]
+    }
   }
   return result
 }
 
-function mergeStrings<T extends Record<string, string>>(defaults: T, input: unknown): T {
-  return { ...defaults, ...stringOverrides(defaults, input) }
+function mergeStrings<T extends Record<string, string>>(defaults: T, input: unknown, allowEmpty = false): T {
+  return { ...defaults, ...stringOverrides(defaults, input, allowEmpty) }
 }
 
 export function dashboardOptions(input: DashboardOptionsInput = {}): DashboardOptions {
-  const iconStyle: IconStyle = input.iconStyle === "unicode" ? "unicode" : "nerd"
+  const iconStyle: IconStyle = input.iconStyle === "nerd" ? "nerd" : "unicode"
   const defaultIcons = iconStyle === "unicode" ? UNICODE_ICONS : DEFAULT_ICONS
 
   return {
@@ -103,6 +109,6 @@ export function dashboardOptions(input: DashboardOptionsInput = {}): DashboardOp
       : "open",
     iconStyle,
     colors: stringOverrides(DEFAULT_SKIN, input.colors),
-    icons: mergeStrings(defaultIcons, input.icons),
+    icons: mergeStrings(defaultIcons, input.icons, true),
   }
 }

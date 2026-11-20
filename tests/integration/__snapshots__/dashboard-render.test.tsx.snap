@@ -2,9 +2,9 @@
 
 exports[`DashboardView render loading state 1`] = `
 "
-Pull Requests                      branch   open
+Pull Requests                         branch  open
 
- 󰔟 Loading PRs
+ … Loading PRs
   Checking GitHub…
 
 
@@ -26,18 +26,18 @@ Pull Requests                      branch   open
 
 exports[`DashboardView render ok state with PRs 1`] = `
 "
-Pull Requests                      branch   open
+Pull Requests                         branch  open
 
- Add login flow
-  #10 +42 -8                                    ●
+• Add login flow
+  #10 +42 -8                                   ✓ ●
 
- Fix race condition
-  #11 +42 -8                                    ●
+• Fix race condition
+  #11 +42 -8                                   ✓ ●
 
- WIP: refactor
+• WIP: refactor
   #12 +42 -8                                     ●
 
- Update docs
+• Update docs
   #13 +42 -8                                     ●
 
 
@@ -50,9 +50,9 @@ Pull Requests                      branch   open
 
 exports[`DashboardView render no-repo state 1`] = `
 "
-Pull Requests                      branch   open
+Pull Requests                         branch  open
 
-  No GitHub repo
+ ℹ No GitHub repo
   Add a GitHub remote or switch to the right
  project.
 
@@ -74,9 +74,9 @@ Pull Requests                      branch   open
 
 exports[`DashboardView render error state 1`] = `
 "
-Pull Requests                      branch   open
+Pull Requests                         branch  open
 
-  GitHub sign-in failed
+ ⚠ GitHub sign-in failed
    Set GITHUB_TOKEN or GH_TOKEN.
 
 
@@ -98,9 +98,9 @@ Pull Requests                      branch   open
 
 exports[`DashboardView render ok state with empty PRs 1`] = `
 "
-Pull Requests                      branch   open
+Pull Requests                         branch  open
 
-  No matching PRs
+ ℹ No matching PRs
   Try a different scope or status.
 
 
