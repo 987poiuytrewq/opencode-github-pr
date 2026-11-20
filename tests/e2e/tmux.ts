@@ -4,11 +4,13 @@ export class TmuxSession {
   readonly name: string
   readonly cols: number
   readonly rows: number
+  private readonly tmuxBin: string
 
-  private constructor(name: string, cols: number, rows: number) {
+  private constructor(name: string, cols: number, rows: number, tmuxBin: string) {
     this.name = name
     this.cols = cols
     this.rows = rows
+    this.tmuxBin = tmuxBin
   }
 
   static async create(opts: {
@@ -18,8 +20,9 @@ export class TmuxSession {
     cwd: string
     env?: Record<string, string>
     command: string[]
+    tmuxBin?: string
   }): Promise<TmuxSession> {
-    const session = new TmuxSession(opts.name, opts.cols, opts.rows)
+    const session = new TmuxSession(opts.name, opts.cols, opts.rows, opts.tmuxBin ?? "tmux")
     const args = [
       "new-session",
       "-d",
@@ -32,16 +35,14 @@ export class TmuxSession {
       args.push("-e", `${k}=${v}`)
     }
     args.push("--", ...opts.command)
-    let created = false
     try {
-      await session.run("tmux", args)
-      created = true
-      await session.run("tmux", ["set-option", "-t", opts.name, "mouse", "off"])
+      await session.run(session.tmuxBin, args)
+      await session.run(session.tmuxBin, ["set-option", "-t", opts.name, "mouse", "off"])
       return session
     } catch (error) {
-      // `new-session` can succeed even if later setup fails. Do not leave that
-      // partially initialized session behind.
-      if (created) await session.kill()
+      // Try to kill by name even when `new-session` reports a failure: tmux
+      // may have created the session before a later setup step failed.
+      await session.kill()
       throw error
     }
   }
@@ -71,15 +72,15 @@ export class TmuxSession {
   }
 
   sendKeys(text: string): Promise<void> {
-    return this.run("tmux", ["send-keys", "-t", this.name, text]).then(() => {})
+    return this.run(this.tmuxBin, ["send-keys", "-t", this.name, text]).then(() => {})
   }
 
   sendRaw(bytes: string): Promise<void> {
-    return this.run("tmux", ["send-keys", "-t", this.name, "-l", bytes]).then(() => {})
+    return this.run(this.tmuxBin, ["send-keys", "-t", this.name, "-l", bytes]).then(() => {})
   }
 
   async capturePane(): Promise<string> {
-    return this.run("tmux", [
+    return this.run(this.tmuxBin, [
       "capture-pane",
       "-t", this.name,
       "-p",
@@ -88,7 +89,7 @@ export class TmuxSession {
   }
 
   async capturePanePlain(): Promise<string> {
-    return this.run("tmux", [
+    return this.run(this.tmuxBin, [
       "capture-pane",
       "-t", this.name,
       "-p",
@@ -133,7 +134,7 @@ export class TmuxSession {
   }
 
   async paneTty(): Promise<string> {
-    return this.run("tmux", ["display", "-t", this.name, "-p", "#{pane_tty}"])
+    return this.run(this.tmuxBin, ["display", "-t", this.name, "-p", "#{pane_tty}"])
   }
 
   async writeToTty(bytes: string): Promise<void> {
@@ -143,7 +144,7 @@ export class TmuxSession {
 
   async kill(): Promise<void> {
     try {
-      await this.run("tmux", ["kill-session", "-t", this.name])
+      await this.run(this.tmuxBin, ["kill-session", "-t", this.name])
     } catch {}
   }
 }
