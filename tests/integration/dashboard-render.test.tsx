@@ -111,6 +111,21 @@ describe("DashboardView render", () => {
     expect(description?.fg).toEqual(muted?.fg)
   })
 
+  test("no-matching-PR description wraps under its text", async () => {
+    const r = await renderState(okState({ prs: [] }), {}, 32)
+    await r.flush()
+    const lines = captureFrame(r).split("\n")
+    const titleLine = lines.find((line) => line.includes("No matching PRs"))
+    const descriptionStart = lines.findIndex((line) => line.includes("Try a different scope"))
+    const descriptionLines = lines.slice(descriptionStart).filter((line) => line.trim().length > 0).slice(0, 2)
+
+    expect(titleLine).toBeDefined()
+    expect(descriptionStart).toBeGreaterThanOrEqual(0)
+    expect(descriptionLines).toHaveLength(2)
+    const titleTextStart = titleLine!.indexOf("No matching PRs")
+    expect(descriptionLines.every((line) => line.search(/\S/) === titleTextStart)).toBe(true)
+  })
+
   test("ok state with empty PRs", async () => {
     const r = await renderState(okState({ prs: [] }))
     await r.flush()

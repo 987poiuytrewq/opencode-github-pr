@@ -16,6 +16,7 @@ import { skin, type Skin } from "./theme"
 import { errorMessages } from "../domain/messages"
 import { PRRow } from "./PRRow"
 import type { DashboardIcons } from "./config"
+import { StatusMessage } from "./StatusMessage"
 
 // GitHub returns up to 100 PRs per GraphQL page (see PULL_REQUESTS_QUERY).
 const PRS_PER_PAGE = 100
@@ -214,12 +215,13 @@ export function DashboardView(props: {
       </Show>
 
       <Show when={props.state.status === DashboardStatus.Error}>
-        <box flexDirection="column" paddingLeft={1} paddingTop={1} paddingRight={1}>
-          <text fg={sk.error} selectable={false}>{withIcon(props.icons.error, errorPresentation().title)}</text>
-          <box paddingLeft={2} width="100%">
-            <text fg={sk.muted} selectable={false}>{errorPresentation().description}</text>
-          </box>
-        </box>
+        <StatusMessage
+          icon={props.icons.error}
+          title={errorPresentation().title}
+          description={errorPresentation().description}
+          titleColor={sk.error}
+          descriptionColor={sk.muted}
+        />
       </Show>
 
       <Show
@@ -230,10 +232,13 @@ export function DashboardView(props: {
           (props.state.status === DashboardStatus.Ok || props.state.prs.length > 0)
         }
       >
-        <box flexDirection="column" paddingLeft={1} paddingTop={1} paddingRight={1}>
-          <text fg={sk.muted} selectable={false}>{withIcon(props.icons.info, errorMessages.noMatchingPRs)}</text>
-          <text fg={sk.muted} selectable={false}>  Try a different scope or status.</text>
-        </box>
+        <StatusMessage
+          icon={props.icons.info}
+          title={errorMessages.noMatchingPRs}
+          description="Try a different scope or status."
+          titleColor={sk.muted}
+          descriptionColor={sk.muted}
+        />
       </Show>
 
       <Show when={listIsAvailable() && prs().length > 0}>
