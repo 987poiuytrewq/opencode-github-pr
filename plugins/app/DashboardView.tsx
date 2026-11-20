@@ -18,10 +18,6 @@ import { PRRow } from "./PRRow"
 import type { DashboardIcons } from "./config"
 import { StatusMessage } from "./StatusMessage"
 
-function withIcon(icon: string, label: string): string {
-  return icon ? `${icon} ${label}` : label
-}
-
 export function DashboardView(props: {
   theme: ResolvedTheme
   state: DashboardState
@@ -235,10 +231,13 @@ export function DashboardView(props: {
       </Show>
 
       <Show when={props.state.status === DashboardStatus.NoRepo}>
-        <box flexDirection="column" paddingLeft={1} paddingTop={1} paddingRight={1}>
-          <text fg={sk.text} selectable={false}>{withIcon(props.icons.info, "No GitHub repo")}</text>
-          <text fg={sk.muted} selectable={false}>  Add a GitHub remote or switch to the right project.</text>
-        </box>
+        <StatusMessage
+          icon={props.icons.info}
+          title="No GitHub repo"
+          description="Add a GitHub remote or switch to the right project."
+          titleColor={sk.muted}
+          descriptionColor={sk.muted}
+        />
       </Show>
 
       <Show when={props.state.status === DashboardStatus.Error}>
@@ -326,7 +325,12 @@ export function DashboardView(props: {
             </box>
           </Show>
           <Show when={filtersMatch() && props.state.pagination.limitReached}>
-            <text fg={sk.warning} selectable={false}>GitHub search is limited to 1,000 matching PRs</text>
+            <StatusMessage
+              icon={props.icons.info}
+              title="GitHub search is limited to 1,000 matching PRs"
+              titleColor={sk.muted}
+              descriptionColor={sk.muted}
+            />
           </Show>
         </box>
       </Show>

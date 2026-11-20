@@ -83,14 +83,15 @@ describe("DashboardView render", () => {
     expect(captureFrame(r)).toMatchSnapshot()
   })
 
-  test("dims the second line of status text", async () => {
+  test("no-repo message uses the same muted styling as other info messages", async () => {
     const r = await renderState(noRepoState())
     await r.flush()
     const spans = r.captureSpans().lines.flatMap((line) => line.spans)
     const title = spans.find((span) => span.text.includes("No GitHub repo"))
     const detail = spans.find((span) => span.text.includes("Add a GitHub remote"))
 
-    expect(title?.fg?.toInts()).not.toEqual(detail?.fg?.toInts())
+    expect(title?.fg?.toInts()).toEqual(detail?.fg?.toInts())
+    expect(title?.fg?.toInts()).toEqual([136, 136, 136, 255])
   })
 
   test("error state", async () => {
@@ -168,6 +169,29 @@ describe("DashboardView render", () => {
     }))
     await r.flush()
     expect(captureFrame(r)).toContain("1 of 6")
+  })
+
+  test("shows the search-limit notice using the info-panel style", async () => {
+    const r = await renderState(okState({
+      pagination: {
+        listing: "open",
+        scope: "branch",
+        scopeValue: "feature",
+        cursor: null,
+        hasMore: false,
+        totalCount: 1000,
+        pagesLoaded: 4,
+        loading: false,
+        limitReached: true,
+      },
+    }))
+    await r.flush()
+    const spans = r.captureSpans().lines.flatMap((line) => line.spans)
+    const notice = spans.find((span) => span.text.includes("GitHub search is limited"))
+
+    expect(captureFrame(r)).toContain("GitHub search is limited to 1,000 matching PRs")
+    expect(notice?.text).toContain(dashboardOptions().icons.info)
+    expect(notice?.fg?.toInts()).toEqual([136, 136, 136, 255])
   })
 
   test("shows a loading line while a server-side status listing is changing", async () => {
