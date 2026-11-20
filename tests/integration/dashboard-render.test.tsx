@@ -230,6 +230,23 @@ describe("DashboardView render", () => {
     expect(frame).not.toContain("")
   })
 
+  test("uses configured icons for draft and closed PRs", async () => {
+    const r = await renderState(okState({
+      prs: [
+        makeTUIPR({ number: 1, title: "Draft feature", isDraft: true }),
+        makeTUIPR({ number: 2, title: "Closed feature", isClosed: true }),
+      ],
+    }), {
+      statusFilter: "all",
+      options: { icons: { draftPR: "D", closedPR: "C" } },
+    })
+    await r.flush()
+    const frame = captureFrame(r)
+
+    expect(frame).toContain("D Draft feature")
+    expect(frame).toContain("C Closed feature")
+  })
+
   test("hides zero comment counts and only shows non-zero comment statuses", async () => {
     const r = await renderState(okState({
       prs: [makeTUIPR({

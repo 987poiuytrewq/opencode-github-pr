@@ -5,6 +5,8 @@ import { DEFAULT_SKIN } from "../../plugins/app/theme"
 describe("dashboard options", () => {
   test("uses distinct Nerd Font PR icons when Nerd Font style is selected", () => {
     expect(DEFAULT_ICONS.openPR).toBe("")
+    expect(DEFAULT_ICONS.closedPR).toBe(DEFAULT_ICONS.openPR)
+    expect(DEFAULT_ICONS.draftPR).toBe(DEFAULT_ICONS.openPR)
     expect(DEFAULT_ICONS.mergedPR).toBe("")
     expect(dashboardOptions({ iconStyle: "nerd" }).iconStyle).toBe("nerd")
   })
@@ -63,6 +65,8 @@ describe("dashboard options", () => {
       iconStyle: "unicode",
       icons: UNICODE_ICONS,
     })
+    expect(UNICODE_ICONS.closedPR).toBe(UNICODE_ICONS.openPR)
+    expect(UNICODE_ICONS.draftPR).toBe(UNICODE_ICONS.openPR)
     expect(dashboardOptions({ iconStyle: "unicode", icons: { openPR: "P" } })).toMatchObject({
       iconStyle: "unicode",
       icons: { ...UNICODE_ICONS, openPR: "P" },

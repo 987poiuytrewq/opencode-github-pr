@@ -4,6 +4,8 @@ import { DEFAULT_TUI_PAGES_PER_BATCH, MIN_PAGES_PER_BATCH } from "../infra/loade
 
 export const DEFAULT_ICONS = {
   openPR: "",
+  closedPR: "",
+  draftPR: "",
   mergedPR: "",
   review: "",
   openComment: "󰅺",
@@ -18,6 +20,8 @@ export const DEFAULT_ICONS = {
 
 export const UNICODE_ICONS = {
   openPR: "•",
+  closedPR: "•",
+  draftPR: "•",
   mergedPR: "•",
   review: "✓",
   openComment: "■",

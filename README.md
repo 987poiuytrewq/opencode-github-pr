@@ -261,7 +261,9 @@ them:
 
 | Key | Nerd Font (default) | Unicode | Used for |
 | --- | --- | --- | --- |
-| `openPR` | `U+E726` | `•` | Open, draft and closed PRs |
+| `openPR` | `U+E726` | `•` | Open PRs |
+| `closedPR` | `U+E726` | `•` | Closed PRs |
+| `draftPR` | `U+E726` | `•` | Draft PRs |
 | `mergedPR` | `U+E727` | `•` | Merged PRs |
 | `review` | `U+F4FF` | `✓` | Review status |
 | `openComment` | `U+F017A` | `■` | Unresolved review threads |
@@ -285,6 +287,8 @@ If neither set suits your font, replace every icon with ASCII characters:
   "options": {
     "icons": {
       "openPR": "o",
+      "closedPR": "c",
+      "draftPR": "d",
       "mergedPR": "m",
       "review": "R",
       "openComment": "C",
