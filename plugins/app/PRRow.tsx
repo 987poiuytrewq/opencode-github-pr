@@ -101,6 +101,8 @@ export function PRRow(props: {
   merged: string
   icons: {
     openPR: string
+    closedPR: string
+    draftPR: string
     mergedPR: string
     review: string
     openComment: string
@@ -109,7 +111,13 @@ export function PRRow(props: {
 }) {
   const [titleHovered, setTitleHovered] = createSignal(false)
   const title = () => truncateTitle(props.pr.title, props.titleWidth)
-  const icon = props.pr.isMerged ? props.icons.mergedPR : props.icons.openPR
+  const icon = props.pr.isMerged
+    ? props.icons.mergedPR
+    : props.pr.isDraft
+      ? props.icons.draftPR
+      : props.pr.isClosed
+        ? props.icons.closedPR
+        : props.icons.openPR
   const iconColor = props.pr.isMerged
     ? props.merged
     : props.pr.isDraft

@@ -54,6 +54,8 @@ export function DashboardView(props: {
       if (!view) return
       const iconWidth = Math.max(
         Bun.stringWidth(props.icons.openPR),
+        Bun.stringWidth(props.icons.closedPR),
+        Bun.stringWidth(props.icons.draftPR),
         Bun.stringWidth(props.icons.mergedPR),
       )
       const nextWidth = Math.max(1, Math.floor(view.width) - iconWidth - 1)
