@@ -1,6 +1,6 @@
 {
   "name": "opencode-github-pr",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "description": "GitHub pull request dashboard for the OpenCode sidebar: CI, review and merge status for your PRs.",
   "keywords": [
     "opencode",
@@ -25,7 +25,10 @@
   },
   "files": [
     "plugins/",
-    "demo/fixtures.ts"
+    "demo/fixtures.ts",
+    "demo/demo.gif",
+    "README.md",
+    "LICENSE"
   ],
   "scripts": {
     "test": "make test",
