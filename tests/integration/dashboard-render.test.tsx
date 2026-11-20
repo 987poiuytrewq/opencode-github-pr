@@ -83,6 +83,16 @@ describe("DashboardView render", () => {
     expect(captureFrame(r)).toMatchSnapshot()
   })
 
+  test("dims the second line of status text", async () => {
+    const r = await renderState(noRepoState())
+    await r.flush()
+    const spans = r.captureSpans().lines.flatMap((line) => line.spans)
+    const title = spans.find((span) => span.text.includes("No GitHub repo"))
+    const detail = spans.find((span) => span.text.includes("Add a GitHub remote"))
+
+    expect(title?.fg?.toInts()).not.toEqual(detail?.fg?.toInts())
+  })
+
   test("error state", async () => {
     const r = await renderState(errorState())
     await r.flush()
@@ -119,7 +129,7 @@ describe("DashboardView render", () => {
 
     expect(descriptionStart).toBeGreaterThanOrEqual(0)
     expect(descriptionLines).toHaveLength(2)
-    expect(descriptionLines.every((line) => line.startsWith("   "))).toBe(true)
+    expect(descriptionLines.every((line) => line.startsWith("  "))).toBe(true)
     expect(description?.fg).toEqual(muted?.fg)
   })
 
@@ -152,13 +162,14 @@ describe("DashboardView render", () => {
         scopeValue: "feature",
         cursor: "cursor-1",
         hasMore: true,
+        totalCount: 30,
         pagesLoaded: 4,
         loading: false,
         limitReached: false,
       },
     }))
     await r.flush()
-    expect(captureFrame(r)).toContain("1 of 1+")
+    expect(captureFrame(r)).toContain("1 of 6")
   })
 
   test("shows a loading line while a server-side status listing is changing", async () => {
@@ -170,7 +181,7 @@ describe("DashboardView render", () => {
     await r.flush()
     const frame = captureFrame(r)
     expect(frame).toContain("Loading PRs")
-    expect(frame).toContain("Loading closed PRs")
+    expect(frame).not.toContain("Loading closed PRs")
     expect(frame).not.toContain("No matching")
   })
 
@@ -186,13 +197,14 @@ describe("DashboardView render", () => {
     }), { statusFilter: "closed" })
     await r.flush()
     const frame = captureFrame(r)
-    expect(frame).toContain("• Merged feature")
+    const icons = dashboardOptions().icons
+    expect(frame).toContain(`${icons.mergedPR} Merged feature`)
     const mergedIcon = r.captureSpans().lines.flatMap((line) => line.spans)
-      .find((span) => span.text.includes("•"))
+      .find((span) => span.text.includes(icons.mergedPR))
     expect(mergedIcon?.fg?.toInts()).toEqual([94, 168, 245, 255])
     expect(frame).toContain("#42 +17 -4")
-    expect(frame).toContain("●")
-    expect(frame).not.toContain("■0")
+    expect(frame).toContain(icons.check)
+    expect(frame).not.toContain(`${icons.openComment}0`)
     expect(frame).not.toContain("")
   })
 
@@ -204,8 +216,9 @@ describe("DashboardView render", () => {
     }))
     await r.flush()
     const frame = captureFrame(r)
-    expect(frame).toContain("■ 1")
-    expect(frame).not.toContain("■1")
+    const commentIcon = dashboardOptions().icons.openComment
+    expect(frame).toContain(`${commentIcon} 1`)
+    expect(frame).not.toContain(`${commentIcon}1`)
     expect(frame).not.toContain("")
   })
 
@@ -228,7 +241,7 @@ describe("DashboardView render", () => {
     }), {}, 24)
     await r.flush()
     const lines = r.captureCharFrame().split("\n")
-    const titleLine = lines.find((line) => line.includes("• A"))
+    const titleLine = lines.find((line) => line.includes(`${dashboardOptions().icons.openPR} A`))
 
     expect(titleLine).toContain("A very long pull…")
     expect(lines.filter((line) => line.includes("request title")).length).toBe(0)
@@ -283,7 +296,7 @@ describe("DashboardView render", () => {
     expect(frame).toContain("1 of 2")
     expect(frame).not.toContain("P Third")
     const mutedSpan = r.captureSpans().lines.flatMap((line) => line.spans)
-      .find((span) => span.text.includes("S all"))
+      .find((span) => span.text === "all")
     expect(mutedSpan?.fg?.toInts()).toEqual([18, 52, 86, 255])
   })
 
@@ -291,7 +304,8 @@ describe("DashboardView render", () => {
     const r = await renderState(okState())
     await r.flush()
     const heading = r.captureCharFrame().split("\n").find((line) => line.includes("Pull Requests"))
-    expect(heading).toContain("branch  open")
+    expect(heading).toContain("branch open")
+    expect(heading).not.toContain("branch  open")
     expect(heading?.trimEnd().length).toBe(50)
   })
 
@@ -305,7 +319,7 @@ describe("DashboardView render", () => {
     expect(filterLabels).toContain("open")
   })
 
-  test("status groups render comments, reviews, then mixed checks with single spaces", async () => {
+  test("status groups keep related review and check indicators together", async () => {
     const r = await renderState(okState({
       prs: [makeTUIPR({
         number: 42,
@@ -320,7 +334,10 @@ describe("DashboardView render", () => {
     }))
     await r.flush()
     const frame = captureFrame(r)
-    expect(frame).toContain("■ 1 ✓1 ✓1 ●3 ●1")
+    const icons = dashboardOptions().icons
+    expect(frame).toContain(
+      `${icons.openComment} 1 ${icons.review}1${icons.review}1 ${icons.check}3${icons.check}1`,
+    )
     expect(frame).not.toContain("")
   })
 
@@ -352,8 +369,9 @@ describe("DashboardView render", () => {
     }))
     await r.flush()
     const frame = r.captureCharFrame()
-    expect(frame).toContain("✓")
-    expect(frame).toContain("■ 1")
+    const icons = dashboardOptions().icons
+    expect(frame).toContain(icons.review)
+    expect(frame).toContain(`${icons.openComment} 1`)
     expect(frame).not.toContain("")
   })
 
@@ -367,7 +385,7 @@ describe("DashboardView mouse interaction", () => {
     expect(frame).toContain("Pull Requests")
     expect(frame).toContain("Add login flow")
     expect(frame).not.toContain("▼")
-    expect(frame).not.toContain("▶")
+    expect(frame).not.toContain(dashboardOptions().icons.nextPage)
   })
 
   test("clicking a PR row opens it", async () => {
@@ -408,14 +426,17 @@ describe("DashboardView mouse interaction", () => {
     const filterSpan = (label: string) =>
       r.captureSpans().lines.flatMap((line) => line.spans).find((span) => span.text.includes(label))
     const scopeDefault = filterSpan("branch")
+    const scopeIconDefault = filterSpan(dashboardOptions().icons.scope)
     const statusDefault = filterSpan("open")
     expect(scopeDefault).toBeDefined()
+    expect(scopeIconDefault).toBeDefined()
     expect(statusDefault).toBeDefined()
 
     const header = r.captureCharFrame().split("\n").find((line) => line.includes("Pull Requests")) ?? ""
     await r.mockMouse.moveTo(header.indexOf("branch"), 1)
     await r.flush()
     expect(filterSpan("branch")?.fg).not.toEqual(scopeDefault?.fg)
+    expect(filterSpan(dashboardOptions().icons.scope)?.fg).toEqual(scopeIconDefault?.fg)
     expect(filterSpan("open")?.fg).toEqual(statusDefault?.fg)
 
     await r.mockMouse.moveTo(header.indexOf("open"), 1)
@@ -475,9 +496,9 @@ describe("DashboardView mouse interaction", () => {
 
     await clickLabel("●")
     expect(opened).toEqual([{ number: 42, target: "checks" }])
-    await clickLabel("✓")
+    await clickLabel(dashboardOptions().icons.review)
     expect(opened.at(-1)).toEqual({ number: 42, target: "overview" })
-    await clickLabel("■")
+    await clickLabel(dashboardOptions().icons.openComment)
     expect(opened.at(-1)).toEqual({ number: 42, target: "files" })
     await clickLabel("+42")
     expect(opened.at(-1)).toEqual({ number: 42, target: "files" })
@@ -495,6 +516,7 @@ describe("DashboardView mouse interaction", () => {
         scopeValue: null,
         cursor: null,
         hasMore: false,
+        totalCount: prs.length,
         pagesLoaded: 1,
         loading: false,
         limitReached: false,
@@ -514,25 +536,26 @@ describe("DashboardView mouse interaction", () => {
     }
 
     let frame = r.captureCharFrame()
+    const openPRIcon = dashboardOptions().icons.openPR
     expect(frame).toContain("1 of 3")
-    expect(frame).toContain("• PR 10")
-    expect(frame).toContain("• PR 14")
-    expect(frame).not.toContain("• PR 15")
+    expect(frame).toContain(`${openPRIcon} PR 10`)
+    expect(frame).toContain(`${openPRIcon} PR 14`)
+    expect(frame).not.toContain(`${openPRIcon} PR 15`)
 
-    await clickArrow("1 of 3", "◀")
+    await clickArrow("1 of 3", dashboardOptions().icons.previousPage)
     expect(r.captureCharFrame()).toContain("1 of 3")
 
-    await clickArrow("1 of 3", "▶")
+    await clickArrow("1 of 3", dashboardOptions().icons.nextPage)
     frame = r.captureCharFrame()
     expect(frame).toContain("2 of 3")
-    expect(frame).toContain("• PR 15")
-    expect(frame).not.toContain("• PR 14")
+    expect(frame).toContain(`${openPRIcon} PR 15`)
+    expect(frame).not.toContain(`${openPRIcon} PR 14`)
 
-    await clickArrow("2 of 3", "▶")
+    await clickArrow("2 of 3", dashboardOptions().icons.nextPage)
     expect(r.captureCharFrame()).toContain("3 of 3")
-    await clickArrow("3 of 3", "▶")
+    await clickArrow("3 of 3", dashboardOptions().icons.nextPage)
     expect(r.captureCharFrame()).toContain("3 of 3")
-    await clickArrow("3 of 3", "◀")
+    await clickArrow("3 of 3", dashboardOptions().icons.previousPage)
     expect(r.captureCharFrame()).toContain("2 of 3")
   })
 
@@ -546,6 +569,7 @@ describe("DashboardView mouse interaction", () => {
         scopeValue: "feature",
         cursor: "cursor-4",
         hasMore: true,
+        totalCount: 3,
         pagesLoaded: 4,
         loading: false,
         limitReached: false,
@@ -556,15 +580,37 @@ describe("DashboardView mouse interaction", () => {
       onLoadMore: async () => { loadRequests++ },
     })
     await r.flush()
-    expect(captureFrame(r)).toContain("1 of 1+")
+    expect(captureFrame(r)).toContain("1 of 3")
+    const pagerLine = r.captureCharFrame().split("\n").find((line) => line.includes("1 of 3"))!
+    const nextArrow = dashboardOptions().icons.nextPage
+    expect(pagerLine.indexOf(nextArrow) + Bun.stringWidth(nextArrow)).toBeLessThanOrEqual(49)
 
     const lines = r.captureCharFrame().split("\n")
-    const y = lines.findIndex((line) => line.includes("1 of 1+"))
+    const y = lines.findIndex((line) => line.includes("1 of 3"))
     const x = lines[y].indexOf(dashboardOptions().icons.nextPage)
     await r.mockMouse.click(x, y)
     await r.flush()
 
     expect(loadRequests).toBe(1)
+  })
+
+  test("does not show loading text while pagination is fetching another batch", async () => {
+    const r = await renderState(okState({
+      pagination: {
+        listing: "open",
+        scope: "branch",
+        scopeValue: "feature",
+        cursor: "cursor-4",
+        hasMore: true,
+        totalCount: 20,
+        pagesLoaded: 4,
+        loading: true,
+        limitReached: false,
+      },
+    }))
+    await r.flush()
+
+    expect(captureFrame(r)).not.toContain("Loading more PRs")
   })
 
   test("prefetches another batch on each forward page action", async () => {
@@ -580,6 +626,7 @@ describe("DashboardView mouse interaction", () => {
         scopeValue: "feature",
         cursor: "cursor-4",
         hasMore: true,
+        totalCount: 5,
         pagesLoaded: 4,
         loading: false,
         limitReached: false,
@@ -590,13 +637,13 @@ describe("DashboardView mouse interaction", () => {
       onLoadMore: async () => { loadRequests++ },
     })
     await r.flush()
-    expect(captureFrame(r)).toContain("1 of 2+")
+    expect(captureFrame(r)).toContain("1 of 5")
     const lines = r.captureCharFrame().split("\n")
-    const y = lines.findIndex((line) => line.includes("1 of 2+"))
+    const y = lines.findIndex((line) => line.includes("1 of 5"))
     const x = lines[y].indexOf(dashboardOptions().icons.nextPage)
     await r.mockMouse.click(x, y)
     await r.flush()
-    expect(captureFrame(r)).toContain("2 of 2+")
+    expect(captureFrame(r)).toContain("2 of 5")
     expect(loadRequests).toBe(1)
   })
 
@@ -609,6 +656,7 @@ describe("DashboardView mouse interaction", () => {
         scopeValue: null,
         cursor: "cursor-4",
         hasMore: true,
+        totalCount: 0,
         pagesLoaded: 4,
         loading: false,
         limitReached: false,

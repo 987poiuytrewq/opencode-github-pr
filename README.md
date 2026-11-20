@@ -22,7 +22,7 @@ repository, their CI, review and merge status, and jump straight to the right pa
 - [Bun](https://bun.sh), to install the plugin's dependencies.
 - A GitHub token, or the [GitHub CLI](https://cli.github.com) signed in with `gh auth login`. See
   [Authentication](#authentication).
-- A terminal font that supports the Unicode symbols used by the dashboard. Nerd Fonts are optional.
+- A terminal font that supports Nerd Font glyphs, or set `iconStyle` to `"unicode"` to use standard Unicode symbols.
 
 ## Install
 
@@ -162,9 +162,9 @@ Pass options in the plugin entry's `options` object. Every option is optional:
 | `requestTimeoutMs` | `15000` | How long to wait for a GitHub request before giving up, in milliseconds. |
 | `defaultScope` | `"author"` | Scope filter at startup: `branch`, `author`, `assignee` or `all`. |
 | `defaultStatusFilter` | `"open"` | Status filter at startup: `open`, `closed` or `all`. |
-| `iconStyle` | `"unicode"` | Icon set to use: `"unicode"` or `"nerd"`. |
+| `iconStyle` | `"nerd"` | Icon set to use: `"nerd"` or `"unicode"`. |
 | `colors` | Theme | Colour overrides. See [Colours](#colours). |
-| `icons` | Unicode symbols | Icon overrides. See [Icons](#icons). |
+| `icons` | Nerd Font glyphs | Icon overrides. See [Icons](#icons). |
 
 Numeric options must be positive numbers. Invalid values fall back to the default.
 
@@ -204,7 +204,7 @@ Colour and icon overrides go inside the plugin entry's `options`, next to the ot
 ### Icons
 
 Every icon can be replaced with a string. An empty string hides the icon; whitespace-only strings are ignored. The
-default Unicode set is:
+Unicode set is available by setting `iconStyle` to `"unicode"`:
 
 | Key | Default | Used for |
 | --- | --- | --- |
@@ -223,7 +223,7 @@ default Unicode set is:
 
 #### Nerd Font icons
 
-Set `iconStyle` to `"nerd"` to use Nerd Font glyphs:
+Nerd Font glyphs are the default. Set `iconStyle` to `"nerd"` explicitly to keep using this set:
 
 ```json
 {

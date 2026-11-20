@@ -124,7 +124,7 @@ describe("useDashboard open-first loading", () => {
     inRepo(async () => {
       const queries: string[] = []
       mockOctokitOp("graphql", (params) => {
-        const query = params?.params?.query
+        const query = params?.params?.searchQuery
         if (typeof query === "string") {
           queries.push(query)
           return {

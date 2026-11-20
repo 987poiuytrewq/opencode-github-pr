@@ -26,6 +26,7 @@ export function createDashboard(
       scopeValue: null,
       cursor: null,
       hasMore: false,
+      totalCount: null,
       pagesLoaded: 0,
       loading: false,
       limitReached: false,
