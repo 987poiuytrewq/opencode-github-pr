@@ -2,7 +2,6 @@
 import { describe, expect, test, beforeEach, afterEach } from "bun:test"
 import {
   installOctokitMock,
-  mockOctokitDefault,
   mockOctokitOp,
   clearOctokitMocks,
 } from "../helpers/octokit-mock"
