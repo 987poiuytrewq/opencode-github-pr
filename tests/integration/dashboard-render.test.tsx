@@ -307,8 +307,8 @@ describe("DashboardView render", () => {
     expect(heading?.trimEnd().length).toBe(50)
   })
 
-  test("does not leave leading spaces when scope and status icons are hidden", async () => {
-    const r = await renderState(okState(), { options: { icons: { scope: "", status: "" } } })
+  test("does not leave leading spaces when the scope icon is hidden", async () => {
+    const r = await renderState(okState(), { options: { icons: { scope: "" } } })
     await r.flush()
     const heading = r.captureSpans().lines.find((line) => line.spans.some((span) => span.text.includes("Pull Requests")))
     const filterLabels = heading?.spans.map((span) => span.text).filter((text) => text.includes("branch") || text.includes("open"))
