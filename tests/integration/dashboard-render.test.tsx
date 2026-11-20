@@ -65,6 +65,16 @@ describe("DashboardView render", () => {
     expect(heading?.bg?.toInts()[3]).toBe(0)
   })
 
+  test("leaves the background behind each row's details line transparent", async () => {
+    const r = await renderState(okState({ prs: [makeTUIPR({ number: 42 })] }), { scope: "all", statusFilter: "all" })
+    await r.flush()
+    const details = r.captureSpans().lines
+      .find((line) => line.spans.some((span) => span.text.includes("#42")))
+
+    expect(details).toBeDefined()
+    for (const span of details!.spans) expect(span.bg?.toInts()[3] ?? 0).toBe(0)
+  })
+
   test("loading state", async () => {
     const r = await renderState(loadingState())
     await r.flush()

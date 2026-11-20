@@ -90,7 +90,6 @@ function ClickableComment(props: {
 export function PRRow(props: {
   pr: PR
   titleWidth: number
-  secondaryBackground: string
   onClick: (target: PRLinkTarget) => void
   text: string
   muted: string
@@ -151,7 +150,7 @@ export function PRRow(props: {
           {titleHovered() ? <u>{title()}</u> : title()}
         </text>
       </box>
-      <box flexDirection="row" gap={1} paddingLeft={2} width="100%" backgroundColor={props.secondaryBackground}>
+      <box flexDirection="row" gap={1} paddingLeft={2} width="100%">
         <ClickableText
           label={`#${props.pr.number}`}
           color={props.muted}

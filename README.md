@@ -222,7 +222,6 @@ By default, colours come from your active OpenCode theme. Override any of them w
 
 | Key | Used for | Default theme token |
 | --- | --- | --- |
-| `panelAlt` | Background of each row's second line | Raised background |
 | `text` | PR titles and the panel heading | Text |
 | `muted` | Secondary text, neutral states | Muted text |
 | `accent` | Hovered filters and page arrows | Primary action text |

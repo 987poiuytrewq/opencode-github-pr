@@ -275,7 +275,6 @@ export function DashboardView(props: {
                 <PRRow
                   pr={pr}
                   titleWidth={titleWidth()}
-                  secondaryBackground={sk.panelAlt}
                   onClick={(target) => {
                     props.setSelectedIdx(currentPage() * props.pageSize + i())
                     props.onOpen(pr.number, target)

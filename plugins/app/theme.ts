@@ -4,7 +4,6 @@
 import type { ResolvedTheme } from "@opencode/theme/tui"
 
 export const DEFAULT_SKIN = {
-  panelAlt: "#1d1d1d",
   text: "#e5e5e5",
   muted: "#888888",
   accent: "#5f87ff",
@@ -16,7 +15,6 @@ export const DEFAULT_SKIN = {
 }
 
 export type Skin = {
-  panelAlt: string
   text: string
   muted: string
   accent: string
@@ -39,7 +37,6 @@ export function toHex(c: { toInts(): [number, number, number, number] }): string
 
 export function skin(t: ResolvedTheme, overrides: Partial<Skin> = {}): Skin {
   return {
-    panelAlt: toHex(t.background.raised.base),
     text: toHex(t.text.base),
     muted: toHex(t.text.muted),
     accent: toHex(t.text.action.primary.base),

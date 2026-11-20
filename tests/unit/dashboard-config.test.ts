@@ -75,7 +75,7 @@ describe("dashboard options", () => {
 
   test("ignores colour and icon keys that no longer have an effect", () => {
     const options = dashboardOptions({
-      colors: { panel: "#000000", border: "#111111", borderActive: "#222222" },
+      colors: { panel: "#000000", panelAlt: "#1d1d1d", border: "#111111", borderActive: "#222222" },
       icons: { status: "X" },
     })
     expect(options.colors).toEqual({})
@@ -106,6 +106,6 @@ describe("dashboard options", () => {
       colors: {},
       icons: DEFAULT_ICONS,
     })
-    expect(Object.keys(DEFAULT_SKIN)).toHaveLength(9)
+    expect(Object.keys(DEFAULT_SKIN)).toHaveLength(8)
   })
 })
