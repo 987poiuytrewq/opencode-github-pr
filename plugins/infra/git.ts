@@ -27,10 +27,6 @@ export function currentBranch(cwd: string): string | null {
   }
 }
 
-export function originRemoteUrl(cwd: string): string | null {
-  return remoteUrls(cwd).find(({ name }) => name === "origin")?.url ?? null
-}
-
 function remoteUrls(cwd: string): Array<{ name: string; url: string }> {
   const paths = gitPaths(cwd)
   if (!paths) return []

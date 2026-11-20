@@ -5,6 +5,7 @@ import { truncateTitle } from "../domain/format"
 import {
   checkStatusGroups,
   commentThreadCounts,
+  mergeReadiness,
   reviewStatusGroups,
   type StatusCategory,
 } from "../domain/pr-status"
@@ -122,11 +123,7 @@ export function PRRow(props: {
     ? props.merged
     : props.pr.isDraft
       ? props.draft
-    : props.pr.mergeable === "MERGEABLE"
-      ? props.pass
-      : props.pr.mergeable === "CONFLICTING"
-        ? props.fail
-        : props.muted
+      : statusColor(mergeReadiness(props.pr), props)
   const checks = checkStatusGroups(props.pr)
   const reviews = reviewStatusGroups(props.pr)
   const comments = commentThreadCounts(props.pr)
