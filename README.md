@@ -31,12 +31,12 @@ repository, their CI, review and merge status, and jump straight to the right pa
 
 ## Install from npm
 
-Add the package name to the `plugins` array in your OpenCode config, either globally at
-`~/.config/opencode/opencode.json` or in a project's `opencode.json`:
+Add the package to the `plugins` array in your OpenCode CLI config, `~/.config/opencode/cli.json` (or
+`$XDG_CONFIG_HOME/opencode/cli.json` when `XDG_CONFIG_HOME` is set). Create the file if it doesn't exist:
 
 ```json
 {
-  "$schema": "https://opencode.ai/config.json",
+  "$schema": "https://opencode.ai/v2/cli.json",
   "plugins": ["opencode-github-pr"]
 }
 ```
@@ -47,7 +47,7 @@ To pass [options](#configuration), use the object form of the entry:
 
 ```json
 {
-  "$schema": "https://opencode.ai/config.json",
+  "$schema": "https://opencode.ai/v2/cli.json",
   "plugins": [
     {
       "package": "opencode-github-pr",
@@ -58,6 +58,10 @@ To pass [options](#configuration), use the object form of the entry:
   ]
 }
 ```
+
+The dashboard runs in the TUI, so it belongs in `cli.json`, which holds terminal settings and plugins. Don't put
+it in `opencode.json`: the plugin loads from there too, but its options aren't passed to the dashboard. `cli.json`
+is global only; there is no per-project version.
 
 ## Install from source
 
@@ -86,8 +90,8 @@ To pass [options](#configuration), use the object form of the entry:
 
 3. Restart OpenCode. The **Pull Requests** panel appears in the session sidebar.
 
-However you install it, add the plugin to `opencode.json`, not `cli.json`. The package has a server part and a TUI part; the TUI loads its part
-from the server's plugin list, including when it is connected to a remote server.
+A source install loaded from `opencode.json` can't take [options](#configuration), because options set there
+aren't passed to the dashboard, so it uses the defaults.
 
 ## Authentication
 
@@ -180,12 +184,11 @@ batch. Use [`pageSize` and `pagesPerBatch`](#configuration) to change how much i
 
 ## Configuration
 
-Pass options in the plugin entry's `options` object. Every option is optional. If you installed from source, use
-the clone's path as the `package` value instead:
+Pass options in the plugin entry's `options` object in [`cli.json`](#install-from-npm). Every option is optional:
 
 ```json
 {
-  "$schema": "https://opencode.ai/config.json",
+  "$schema": "https://opencode.ai/v2/cli.json",
   "plugins": [
     {
       "package": "opencode-github-pr",
@@ -315,7 +318,8 @@ unset for GitHub.com.
 
 | You see | What to do |
 | --- | --- |
-| No **Pull Requests** panel | Check that the plugin is in `opencode.json` (not `cli.json`) and that `enabled` isn't `false`, then restart OpenCode. If you installed from source, check that `bun install` has run in the clone. Plugin load errors are written to `~/.local/share/opencode/log/opencode.log`. |
+| No **Pull Requests** panel | Check that the plugin is in `~/.config/opencode/cli.json` (or `opencode.json` for a source install) and that `enabled` isn't `false`, then restart OpenCode. If you installed from source, check that `bun install` has run in the clone. Plugin load errors are written to `~/.local/share/opencode/log/opencode.log`. |
+| Options have no effect | The plugin is declared in `opencode.json`, which doesn't pass options to the dashboard. Move the entry, with its `options`, to [`~/.config/opencode/cli.json`](#install-from-npm) and remove it from `opencode.json`. |
 | Icons show as boxes or question marks | Your terminal font doesn't have Nerd Font glyphs. Set `iconStyle` to `"unicode"`, install a Nerd Font, or use [plain-text icons](#plain-text-icons). |
 | **No GitHub repo** | The session's directory isn't a Git repository with a GitHub remote. Add a remote, or open a session in the right project. For Enterprise, check `GITHUB_ENTERPRISE_URL`. |
 | **GitHub sign-in failed** | No valid token was found. Run `gh auth login`, or set `GITHUB_TOKEN` where the OpenCode server starts. |
