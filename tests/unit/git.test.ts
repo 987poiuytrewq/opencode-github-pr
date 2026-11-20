@@ -94,6 +94,23 @@ describe("detectRepo", () => {
     }
   })
 
+  test("uses the nearest nested repository for current-branch detection", () => {
+    const outer = makeFakeRepo("outer", "repo")
+    const inner = join(outer, "packages", "inner")
+    mkdirSync(join(inner, ".git"), { recursive: true })
+    writeFileSync(join(inner, ".git", "config"), `[remote "origin"]\n\turl = git@github.com:inner/repo.git\n`)
+    writeFileSync(join(inner, ".git", "HEAD"), "ref: refs/heads/inner-branch\n")
+    const nested = join(inner, "src", "deep")
+    mkdirSync(nested, { recursive: true })
+
+    try {
+      expect(detectRepo(nested)).toEqual({ owner: "inner", repo: "repo" })
+      expect(currentBranch(nested)).toBe("inner-branch")
+    } finally {
+      rmSync(outer, { recursive: true, force: true })
+    }
+  })
+
   test("reads shared config and HEAD from a linked worktree", () => {
     const root = mkdtempSync(join(tmpdir(), "pr-dash-worktree-"))
     const worktree = join(root, "checkout")
@@ -104,6 +121,7 @@ describe("detectRepo", () => {
     writeFileSync(join(worktree, ".git"), `gitdir: ${worktreeGitDir}\n`)
     writeFileSync(join(worktreeGitDir, "commondir"), "../..\n")
     writeFileSync(join(commonGitDir, "config"), `[remote "origin"]\n\turl = git@github.com:foo/bar.git\n`)
+    writeFileSync(join(commonGitDir, "HEAD"), "ref: refs/heads/main\n")
     writeFileSync(join(worktreeGitDir, "HEAD"), "ref: refs/heads/e2e-plugin-install\n")
 
     try {
