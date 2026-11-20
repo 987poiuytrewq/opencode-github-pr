@@ -44,6 +44,13 @@ describe("dashboard demo data", () => {
     expect(new Set(all.map((pr) => pr.authorLogin)).size).toBeGreaterThan(1);
   });
 
+  test("uses distinct additions and deletions counts for each PR", () => {
+    const { prs } = demoDashboardState();
+
+    expect(new Set(prs.map((pr) => pr.additions)).size).toBe(prs.length);
+    expect(new Set(prs.map((pr) => pr.deletions)).size).toBe(prs.length);
+  });
+
   test("returns independent fixture arrays for each TUI instance", () => {
     const first = demoDashboardState();
     const second = demoDashboardState();
