@@ -16,6 +16,7 @@ describe("dashboard demo data", () => {
 
     expect(state.status).toBe(DashboardStatus.Ok);
     expect(authoredOpen.length).toBeGreaterThan(5);
+    expect(state.pagination.totalCount).toBe(authoredOpen.length);
     expect(
       authoredOpen.some((pr) => pr.headRefName === state.currentBranch),
     ).toBe(true);
@@ -41,6 +42,13 @@ describe("dashboard demo data", () => {
     expect(closed.length).toBeGreaterThan(0);
     expect(all.length).toBeGreaterThan(state.prs.length - 1);
     expect(new Set(all.map((pr) => pr.authorLogin)).size).toBeGreaterThan(1);
+  });
+
+  test("uses distinct additions and deletions counts for each PR", () => {
+    const { prs } = demoDashboardState();
+
+    expect(new Set(prs.map((pr) => pr.additions)).size).toBe(prs.length);
+    expect(new Set(prs.map((pr) => pr.deletions)).size).toBe(prs.length);
   });
 
   test("returns independent fixture arrays for each TUI instance", () => {

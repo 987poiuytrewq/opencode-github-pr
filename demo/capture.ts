@@ -11,8 +11,8 @@ import { createServer } from "node:net";
 import { tmpdir } from "node:os";
 import { dirname, join, resolve } from "node:path";
 
-const COLUMNS = 140;
-const ROWS = 44;
+const COLUMNS = 84;
+const ROWS = 28;
 const START_TIMEOUT_MS = 45_000;
 const UI_TIMEOUT_MS = 12_000;
 const GIF_EXIT_TRIM_SECONDS = 0.6;
@@ -460,6 +460,17 @@ async function main(): Promise<void> {
     );
     await run("tmux", createArgs);
     await tmux(socket, ["set-option", "-t", session, "mouse", "off"]);
+    const readyScreen = await waitForText(
+      socket,
+      session,
+      "Build · Big Pickle OpenCode",
+      START_TIMEOUT_MS,
+    );
+    if (!readyScreen.includes("Pull Requests")) {
+      await tmux(socket, ["send-keys", "-t", session, "C-x"]);
+      await Bun.sleep(100);
+      await tmux(socket, ["send-keys", "-t", session, "b"]);
+    }
     const initialScreen = await waitForText(
       socket,
       session,
