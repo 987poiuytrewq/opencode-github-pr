@@ -69,7 +69,10 @@ export function createOctokit(opts: OctokitOpts = {}): Octokit {
               octokit.log.warn(
                 `[pr-dashboard] rate limit hit on ${options.method} ${options.url}; retry ${retryCount} after ${retryAfter}s`,
               )
-              return retryCount < 2
+              // Primary limits can last for an hour or more. Only let the
+              // plugin retry brief waits; longer cooldowns are surfaced to
+              // the dashboard so it can stop scheduling more requests.
+              return retryCount < 2 && retryAfter <= 5
             },
             onSecondaryRateLimit: (retryAfter: number, options: Required<EndpointDefaults>, octokit: CoreOctokit) => {
               octokit.log.warn(

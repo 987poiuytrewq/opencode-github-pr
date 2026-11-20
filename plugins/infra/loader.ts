@@ -94,7 +94,33 @@ async function graphqlPartial(
   try {
     return await getOctokit(requestTimeoutMs).graphql(query, vars)
   } catch (e: unknown) {
-    if (isRecord(e) && "data" in e && e.data) return e.data
+    if (isRecord(e) && "data" in e && e.data) {
+      const data = isRecord(e.data) ? e.data : {}
+      const errors = Array.isArray(e.errors) ? e.errors : []
+      const hasFatalType = errors.some((error) => {
+        if (!isRecord(error) || typeof error.type !== "string") return false
+        if (error.type === "RATE_LIMITED") return true
+        if (error.type !== "NOT_FOUND" && error.type !== "FORBIDDEN") return false
+        // A nested field can be unavailable while the PR listing remains
+        // useful. Root/connection errors make the listing itself unreliable.
+        return !Array.isArray(error.path) || error.path.length <= 2
+      })
+      const root = isRecord(data.repository) ? data.repository : null
+      const hasRootFailure =
+        data.repository === null ||
+        errors.some((error) => {
+          if (!isRecord(error) || !Array.isArray(error.path)) return false
+          const path = error.path
+          return (
+            (path.length === 1 && (path[0] === "repository" || path[0] === "search")) ||
+            (path.length === 2 &&
+              path[0] === "repository" &&
+              path[1] === "pullRequests" &&
+              !query.includes("recentPullRequests:"))
+          )
+        })
+      if (!hasFatalType && !hasRootFailure && root !== null) return e.data
+    }
     throw e
   }
 }
