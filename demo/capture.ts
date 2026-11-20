@@ -254,6 +254,10 @@ async function exerciseDashboard(
   session: string,
 ): Promise<void> {
   await waitForText(socket, session, "Add passkey sign-in", START_TIMEOUT_MS);
+  await waitForText(socket, session, "Retry expired sessions");
+  await waitForText(socket, session, "Add audit log filters");
+  await waitForText(socket, session, "Improve keyboard navigation");
+  await waitForText(socket, session, "Cache organization membership");
   await waitForText(socket, session, "1 of 2");
   await Bun.sleep(700);
 
