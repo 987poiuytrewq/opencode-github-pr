@@ -35,6 +35,7 @@ function buildMockClient() {
     pulls: {
       list: async (params: any) => dispatch("pulls.list", params),
       get: async (params: any) => dispatch("pulls.get", params),
+      requestReviewers: async (params: any) => dispatch("pulls.requestReviewers", params),
     },
     repos: {
       getBranchProtection: async (params: any) => dispatch("repos.getBranchProtection", params),

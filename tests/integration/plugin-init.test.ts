@@ -45,9 +45,13 @@ describe("V2 TUI plugin setup", () => {
     const ids = commands.map((item: any) => item.id)
     expect(ids).toContain("opencode-github-pr.refresh")
     expect(ids).toContain("opencode-github-pr.open")
-    expect(ids).not.toContain("opencode-github-pr.add-reviewer")
+    expect(ids).toContain("opencode-github-pr.add-reviewer")
     expect(ids).not.toContain("opencode-github-pr.rerequest-review")
     expect(ids).not.toContain("opencode-github-pr.add-current-branch-reviewer")
+    expect(commands.find((item: any) => item.id === "opencode-github-pr.add-reviewer").slash).toEqual({
+      name: "pr-reviewer",
+      arguments: true,
+    })
     expect(commands.find((item: any) => item.id === "opencode-github-pr.refresh").slash.name).toBe("pr-refresh")
     cleanup?.()
   })

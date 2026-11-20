@@ -18,6 +18,7 @@ import { dashboardOptions } from "./app/config"
 const command = {
   refresh: "opencode-github-pr.refresh",
   open: "opencode-github-pr.open",
+  requestReviewer: "opencode-github-pr.add-reviewer",
 }
 
 async function setup(api: TuiPluginContext) {
@@ -180,6 +181,19 @@ async function setup(api: TuiPluginContext) {
             run() {
               const pr = visiblePRs()[selectedIdx()]
               if (pr) void actions.openPR(pr.number)
+            },
+          },
+          {
+            id: command.requestReviewer,
+            title: "PRs: Request reviewer for selected PR",
+            description: "Request a review from a GitHub user or organization team.",
+            group: "PR Dashboard",
+            palette: true,
+            slash: { name: "pr-reviewer", arguments: true },
+            enabled: () => visiblePRs().length > 0,
+            run(input?: string) {
+              const pr = visiblePRs()[selectedIdx()]
+              if (pr) void actions.requestReviewer(pr.number, input)
             },
           },
         ],
