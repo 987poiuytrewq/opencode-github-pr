@@ -57,10 +57,17 @@ export type DashboardState = {
   currentBranch: string | null
   viewerLogin: string | null
   fetchedAt: number | null
-  // Closed and merged PRs load only once a status filter needs them.
-  closedLoaded: boolean
-  // Whether more PRs exist than the page limit loaded, per listing.
-  truncated: { open: boolean; closed: boolean }
+  // The active status listing is fetched from GitHub in cursor-based batches.
+  pagination: {
+    listing: PRStatusFilter
+    scope: PRScope
+    scopeValue: string | null
+    cursor: string | null
+    hasMore: boolean
+    pagesLoaded: number
+    loading: boolean
+    limitReached: boolean
+  }
   error?: string
   errorKind?: PRListErrorKind
 }
@@ -71,6 +78,7 @@ export type DashboardState = {
 export interface DashboardContext {
   state: () => DashboardState
   refresh: () => Promise<void>
+  loadMore: () => Promise<void>
   refreshOne: (n: number) => Promise<void>
   selectedIdx: () => number
   setSelectedIdx: (n: number) => void

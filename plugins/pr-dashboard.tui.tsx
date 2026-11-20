@@ -31,8 +31,16 @@ async function setup(api: TuiPluginContext) {
     currentBranch: null,
     viewerLogin: null,
     fetchedAt: null,
-    closedLoaded: false,
-    truncated: { open: false, closed: false },
+    pagination: {
+      listing: "open",
+      scope: "all",
+      scopeValue: null,
+      cursor: null,
+      hasMore: false,
+      pagesLoaded: 0,
+      loading: false,
+      limitReached: false,
+    },
   })
   const demoMode = process.env.OPENCODE_GITHUB_PR_DEMO === "1"
   if (demoMode) {
@@ -45,29 +53,50 @@ async function setup(api: TuiPluginContext) {
   const visiblePRs = () =>
     filterPRs(state().prs, scope(), statusFilter(), state().currentBranch, state().viewerLogin)
   const cycleScope = () => {
-    setScope(nextPRScope(scope()))
+    const nextScope = nextPRScope(scope())
+    setScope(nextScope)
     setSelectedIdx(0)
+    if (demoMode) {
+      setState((s) => ({
+        ...s,
+        pagination: {
+          ...s.pagination,
+          scope: nextScope,
+          scopeValue: nextScope === "branch" ? s.currentBranch : null,
+        },
+      }))
+    } else {
+      void dash.refresh()
+    }
   }
   const cycleStatus = () => {
-    setStatusFilter(nextPRStatusFilter(statusFilter()))
+    const nextStatus = nextPRStatusFilter(statusFilter())
+    setStatusFilter(nextStatus)
     setSelectedIdx(0)
-    // Closed PRs load on demand; fetch them (or refresh a cached copy).
-    if (statusFilter() !== "open") void dash.refresh()
+    // Each status is queried separately so GitHub applies the status filter.
+    if (demoMode) {
+      setState((s) => ({ ...s, pagination: { ...s.pagination, listing: nextStatus } }))
+    } else {
+      void dash.refresh()
+    }
   }
 
   const dash = demoMode
-    ? { refresh: async () => {}, refreshOne: async () => {} }
+    ? { refresh: async () => {}, loadMore: async () => {}, refreshOne: async () => {} }
     : useDashboard(
         api,
         state,
         setState,
         options.requestTimeoutMs,
-        options.maxPRPages,
-        () => statusFilter() !== "open",
+        options.pagesPerBatch,
+        statusFilter,
+        scope,
+        options.pageSize,
       )
   const dashboard: DashboardContext = {
     state,
     refresh: dash.refresh,
+    loadMore: dash.loadMore,
     refreshOne: dash.refreshOne,
     selectedIdx,
     setSelectedIdx,
@@ -88,8 +117,8 @@ async function setup(api: TuiPluginContext) {
         statusFilter={statusFilter()}
         onCycleScope={cycleScope}
         onCycleStatus={cycleStatus}
+        onLoadMore={dash.loadMore}
         pageSize={options.pageSize}
-        maxPRPages={options.maxPRPages}
         colors={options.colors}
         icons={options.icons}
       />

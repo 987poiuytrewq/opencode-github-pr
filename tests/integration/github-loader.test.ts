@@ -6,7 +6,7 @@ import {
   mockOctokitOp,
 } from "../helpers/octokit-mock";
 import {
-  MAX_REPOSITORY_PR_PAGES,
+  DEFAULT_PR_BATCH_SIZE,
   repositoryPRs,
   fetchOnePR,
 } from "../../plugins/infra/loader";
@@ -54,17 +54,25 @@ describe("repositoryPRs", () => {
 
     const result = await repositoryPRs({ owner: "foo", repo: "bar" }, 3);
     expect(paramsSeen).toEqual([
-      { owner: "foo", name: "bar", states: ["OPEN"], head: null, after: null },
+      {
+        owner: "foo",
+        name: "bar",
+        states: ["OPEN"],
+        head: null,
+        after: null,
+        first: 3,
+      },
       {
         owner: "foo",
         name: "bar",
         states: ["OPEN"],
         head: null,
         after: "cursor-1",
+        first: 2,
       },
     ]);
     expect(result.viewerLogin).toBe("octocat");
-    expect(result.listingTruncated).toBe(false);
+    expect(result.hasMore).toBe(false);
     expect(result.fetchedPages).toBe(2);
     expect(
       result.prs.map((pr) => ({
@@ -92,7 +100,7 @@ describe("repositoryPRs", () => {
     ]);
   });
 
-  test("loads one page by default and reports that more PRs are available", async () => {
+  test("loads the default four-PR batch and reports that more PRs are available", async () => {
     let calls = 0;
     mockOctokitDefault((op) => {
       if (op !== "graphql") return null;
@@ -110,9 +118,71 @@ describe("repositoryPRs", () => {
 
     const result = await repositoryPRs({ owner: "foo", repo: "bar" });
 
-    expect(MAX_REPOSITORY_PR_PAGES).toBe(1);
-    expect(calls).toBe(1);
-    expect(result.listingTruncated).toBe(true);
+    expect(DEFAULT_PR_BATCH_SIZE).toBe(4);
+    expect(calls).toBe(4);
+    expect(result.hasMore).toBe(true);
+    expect(result.endCursor).toBe("cursor-4");
+  });
+
+  test("requests exactly the requested PR batch size when it fits in one GitHub request", async () => {
+    let captured: any = null;
+    mockOctokitDefault((op, params) => {
+      if (op !== "graphql") return null;
+      captured = params;
+      return {
+        viewer: { login: "octocat" },
+        repository: {
+          pullRequests: {
+            pageInfo: { hasNextPage: false, endCursor: "cursor-20" },
+            nodes: Array.from({ length: params.params.first }, (_, i) => ({
+              number: i + 1,
+              title: `PR ${i + 1}`,
+              state: "OPEN",
+            })),
+          },
+        },
+      };
+    });
+
+    const result = await repositoryPRs({ owner: "foo", repo: "bar" }, 20);
+
+    expect(captured.params.first).toBe(20);
+    expect(result.prs).toHaveLength(20);
+    expect(result.fetchedPages).toBe(1);
+  });
+
+  test("splits a PR batch larger than 100 across GitHub requests", async () => {
+    const firsts: number[] = [];
+    let offset = 0;
+    mockOctokitDefault((op, params) => {
+      if (op !== "graphql") return null;
+      const first = params.params.first;
+      firsts.push(first);
+      const start = offset + 1;
+      offset += first;
+      return {
+        viewer: { login: "octocat" },
+        repository: {
+          pullRequests: {
+            pageInfo: {
+              hasNextPage: offset < 120,
+              endCursor: `cursor-${offset}`,
+            },
+            nodes: Array.from({ length: first }, (_, i) => ({
+              number: start + i,
+              title: `PR ${start + i}`,
+              state: "OPEN",
+            })),
+          },
+        },
+      };
+    });
+
+    const result = await repositoryPRs({ owner: "foo", repo: "bar" }, 120);
+
+    expect(firsts).toEqual([100, 20]);
+    expect(result.prs).toHaveLength(120);
+    expect(result.fetchedPages).toBe(2);
   });
 
   test("requests closed and merged PRs for the closed listing", async () => {
@@ -134,7 +204,174 @@ describe("repositoryPRs", () => {
     ]);
   });
 
-  test("stops after the page limit and reports that more PRs are available", async () => {
+  test("requests all pull request states for the all listing", async () => {
+    const paramsSeen: any[] = [];
+    mockOctokitDefault((op, params) => {
+      if (op !== "graphql") return null;
+      paramsSeen.push(params.params);
+      return {
+        repository: {
+          pullRequests: { pageInfo: { hasNextPage: false }, nodes: [] },
+        },
+      };
+    });
+
+    await repositoryPRs({ owner: "foo", repo: "bar" }, 1, 15_000, "all");
+
+    expect(paramsSeen.map(({ states }) => states)).toEqual([
+      ["OPEN", "CLOSED", "MERGED"],
+    ]);
+  });
+
+  test("uses GitHub search for the author scope and includes the status filter", async () => {
+    let captured: any = null;
+    mockOctokitDefault((op, params) => {
+      if (op !== "graphql") return null;
+      captured = params;
+      return {
+        viewer: { login: "octocat" },
+        search: {
+          pageInfo: { hasNextPage: false, endCursor: "search-cursor-1" },
+          nodes: [
+            {
+              number: 7,
+              title: "Authored PR",
+              state: "CLOSED",
+              author: { login: "octocat" },
+            },
+          ],
+        },
+      };
+    });
+
+    const result = await repositoryPRs(
+      { owner: "foo", repo: "bar" },
+      4,
+      15_000,
+      "closed",
+      null,
+      "author",
+    );
+
+    expect(captured.query).toContain("search(query: $query");
+    expect(captured.params.query).toContain(
+      "repo:foo/bar is:pr author:@me is:closed",
+    );
+    expect(result.prs.map(({ number }) => number)).toEqual([7]);
+    expect(result.viewerLogin).toBe("octocat");
+  });
+
+  test("uses the pull-request connection head filter for the branch scope", async () => {
+    let captured: any = null;
+    mockOctokitDefault((op, params) => {
+      if (op !== "graphql") return null;
+      captured = params;
+      return {
+        viewer: { login: "octocat" },
+        repository: {
+          pullRequests: {
+            pageInfo: { hasNextPage: false },
+            nodes: [
+              {
+                number: 8,
+                title: "Branch PR",
+                state: "OPEN",
+                headRefName: "feature/x",
+              },
+            ],
+          },
+        },
+      };
+    });
+
+    const result = await repositoryPRs(
+      { owner: "foo", repo: "bar" },
+      4,
+      15_000,
+      "open",
+      null,
+      "branch",
+      "feature/x",
+    );
+
+    expect(captured.params).toMatchObject({
+      states: ["OPEN"],
+      head: "feature/x",
+    });
+    expect(captured.query).toContain("headRefName: $head");
+    expect(result.prs.map(({ number }) => number)).toEqual([8]);
+  });
+
+  test("stops search-backed listings at GitHub's 1,000-result limit", async () => {
+    let calls = 0;
+    mockOctokitDefault((op, params) => {
+      if (op !== "graphql") return null;
+      calls++;
+      const first = params.params.first;
+      const start = calls === 1 ? 999 : 1000;
+      return {
+        viewer: { login: "octocat" },
+        search: {
+          pageInfo: {
+            hasNextPage: true,
+            endCursor: `search-cursor-${start + first - 1}`,
+          },
+          nodes: Array.from({ length: first }, (_, i) => ({
+            number: start + i,
+            title: `PR ${start + i}`,
+            state: "OPEN",
+          })),
+        },
+      };
+    });
+
+    const result = await repositoryPRs(
+      { owner: "foo", repo: "bar" },
+      4,
+      15_000,
+      "all",
+      "search-cursor-998",
+      "assignee",
+      null,
+      998,
+    );
+
+    expect(calls).toBe(1);
+    expect(result.fetchedPages).toBe(1);
+    expect(result.prs).toHaveLength(2);
+    expect(result.hasMore).toBe(false);
+    expect(result.limitReached).toBe(true);
+  });
+
+  test("continues from the supplied cursor without refetching the first page", async () => {
+    const paramsSeen: any[] = [];
+    mockOctokitDefault((op, params) => {
+      if (op !== "graphql") return null;
+      paramsSeen.push(params.params);
+      return {
+        repository: {
+          pullRequests: {
+            pageInfo: { hasNextPage: false, endCursor: "cursor-5" },
+            nodes: [{ number: 5, title: "PR 5", state: "OPEN" }],
+          },
+        },
+      };
+    });
+
+    const result = await repositoryPRs(
+      { owner: "foo", repo: "bar" },
+      4,
+      15_000,
+      "open",
+      "cursor-4",
+    );
+
+    expect(paramsSeen.map(({ after }) => after)).toEqual(["cursor-4"]);
+    expect(result.prs.map(({ number }) => number)).toEqual([5]);
+    expect(result.endCursor).toBe("cursor-5");
+  });
+
+  test("stops after the batch count and reports that more PRs are available", async () => {
     const paramsSeen: any[] = [];
     let lastQuery = "";
     mockOctokitDefault((op, params) => {
@@ -161,13 +398,13 @@ describe("repositoryPRs", () => {
       "cursor-1",
       "cursor-2",
     ]);
-    expect(lastQuery).toContain("pullRequests(first: 100");
+    expect(lastQuery).toContain("pullRequests(first: $first");
     expect(result.prs.map(({ number }) => number)).toEqual([1, 2, 3]);
     expect(result.fetchedPages).toBe(3);
-    expect(result.listingTruncated).toBe(true);
+    expect(result.hasMore).toBe(true);
   });
 
-  test("honors a customized repository page limit", async () => {
+  test("honors a customized PR batch size", async () => {
     let calls = 0;
     mockOctokitDefault((op) => {
       if (op !== "graphql") return null;
@@ -187,7 +424,7 @@ describe("repositoryPRs", () => {
 
     expect(calls).toBe(2);
     expect(result.fetchedPages).toBe(2);
-    expect(result.listingTruncated).toBe(true);
+    expect(result.hasMore).toBe(true);
   });
 
   test("rejects an invalid or repeated pagination cursor", async () => {

@@ -126,11 +126,11 @@ These commands are available as slash commands and in the command palette, under
 The list refreshes when OpenCode starts, each time a session goes idle (for example after the agent finishes a task),
 and every 60 seconds while a session is open. Use `/pr-refresh` to reload it on demand.
 
-The dashboard loads the 100 most recently updated open PRs in the repository. Closed and merged PRs are loaded
-separately, the first time you switch the status filter to `closed` or `all`, and then kept so switching back is
-instant. Loading them separately means a backlog of closed PRs can't push open ones out of the list.
-
-If a repository has more PRs than were loaded, the panel says so. Raise [`maxPRPages`](#configuration) to load more.
+GitHub applies both status and scope filters. Status can be `open`, `closed` (closed or merged), or `all`. Scope can
+be the current branch, PR author, assignee, or all PRs. The dashboard initially fetches four TUI pages of PRs. As
+you page forward, it fetches the next four TUI pages in the background. A batch may use multiple GitHub requests
+when it exceeds GitHub's 100-PR request size. If you reach the end of the loaded results, the TUI advances as soon
+as the new batch arrives. GitHub search limits author and assignee results to 1,000 PRs per filter.
 
 ## Configuration
 
@@ -157,7 +157,7 @@ Pass options in the plugin entry's `options` object. Every option is optional:
 | --- | --- | --- |
 | `enabled` | `true` | Set to `false` to turn the dashboard off without uninstalling it. |
 | `pageSize` | `5` | PRs shown per page. |
-| `maxPRPages` | `1` | Pages of 100 PRs to load from GitHub for open PRs, and again for closed PRs when shown. `2` loads up to 200 of each. Higher values use more API quota. |
+| `pagesPerBatch` | `4` | TUI pages to fetch per batch. Each batch contains `pageSize × pagesPerBatch` PRs (at least four TUI pages); additional batches load as you page forward. |
 | `refreshIntervalMs` | `60000` | How often the list refreshes while a session is open, in milliseconds. |
 | `requestTimeoutMs` | `15000` | How long to wait for a GitHub request before giving up, in milliseconds. |
 | `defaultScope` | `"author"` | Scope filter at startup: `branch`, `author`, `assignee` or `all`. |
@@ -297,7 +297,7 @@ unset for GitHub.com.
 | **No GitHub repo** | The session's directory isn't a Git repository with a GitHub remote. Add a remote, or open a session in the right project. For Enterprise, check `GITHUB_ENTERPRISE_URL`. |
 | **GitHub sign-in failed** | No valid token was found. Run `gh auth login`, or set `GITHUB_TOKEN` where the OpenCode server starts. |
 | **Permission denied** or **Repo not found** | Your token can't read this repository. Check its scopes or fine-grained permissions, and SSO authorisation for organisation repositories. |
-| **Rate limit exceeded** | GitHub's API limit has been reached. The panel shows when you can try again. Lower `maxPRPages` or raise `refreshIntervalMs` to use less quota. |
+| **Rate limit exceeded** | GitHub's API limit has been reached. The panel shows when you can try again. Raise `refreshIntervalMs` and avoid paging forward unnecessarily to use less quota. |
 | **Request timed out** or **Cannot reach GitHub** | Check your connection or proxy. On slow networks, raise `requestTimeoutMs`. |
 | **No matching PRs** | No PRs match the current filters. Click the scope or status label to widen them. |
 | `branch` scope is empty | The current branch has no PR, or the session is in detached HEAD. |

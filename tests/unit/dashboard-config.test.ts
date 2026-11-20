@@ -13,7 +13,7 @@ describe("dashboard options", () => {
     expect(dashboardOptions()).toEqual({
       enabled: true,
       pageSize: 5,
-      maxPRPages: 1,
+      pagesPerBatch: 4,
       refreshIntervalMs: 60_000,
       requestTimeoutMs: 15_000,
       defaultScope: "author",
@@ -28,7 +28,7 @@ describe("dashboard options", () => {
     expect(
       dashboardOptions({
         pageSize: 8,
-        maxPRPages: 4,
+        pagesPerBatch: 4,
         refreshIntervalMs: 30_000,
         requestTimeoutMs: 10_000,
         defaultScope: "assignee",
@@ -39,7 +39,7 @@ describe("dashboard options", () => {
     ).toEqual({
       enabled: true,
       pageSize: 8,
-      maxPRPages: 4,
+      pagesPerBatch: 4,
       refreshIntervalMs: 30_000,
       requestTimeoutMs: 10_000,
       defaultScope: "assignee",
@@ -48,6 +48,10 @@ describe("dashboard options", () => {
       colors: { accent: "#123456", merged: "magenta" },
       icons: { ...UNICODE_ICONS, openPR: "P", nextPage: ">" },
     })
+  })
+
+  test("keeps each fetch batch at least four TUI pages", () => {
+    expect(dashboardOptions({ pagesPerBatch: 1 }).pagesPerBatch).toBe(4)
   })
 
   test("uses Unicode icons when selected and lets explicit icon overrides take precedence", () => {
@@ -76,7 +80,7 @@ describe("dashboard options", () => {
     expect(
       dashboardOptions({
         pageSize: -1,
-        maxPRPages: 0,
+        pagesPerBatch: 0,
         refreshIntervalMs: "soon",
         requestTimeoutMs: 0,
         defaultScope: "unknown",
@@ -87,7 +91,7 @@ describe("dashboard options", () => {
       }),
     ).toMatchObject({
       pageSize: 5,
-      maxPRPages: 1,
+      pagesPerBatch: 4,
       refreshIntervalMs: 60_000,
       requestTimeoutMs: 15_000,
       defaultScope: "author",

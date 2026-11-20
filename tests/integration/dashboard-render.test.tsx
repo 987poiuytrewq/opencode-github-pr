@@ -11,8 +11,10 @@ async function renderState(state: DashboardState, handlers: Partial<{
   onOpen: (n: number, target?: PRLinkTarget) => void
   onCycleScope: () => void
   onCycleStatus: () => void
+  onLoadMore: () => Promise<void>
   scope: PRScope
   statusFilter: PRStatusFilter
+  paginationListing: PRStatusFilter
   options: Parameters<typeof dashboardOptions>[0]
 }> = {}, width = 50) {
   const { api } = createMockTuiApi()
@@ -21,15 +23,25 @@ async function renderState(state: DashboardState, handlers: Partial<{
     () => (
       <DashboardView
         theme={api.theme}
-        state={state}
+        state={{
+          ...state,
+          pagination: {
+            ...state.pagination,
+            listing: handlers.paginationListing ?? handlers.statusFilter ?? "open",
+            scope: handlers.scope ?? "branch",
+            scopeValue: handlers.scope === "branch" || handlers.scope === undefined
+              ? state.currentBranch
+              : null,
+          },
+        }}
         setSelectedIdx={() => {}}
         onOpen={handlers.onOpen ?? (() => {})}
         scope={handlers.scope ?? "branch"}
         statusFilter={handlers.statusFilter ?? "open"}
         onCycleScope={handlers.onCycleScope ?? (() => {})}
         onCycleStatus={handlers.onCycleStatus ?? (() => {})}
+        onLoadMore={handlers.onLoadMore ?? (async () => {})}
         pageSize={options.pageSize}
-        maxPRPages={options.maxPRPages}
         colors={options.colors}
         icons={options.icons}
       />
@@ -132,35 +144,32 @@ describe("DashboardView render", () => {
     expect(captureFrame(r)).toMatchSnapshot()
   })
 
-  test("shows which listing was truncated, for the current status filter", async () => {
-    const truncated = { open: true, closed: false }
-    let r = await renderState(okState({ truncated }), { statusFilter: "open" })
+  test("indicates when more server-filtered results are available", async () => {
+    const r = await renderState(okState({
+      pagination: {
+        listing: "open",
+        scope: "branch",
+        scopeValue: "feature",
+        cursor: "cursor-1",
+        hasMore: true,
+        pagesLoaded: 4,
+        loading: false,
+        limitReached: false,
+      },
+    }))
     await r.flush()
-    expect(captureFrame(r)).toContain("Showing 100 newest open PRs")
-    expect(captureFrame(r)).toContain("raise maxPRPages")
-
-    r = await renderState(okState({ truncated }), { statusFilter: "closed" })
-    await r.flush()
-    expect(captureFrame(r)).not.toContain("Showing")
-
-    r = await renderState(okState({ truncated: { open: true, closed: true } }), { statusFilter: "all" })
-    await r.flush()
-    expect(captureFrame(r)).toContain("Showing 100 newest open and closed PRs")
+    expect(captureFrame(r)).toContain("1 of 1+")
   })
 
-  test("truncation notice reflects the configured page limit", async () => {
-    const r = await renderState(okState({ truncated: { open: true, closed: false } }), {
-      statusFilter: "open",
-      options: { maxPRPages: 5 },
+  test("shows a loading line while a server-side status listing is changing", async () => {
+    const r = await renderState(loadingState(), {
+      scope: "all",
+      statusFilter: "closed",
+      paginationListing: "open",
     })
     await r.flush()
-    expect(captureFrame(r)).toContain("Showing 500 newest open PRs")
-  })
-
-  test("shows a loading line instead of an empty list while closed PRs first load", async () => {
-    const r = await renderState(okState({ closedLoaded: false }), { scope: "all", statusFilter: "closed" })
-    await r.flush()
     const frame = captureFrame(r)
+    expect(frame).toContain("Loading PRs")
     expect(frame).toContain("Loading closed PRs")
     expect(frame).not.toContain("No matching")
   })
@@ -478,7 +487,19 @@ describe("DashboardView mouse interaction", () => {
     const prs = Array.from({ length: 12 }, (_, i) =>
       makeTUIPR({ number: 10 + i, title: `PR ${10 + i}` }),
     )
-    const r = await renderState(okState({ prs }), { scope: "all", statusFilter: "all" })
+    const r = await renderState(okState({
+      prs,
+      pagination: {
+        listing: "all",
+        scope: "all",
+        scopeValue: null,
+        cursor: null,
+        hasMore: false,
+        pagesLoaded: 1,
+        loading: false,
+        limitReached: false,
+      },
+    }), { scope: "all", statusFilter: "all" })
     await r.flush()
 
     const clickArrow = async (pageLabel: string, arrow: string) => {
@@ -513,5 +534,90 @@ describe("DashboardView mouse interaction", () => {
     expect(r.captureCharFrame()).toContain("3 of 3")
     await clickArrow("3 of 3", "◀")
     expect(r.captureCharFrame()).toContain("2 of 3")
+  })
+
+  test("fetches another GitHub batch when the next page is not loaded yet", async () => {
+    let loadRequests = 0
+    const r = await renderState(okState({
+      prs: [makeTUIPR({ number: 10, title: "Only loaded PR" })],
+      pagination: {
+        listing: "open",
+        scope: "branch",
+        scopeValue: "feature",
+        cursor: "cursor-4",
+        hasMore: true,
+        pagesLoaded: 4,
+        loading: false,
+        limitReached: false,
+      },
+    }), {
+      scope: "all",
+      options: { pageSize: 1 },
+      onLoadMore: async () => { loadRequests++ },
+    })
+    await r.flush()
+    expect(captureFrame(r)).toContain("1 of 1+")
+
+    const lines = r.captureCharFrame().split("\n")
+    const y = lines.findIndex((line) => line.includes("1 of 1+"))
+    const x = lines[y].indexOf(dashboardOptions().icons.nextPage)
+    await r.mockMouse.click(x, y)
+    await r.flush()
+
+    expect(loadRequests).toBe(1)
+  })
+
+  test("prefetches another batch on each forward page action", async () => {
+    let loadRequests = 0
+    const r = await renderState(okState({
+      prs: [
+        makeTUIPR({ number: 10, title: "First loaded PR" }),
+        makeTUIPR({ number: 11, title: "Second loaded PR" }),
+      ],
+      pagination: {
+        listing: "open",
+        scope: "branch",
+        scopeValue: "feature",
+        cursor: "cursor-4",
+        hasMore: true,
+        pagesLoaded: 4,
+        loading: false,
+        limitReached: false,
+      },
+    }), {
+      scope: "all",
+      options: { pageSize: 1 },
+      onLoadMore: async () => { loadRequests++ },
+    })
+    await r.flush()
+    expect(captureFrame(r)).toContain("1 of 2+")
+    const lines = r.captureCharFrame().split("\n")
+    const y = lines.findIndex((line) => line.includes("1 of 2+"))
+    const x = lines[y].indexOf(dashboardOptions().icons.nextPage)
+    await r.mockMouse.click(x, y)
+    await r.flush()
+    expect(captureFrame(r)).toContain("2 of 2+")
+    expect(loadRequests).toBe(1)
+  })
+
+  test("does not offer a load-more action when the current scope has no matches", async () => {
+    const r = await renderState(okState({
+      prs: [],
+      pagination: {
+        listing: "open",
+        scope: "author",
+        scopeValue: null,
+        cursor: "cursor-4",
+        hasMore: true,
+        pagesLoaded: 4,
+        loading: false,
+        limitReached: false,
+      },
+    }), {
+      scope: "author",
+    })
+    await r.flush()
+    expect(captureFrame(r)).toContain("No matching")
+    expect(captureFrame(r)).not.toContain("Load more results")
   })
 })
