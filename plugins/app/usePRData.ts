@@ -11,7 +11,6 @@ import type { Context as TuiPluginContext } from "@opencode/plugin/tui/context"
 import {
   DashboardStatus,
   type DashboardState,
-  type Repo,
   type PRScope,
   type PRStatusFilter,
 } from "../domain/types"

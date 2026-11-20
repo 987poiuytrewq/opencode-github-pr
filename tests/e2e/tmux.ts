@@ -1,4 +1,4 @@
-import { spawn, type Subprocess } from "bun"
+import { spawn } from "bun"
 
 export class TmuxSession {
   readonly name: string
@@ -167,7 +167,7 @@ export function hasPullRequestsHeading(screen: string): boolean {
 export const OPENCODE_BIN = process.env.OPENCODE_BIN ?? "opencode"
 
 export function e2eDescribe(name: string, fn: () => void): void {
-  const { describe, test } = require("bun:test")
+  const { describe } = require("bun:test")
   if (isE2E()) {
     describe(name, fn)
   } else {

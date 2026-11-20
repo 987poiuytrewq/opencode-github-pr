@@ -1,4 +1,3 @@
-import { mock } from "bun:test"
 import { setOctokit } from "../../plugins/infra/octokit"
 
 // Op-specific handlers receive just the request params (the op is already
@@ -12,7 +11,7 @@ let defaultHandler: OctokitDefaultHandler | null = null
 
 export function mockOctokitOp(op: string, respond: OctokitHandler) {
   handlers.push({
-    match: (o, p) => o === op,
+    match: (o) => o === op,
     respond,
   })
 }

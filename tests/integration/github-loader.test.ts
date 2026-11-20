@@ -683,7 +683,7 @@ describe("repositoryPRs", () => {
 
   test("propagates a pagination request failure instead of returning a partial listing", async () => {
     let calls = 0;
-    mockOctokitDefault((op, params) => {
+    mockOctokitDefault((op) => {
       if (op !== "graphql") return null;
       calls++;
       if (calls === 2) throw new Error("GitHub request failed");
