@@ -273,8 +273,6 @@ export function DashboardView(props: {
               gap={1}
               paddingTop={1}
               width="100%"
-              border={["top"]}
-              borderColor={previousHovered() || nextHovered() ? sk.borderActive : sk.border}
             >
               <text
                 fg={canGoPrevious() && previousHovered() ? sk.accent : sk.muted}
