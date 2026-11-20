@@ -5,9 +5,7 @@ import type { PRListErrorKind } from "./types"
 // Message convention:
 //   - Success messages are verb-specific and live in the tool/action
 //     that produces them (e.g. "Requested review from @alice on PR #42").
-//   - Tool/action failures use the generic `failed(msg)` fallback
-//     ("Failed: <detail>"). The tool description provides context; the
-//     error string just conveys what went wrong.
+//   - Tool/action failures use an error string appropriate to the action.
 //   - Reusable domain states (no repo, no auth, rate limit, HTTP status
 //     categories) have dedicated entries here because they're shared
 //     across multiple actions.
@@ -33,8 +31,6 @@ export const errorMessages = {
     unknown: (msg: string) => msg,
   },
 
-  // generic toast/tool failure fallback
-  failed: (msg: string) => `Failed: ${msg}`,
   unknown: "unknown",
 
   // dashboard view banners / empty states
