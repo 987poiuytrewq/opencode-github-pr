@@ -155,16 +155,21 @@ export function parseRateLimitError(e: unknown): RateLimitInfo {
     : isRecord(details.headers)
       ? details.headers
       : {}
+  const rawDate = headers.date ?? headers.Date
+  const serverNow = rawDate === undefined ? null : Date.parse(String(rawDate))
+  const now = Date.now()
+  const clockOffset = serverNow !== null && Number.isFinite(serverNow) ? serverNow - now : 0
   const rawRetryAfter = headers["retry-after"] ?? headers["Retry-After"]
   const retryAfter = rawRetryAfter === undefined
     ? null
     : /^\d+(?:\.\d+)?$/.test(String(rawRetryAfter))
-      ? Date.now() + Number(rawRetryAfter) * 1000
+      ? (serverNow !== null && Number.isFinite(serverNow) ? serverNow : now) +
+        Number(rawRetryAfter) * 1000 - clockOffset
       : Number.isNaN(Date.parse(String(rawRetryAfter)))
         ? null
-        : Date.parse(String(rawRetryAfter))
+        : Date.parse(String(rawRetryAfter)) - clockOffset
   const rawReset = headers["x-ratelimit-reset"] ?? headers["X-RateLimit-Reset"]
-  const primaryReset = rawReset ? parseInt(String(rawReset), 10) * 1000 : null
+  const primaryReset = rawReset ? parseInt(String(rawReset), 10) * 1000 - clockOffset : null
   const isSecondary =
     /secondary rate limit/i.test(msg) || status === 429 || retryAfter !== null
   const resetAt = isSecondary ? retryAfter ?? primaryReset : primaryReset

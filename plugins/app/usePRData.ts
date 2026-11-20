@@ -18,7 +18,6 @@ import { currentBranch, detectRepo } from "../infra/git"
 import {
   DEFAULT_RECENT_PRS_LIMIT,
   repositoryPRs,
-  fetchOnePR,
   MIN_PAGES_PER_BATCH,
 } from "../infra/loader"
 import { prListErrorKind, prListErrorMessage, parseRateLimitError } from "../domain/messages"
@@ -37,7 +36,6 @@ export function useDashboard(
 ): {
   refresh: () => Promise<void>
   loadMore: () => Promise<void>
-  refreshOne: (n: number) => Promise<void>
 } {
   // Resolve the working directory explicitly when the TUI exposes it, so
   // repo detection doesn't depend on where opencode happens to launch.
@@ -64,28 +62,52 @@ export function useDashboard(
   const loadMoreInFlight = new Map<string, Promise<void>>()
   let refreshToken = 0
   let currentRefreshToken = 0
-  let primaryRateLimitResetAt: number | null = null
-  const primaryLimitActive = (): boolean => {
-    if (primaryRateLimitResetAt === null) return false
-    if (Date.now() >= primaryRateLimitResetAt) {
-      primaryRateLimitResetAt = null
+  let rateLimitResetAt: number | null = null
+  let rateLimitMessage: string | null = null
+  const rateLimitActive = (): boolean => {
+    if (rateLimitResetAt === null) return false
+    if (Date.now() >= rateLimitResetAt) {
+      rateLimitResetAt = null
+      rateLimitMessage = null
       return false
     }
     return true
   }
-  const recordPrimaryRateLimit = (error: unknown) => {
+  const recordRateLimit = (error: unknown) => {
     const rateLimit = parseRateLimitError(error)
-    if (rateLimit.isRateLimit && !rateLimit.isSecondary && rateLimit.resetAt > Date.now()) {
-      primaryRateLimitResetAt = rateLimit.resetAt
+    if (rateLimit.isRateLimit) {
+      rateLimitMessage = rateLimit.message
+      if (rateLimit.resetAt + 2_000 > Date.now()) {
+        rateLimitResetAt = rateLimit.resetAt + 2_000
+      }
     }
     return rateLimit
   }
   const pageBatchSize = pageSize * Math.max(MIN_PAGES_PER_BATCH, pagesPerBatch)
 
   const refresh = async (): Promise<void> => {
-    if (primaryLimitActive()) return
     const listing = statusFilter()
     const scope = scopeFilter()
+    if (rateLimitActive()) {
+      const scopeValue = scope === "branch" ? state().currentBranch : null
+      setState((s) => ({
+        ...s,
+        status: DashboardStatus.Error,
+        pagination: {
+          ...s.pagination,
+          listing,
+          scope,
+          scopeValue,
+          cursor: null,
+          hasMore: false,
+          totalCount: null,
+          loading: false,
+        },
+        error: rateLimitMessage ?? s.error,
+        errorKind: "rate-limit",
+      }))
+      return
+    }
     const filterKey = `${listing}:${scope}`
     if (inFlight) {
       if (filterKey !== inFlightFilterKey) return inFlight.then((): Promise<void> => refresh())
@@ -176,7 +198,7 @@ export function useDashboard(
         }))
       } catch (e: unknown) {
         if (isStale()) return
-        const rl = recordPrimaryRateLimit(e)
+        const rl = recordRateLimit(e)
         setState((s) => ({
           ...s,
           status: DashboardStatus.Error,
@@ -219,7 +241,7 @@ export function useDashboard(
   }
 
   const loadMore = async (): Promise<void> => {
-    if (primaryLimitActive()) return
+    if (rateLimitActive()) return
     const before = state()
     const listing = statusFilter()
     const scope = scopeFilter()
@@ -293,7 +315,7 @@ export function useDashboard(
           }
         })
       } catch (e: unknown) {
-        const rl = recordPrimaryRateLimit(e)
+        const rl = recordRateLimit(e)
         setState((s) =>
           s.pagination.listing === listing &&
             s.pagination.scope === scope &&
@@ -318,32 +340,7 @@ export function useDashboard(
     }
   }
 
-  const refreshOne = async (n: number) => {
-    if (primaryLimitActive()) return
-    const prs = state().prs
-    const idx = prs.findIndex((p) => p.number === n)
-    if (idx < 0) return
-    const repo = state().repo
-    if (!repo) return
-    try {
-      const updated = await fetchOnePR(repo, n)
-      setState((s) => ({
-        ...s,
-        prs: s.prs.map((p) => p.number === n
-          ? {
-              ...updated,
-              checkStatuses: updated.checkStatuses ?? p.checkStatuses,
-              reviewThreads: updated.reviewThreads ?? p.reviewThreads,
-            }
-          : p),
-        fetchedAt: Date.now(),
-      }))
-    } catch (e: unknown) {
-      recordPrimaryRateLimit(e)
-    }
-  }
-
-  return { refresh, loadMore, refreshOne }
+  return { refresh, loadMore }
 }
 
 function timeoutRace<T>(ms: number, fn: () => Promise<T>): Promise<T> {

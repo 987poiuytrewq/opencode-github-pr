@@ -107,7 +107,7 @@ async function setup(api: TuiPluginContext) {
   }
 
   const dash = demoMode
-    ? { refresh: async () => {}, loadMore: async () => {}, refreshOne: async () => {} }
+    ? { refresh: async () => {}, loadMore: async () => {} }
     : useDashboard(
         api,
         state,
@@ -123,7 +123,6 @@ async function setup(api: TuiPluginContext) {
     state,
     refresh: dash.refresh,
     loadMore: dash.loadMore,
-    refreshOne: dash.refreshOne,
     selectedIdx,
     setSelectedIdx,
   }
@@ -166,8 +165,18 @@ async function setup(api: TuiPluginContext) {
             palette: true,
             slash: { name: "pr-refresh" },
             run() {
-              void dash.refresh()
-              api.ui.toast.show({ variant: "info", message: "Refreshing PRs…", duration: 1200 })
+              void dash.refresh().then(() => {
+                const current = state()
+                if (current.errorKind === "rate-limit") {
+                  api.ui.toast.show({
+                    variant: "info",
+                    message: `PR refresh paused: ${current.error ?? "rate limit active"}`,
+                    duration: 5000,
+                  })
+                  return
+                }
+                api.ui.toast.show({ variant: "info", message: "Refreshing PRs…", duration: 1200 })
+              })
             },
           },
           {
