@@ -16,7 +16,12 @@ import {
   type PRStatusFilter,
 } from "../domain/types"
 import { currentBranch, detectRepo } from "../infra/git"
-import { repositoryPRs, fetchOnePR, MIN_PAGES_PER_BATCH } from "../infra/loader"
+import {
+  DEFAULT_RECENT_PRS_LIMIT,
+  repositoryPRs,
+  fetchOnePR,
+  MIN_PAGES_PER_BATCH,
+} from "../infra/loader"
 import { prListErrorKind, prListErrorMessage, parseRateLimitError } from "../domain/messages"
 import { DEFAULT_PAGES_PER_BATCH, DEFAULT_PAGE_SIZE, DEFAULT_REQUEST_TIMEOUT_MS } from "./config"
 
@@ -29,6 +34,7 @@ export function useDashboard(
   statusFilter: () => PRStatusFilter = () => "open",
   scopeFilter: () => PRScope = () => "all",
   pageSize = DEFAULT_PAGE_SIZE,
+  recentPRsLimit = DEFAULT_RECENT_PRS_LIMIT,
 ): {
   refresh: () => Promise<void>
   loadMore: () => Promise<void>
@@ -113,6 +119,8 @@ export function useDashboard(
               hasMore: false,
               totalCount: 0,
               pagesLoaded: 0,
+              searchResultsFetched: 0,
+              supplementalPRCount: 0,
               loading: false,
               limitReached: false,
             },
@@ -123,7 +131,7 @@ export function useDashboard(
           return
         }
         const result = await timeoutRace(requestTimeoutMs, () =>
-          repositoryPRs(repo, pageBatchSize, requestTimeoutMs, listing, null, scope, scopeValue),
+          repositoryPRs(repo, pageBatchSize, requestTimeoutMs, listing, null, scope, scopeValue, 0, recentPRsLimit),
         )
         if (isStale()) return
         setState((s) => ({
@@ -141,6 +149,8 @@ export function useDashboard(
             hasMore: result.hasMore,
             totalCount: result.totalCount,
             pagesLoaded: result.fetchedPages,
+            searchResultsFetched: result.searchResultsFetched,
+            supplementalPRCount: result.supplementalPRCount,
             loading: false,
             limitReached: result.limitReached,
           },
@@ -174,6 +184,8 @@ export function useDashboard(
                 hasMore: false,
                 totalCount: null,
                 pagesLoaded: 0,
+                searchResultsFetched: 0,
+                supplementalPRCount: 0,
                 loading: false,
                 limitReached: false,
               },
@@ -224,7 +236,8 @@ export function useDashboard(
             cursor,
             scope,
             scopeValue,
-            before.prs.length,
+            before.pagination.searchResultsFetched,
+            recentPRsLimit,
           ),
         )
         setState((s) => {
@@ -247,8 +260,12 @@ export function useDashboard(
               scopeValue,
               cursor: result.endCursor,
               hasMore: result.hasMore,
-              totalCount: result.totalCount ?? s.pagination.totalCount,
+              totalCount: s.pagination.supplementalPRCount > 0
+                ? s.pagination.totalCount
+                : result.totalCount ?? s.pagination.totalCount,
               pagesLoaded: s.pagination.pagesLoaded + result.fetchedPages,
+              searchResultsFetched: s.pagination.searchResultsFetched + result.searchResultsFetched,
+              supplementalPRCount: s.pagination.supplementalPRCount,
               loading: false,
               limitReached: result.limitReached,
             },

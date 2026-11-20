@@ -173,8 +173,9 @@ The filters are applied by GitHub, so the dashboard only downloads PRs that matc
 
 - `all` and `branch` use the repository's PR list, so new PRs appear on the next refresh.
 - `author` and `assignee` use GitHub search. Search can take a short while to index a new PR, so a PR you've just
-  opened may appear a refresh or two later. GitHub search also returns at most 1,000 PRs; when you reach that limit,
-  the panel says so.
+  opened may appear a refresh or two later. To bridge that delay, the dashboard also checks a small number of the
+  repository's newest PRs and adds matching ones that search hasn't returned yet. Set `recentPRsLimit` to `0` to disable
+  this supplement. GitHub search also returns at most 1,000 PRs; when you reach that limit, the panel says so.
 
 PRs load in batches. The first batch holds four pages' worth (20 PRs with the default page size). Moving to another
 page starts loading the next batch in the background, so paging stays quick. If you reach the last loaded page
@@ -197,6 +198,7 @@ value:
       "options": {
         "pageSize": 8,
         "refreshIntervalMs": 30000,
+        "recentPRsLimit": 5,
         "defaultScope": "all",
         "defaultStatusFilter": "open"
       }
@@ -212,13 +214,15 @@ value:
 | `pagesPerBatch` | `4` | Pages of PRs to load from GitHub at a time, so each batch is `pageSize × pagesPerBatch` PRs. The minimum is `4`; lower values are raised to it. See [How PRs are loaded](#how-prs-are-loaded). |
 | `refreshIntervalMs` | `60000` | How often the list refreshes while a session is open, in milliseconds. |
 | `requestTimeoutMs` | `15000` | How long to wait for a GitHub request before giving up, in milliseconds. |
+| `recentPRsLimit` | `5` | For `author` and `assignee` scopes, check up to this many newest repository PRs to fill search-index gaps. Set to `0` to disable; values above `100` are capped. |
 | `defaultScope` | `"author"` | Scope filter at startup: `branch`, `author`, `assignee` or `all`. |
 | `defaultStatusFilter` | `"open"` | Status filter at startup: `open`, `closed` or `all`. |
 | `iconStyle` | `"nerd"` | Icon set: `"nerd"` for Nerd Font glyphs, or `"unicode"` for standard Unicode symbols that work in any font. See [Icons](#icons). |
 | `colors` | Theme | Colour overrides. See [Colours](#colours). |
 | `icons` | From `iconStyle` | Overrides for individual icons. See [Icons](#icons). |
 
-Numeric options must be positive numbers. Invalid values fall back to the default.
+Most numeric options must be positive numbers. `recentPRsLimit` accepts `0` through `100`; invalid values fall back to
+the default.
 
 ### Colours
 

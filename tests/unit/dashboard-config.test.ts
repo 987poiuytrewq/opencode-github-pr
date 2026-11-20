@@ -18,6 +18,7 @@ describe("dashboard options", () => {
       pagesPerBatch: 4,
       refreshIntervalMs: 60_000,
       requestTimeoutMs: 15_000,
+      recentPRsLimit: 5,
       defaultScope: "author",
       defaultStatusFilter: "open",
       iconStyle: "nerd",
@@ -33,6 +34,7 @@ describe("dashboard options", () => {
         pagesPerBatch: 4,
         refreshIntervalMs: 30_000,
         requestTimeoutMs: 10_000,
+        recentPRsLimit: 12,
         defaultScope: "assignee",
         defaultStatusFilter: "closed",
         colors: { accent: "#123456", merged: "magenta", unsupported: "#fff" },
@@ -44,6 +46,7 @@ describe("dashboard options", () => {
       pagesPerBatch: 4,
       refreshIntervalMs: 30_000,
       requestTimeoutMs: 10_000,
+      recentPRsLimit: 12,
       defaultScope: "assignee",
       defaultStatusFilter: "closed",
       iconStyle: "nerd",
@@ -54,6 +57,13 @@ describe("dashboard options", () => {
 
   test("keeps each fetch batch at least four TUI pages", () => {
     expect(dashboardOptions({ pagesPerBatch: 1 }).pagesPerBatch).toBe(4)
+  })
+
+  test("allows disabling recent PR supplementation and clamps its limit", () => {
+    expect(dashboardOptions({ recentPRsLimit: 0 }).recentPRsLimit).toBe(0)
+    expect(dashboardOptions({ recentPRsLimit: 7.8 }).recentPRsLimit).toBe(7)
+    expect(dashboardOptions({ recentPRsLimit: 1000 }).recentPRsLimit).toBe(100)
+    expect(dashboardOptions({ recentPRsLimit: -1 }).recentPRsLimit).toBe(5)
   })
 
   test("uses Nerd or Unicode icons as selected and lets explicit icon overrides take precedence", () => {
@@ -93,6 +103,7 @@ describe("dashboard options", () => {
         pagesPerBatch: 0,
         refreshIntervalMs: "soon",
         requestTimeoutMs: 0,
+        recentPRsLimit: "five",
         defaultScope: "unknown",
         defaultStatusFilter: "pending",
         iconStyle: "unknown",
@@ -104,6 +115,7 @@ describe("dashboard options", () => {
       pagesPerBatch: 4,
       refreshIntervalMs: 60_000,
       requestTimeoutMs: 15_000,
+      recentPRsLimit: 5,
       defaultScope: "author",
       defaultStatusFilter: "open",
       iconStyle: "nerd",

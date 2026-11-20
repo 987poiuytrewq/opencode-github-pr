@@ -1,6 +1,11 @@
 import type { PRScope, PRStatusFilter } from "../domain/types"
 import { DEFAULT_SKIN, type Skin } from "./theme"
-import { DEFAULT_TUI_PAGES_PER_BATCH, MIN_PAGES_PER_BATCH } from "../infra/loader"
+import {
+  DEFAULT_RECENT_PRS_LIMIT,
+  DEFAULT_TUI_PAGES_PER_BATCH,
+  MAX_RECENT_PRS_LIMIT,
+  MIN_PAGES_PER_BATCH,
+} from "../infra/loader"
 
 export const DEFAULT_ICONS = {
   openPR: "",
@@ -44,6 +49,7 @@ export type DashboardOptions = {
   pagesPerBatch: number
   refreshIntervalMs: number
   requestTimeoutMs: number
+  recentPRsLimit: number
   defaultScope: PRScope
   defaultStatusFilter: PRStatusFilter
   iconStyle: IconStyle
@@ -57,6 +63,7 @@ type DashboardOptionsInput = {
   pagesPerBatch?: unknown
   refreshIntervalMs?: unknown
   requestTimeoutMs?: unknown
+  recentPRsLimit?: unknown
   defaultScope?: unknown
   defaultStatusFilter?: unknown
   iconStyle?: unknown
@@ -74,6 +81,12 @@ export const DEFAULT_REQUEST_TIMEOUT_MS = 15_000
 
 function positiveNumber(value: unknown, fallback: number): number {
   return typeof value === "number" && Number.isFinite(value) && value > 0 ? Math.max(1, Math.floor(value)) : fallback
+}
+
+function nonNegativeInteger(value: unknown, fallback: number, max: number): number {
+  return typeof value === "number" && Number.isFinite(value) && value >= 0
+    ? Math.min(max, Math.floor(value))
+    : fallback
 }
 
 function stringOverrides<T extends Record<string, string>>(
@@ -106,6 +119,7 @@ export function dashboardOptions(input: DashboardOptionsInput = {}): DashboardOp
     pagesPerBatch: Math.max(MIN_PAGES_PER_BATCH, positiveNumber(input.pagesPerBatch, DEFAULT_PAGES_PER_BATCH)),
     refreshIntervalMs: positiveNumber(input.refreshIntervalMs, DEFAULT_REFRESH_INTERVAL_MS),
     requestTimeoutMs: positiveNumber(input.requestTimeoutMs, DEFAULT_REQUEST_TIMEOUT_MS),
+    recentPRsLimit: nonNegativeInteger(input.recentPRsLimit, DEFAULT_RECENT_PRS_LIMIT, MAX_RECENT_PRS_LIMIT),
     defaultScope: scopes.includes(input.defaultScope as PRScope) ? (input.defaultScope as PRScope) : "author",
     defaultStatusFilter: statusFilters.includes(input.defaultStatusFilter as PRStatusFilter)
       ? (input.defaultStatusFilter as PRStatusFilter)

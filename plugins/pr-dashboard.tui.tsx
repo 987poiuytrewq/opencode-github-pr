@@ -39,6 +39,8 @@ async function setup(api: TuiPluginContext) {
       hasMore: false,
       totalCount: null,
       pagesLoaded: 0,
+      searchResultsFetched: 0,
+      supplementalPRCount: 0,
       loading: false,
       limitReached: false,
     },
@@ -115,6 +117,7 @@ async function setup(api: TuiPluginContext) {
         statusFilter,
         scope,
         options.pageSize,
+        options.recentPRsLimit,
       )
   const dashboard: DashboardContext = {
     state,
