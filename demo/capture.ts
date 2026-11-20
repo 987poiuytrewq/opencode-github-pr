@@ -575,6 +575,8 @@ async function main(): Promise<void> {
         String(COLUMNS),
         "--rows",
         String(ROWS),
+        "--text-font-family",
+        "CommitMono Nerd Font Mono,JetBrains Mono,Fira Code,SF Mono,Menlo,Consolas,DejaVu Sans Mono,Liberation Mono",
         "--idle-time-limit",
         String(GIF_IDLE_LIMIT_SECONDS),
         "--select",
