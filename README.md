@@ -19,12 +19,26 @@ repository, their CI, review and merge status, and jump straight to the right pa
 ## Requirements
 
 - OpenCode **2.0.20 or later** (V2 plugin API).
-- [Bun](https://bun.sh), to install the plugin's dependencies.
+- [Bun](https://bun.sh), if installing from source.
 - A GitHub token, or the [GitHub CLI](https://cli.github.com) signed in with `gh auth login`. See
   [Authentication](#authentication).
 - A terminal font that supports Nerd Font glyphs, or set `iconStyle` to `"unicode"` to use standard Unicode symbols.
 
-## Install
+## Install from npm
+
+Add the package name to the `plugins` array in your OpenCode config, either globally at
+`~/.config/opencode/opencode.json` or in a project's `opencode.json`:
+
+```json
+{
+  "$schema": "https://opencode.ai/config.json",
+  "plugins": ["opencode-github-pr"]
+}
+```
+
+Restart OpenCode. The **Pull Requests** panel appears in the session sidebar.
+
+## Install from source
 
 1. Clone the repository and install its dependencies:
 
@@ -301,6 +315,20 @@ unset for GitHub.com.
 | **Request timed out** or **Cannot reach GitHub** | Check your connection or proxy. On slow networks, raise `requestTimeoutMs`. |
 | **No matching PRs** | No PRs match the current filters. Click the scope or status label to widen them. |
 | `branch` scope is empty | The current branch has no PR, or the session is in detached HEAD. |
+
+## Releasing
+
+Releases are published to npm by GitHub Actions after a GitHub Release is published. To make a release:
+
+1. Set the `version` in `package.json` to the release version and merge that change to `main`.
+2. Create and publish a GitHub Release with the matching `v`-prefixed tag (for example, package version `0.2.0` uses
+   tag `v0.2.0`).
+3. The release workflow verifies the tag and package version, runs the full CI suite, then publishes to npm with
+   provenance. Prereleases are not published.
+
+The repository's npm package must be configured for **trusted publishing** on npmjs.com to use GitHub Actions as the
+publisher, with repository `987poiuytrewq/opencode-github-pr`, workflow `release.yml`, and environment `npm`. The
+workflow's `npm` environment can also be configured with required reviewers to gate publication.
 
 ## Development
 
