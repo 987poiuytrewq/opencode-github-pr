@@ -12,6 +12,9 @@ function color(hex: string) {
 }
 
 const TEST_THEME = {
+  hue: {
+    interactive: { 200: color("#5ea8f5") },
+  },
   background: {
     base: color("#161616"),
     raised: { base: color("#1d1d1d") },
