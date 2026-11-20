@@ -3,12 +3,14 @@ import {
   existsSync,
   mkdirSync,
   mkdtempSync,
+  readdirSync,
   readFileSync,
   rmSync,
+  statSync,
   writeFileSync,
 } from "node:fs";
 import { createServer } from "node:net";
-import { tmpdir } from "node:os";
+import { homedir, tmpdir } from "node:os";
 import { dirname, join, resolve } from "node:path";
 
 const COLUMNS = 84;
@@ -51,6 +53,80 @@ async function run(
 
 function shellQuote(value: string): string {
   return `'${value.replaceAll("'", "'\\''")}'`;
+}
+
+function isCommitMonoNerdFontMonoFile(name: string): boolean {
+  const normalizedName = name.toLowerCase().replace(/[^a-z0-9]/g, "");
+  return (
+    normalizedName.startsWith("commitmononerdfontmono") &&
+    /\.(otf|ttf|ttc)$/i.test(name)
+  );
+}
+
+function findCommitMonoFontDirectory(root: string): string | null {
+  const pending = [{ directory: root, depth: 0 }];
+  const visited = new Set<string>();
+
+  while (pending.length > 0) {
+    const current = pending.shift()!;
+    if (visited.has(current.directory)) continue;
+    visited.add(current.directory);
+
+    let entries;
+    try {
+      entries = readdirSync(current.directory, { withFileTypes: true });
+    } catch {
+      continue;
+    }
+
+    for (const entry of entries) {
+      if (entry.isFile() && isCommitMonoNerdFontMonoFile(entry.name))
+        return current.directory;
+      if (entry.isDirectory() && current.depth < 4) {
+        pending.push({
+          directory: join(current.directory, entry.name),
+          depth: current.depth + 1,
+        });
+      }
+    }
+  }
+
+  return null;
+}
+
+function commitMonoFontDirectory(): string | null {
+  const configuredDirectory = process.env.COMMIT_MONO_FONT_DIR;
+  if (configuredDirectory) {
+    const directory = resolve(configuredDirectory);
+    if (!existsSync(directory) || !statSync(directory).isDirectory()) {
+      fail(`COMMIT_MONO_FONT_DIR is not a directory: ${directory}`);
+    }
+    const found = findCommitMonoFontDirectory(directory);
+    if (!found) {
+      fail(
+        `COMMIT_MONO_FONT_DIR contains no Commit Mono Nerd Font Mono .otf, .ttf, or .ttc files: ${directory}`,
+      );
+    }
+    return found;
+  }
+
+  const home = resolve(process.env.HOME ?? homedir());
+  const xdgDataHome = resolve(
+    process.env.XDG_DATA_HOME ?? join(home, ".local", "share"),
+  );
+  const candidates = [
+    join(home, "Library", "Fonts"),
+    join(xdgDataHome, "fonts"),
+    join(home, ".local", "share", "fonts"),
+    join(home, ".fonts"),
+    join(home, "AppData", "Local", "Microsoft", "Windows", "Fonts"),
+  ];
+
+  for (const candidate of new Set(candidates)) {
+    const found = findCommitMonoFontDirectory(candidate);
+    if (found) return found;
+  }
+  return null;
 }
 
 function gifEndTimeBeforeTerminalExit(recordingPath: string): number {
@@ -568,7 +644,7 @@ async function main(): Promise<void> {
 
     if (options.makeGif && agg) {
       const endTime = gifEndTimeBeforeTerminalExit(options.output);
-      await run(agg, [
+      const args = [
         options.output,
         gifPath,
         "--cols",
@@ -581,7 +657,17 @@ async function main(): Promise<void> {
         String(GIF_IDLE_LIMIT_SECONDS),
         "--select",
         `0..${endTime.toFixed(2)}s`,
-      ]);
+      ];
+      const fontDirectory = commitMonoFontDirectory();
+      if (fontDirectory) {
+        args.push("--font-dir", fontDirectory);
+        console.log(`Using Commit Mono Nerd Font Mono from ${fontDirectory}`);
+      } else {
+        console.log(
+          "Commit Mono Nerd Font Mono was not found in known user font directories; using portable font fallbacks.",
+        );
+      }
+      await run(agg, args);
       console.log(`Trimmed GIF before terminal exit at ${endTime.toFixed(2)}s`);
       console.log(`GIF saved to ${gifPath}`);
     }
