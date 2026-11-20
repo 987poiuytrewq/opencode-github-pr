@@ -1,121 +1,102 @@
 # Suggested changes
 
-These findings come from a review of v0.2.0, based on commit `eb3b07b`. They were first raised in the initial
-review and confirmed as still open after `opencode-github-pr#59` to `#65` were merged. Those PRs fixed every
-finding from the second and third reviews: errors for inaccessible repositories, rate-limit handling, merge
-readiness, team review requests, theme reactivity and unused code.
+These findings come from a review of v0.2.0, based on commit `fb9e93d`. That commit includes
+`opencode-github-pr#66` to `#71`, which addressed the nine items from the previous version of this doc.
 
-When this list was written, typecheck passed, along with 93 unit tests and 109 integration tests. The end-to-end
-tests weren't run because the review environment had no tmux or OpenCode binary.
+When the review was done, typecheck passed, and so did all integration tests. 97 of 98 unit tests passed. The one
+failure is explained in item 3. The end-to-end tests weren't run because the review environment had no tmux or
+OpenCode binary.
 
-The items are listed with the most important first. Items 1–3 affect people using the plugin every day. The rest
-are polish.
+## Fixed since the previous review
 
-## 1. Don't block the TUI while reading the `gh` token
+- **The `gh auth token` lookup no longer blocks the TUI.** It's now asynchronous.
+- **A 401 now clears the cached client,** so a rotated or refreshed token is picked up. The token is no longer
+  reused across hosts.
+- **The OpenCode, OpenTUI and Solid packages are now `peerDependencies`.**
+- **The outer `timeoutRace` is gone.** Octokit's per-request timeout is the only timeout now.
+- **`insteadOf` rewrites and SSH host aliases are resolved.**
+- **Check and review-thread counts use `totalCount`.**
+- **The demo GIF is no longer published, and `@types/bun` and `bun-types` are pinned.**
+- **Integration test renderers are disposed after each test.**
 
-**Where:** `plugins/infra/octokit.ts`, `readGhAuthToken`
+The open items are below, most important first.
 
-**Problem:** When no token is set in the environment, the plugin runs `gh auth token` with `execFileSync`. This runs
-in the TUI process with a 5-second timeout. If `gh` is slow or hangs (for example on a keychain prompt or a slow
-network), the whole TUI freezes until it returns.
+## 1. Branch scope now hides PRs opened from a fork
 
-**Suggested fix:** Use `execFile` from `node:child_process/promises`, or `Bun.spawn`, and make `getAuthToken` and
-`getOctokit` async. The callers in `infra/loader.ts` already await, so the change stays small.
+**Where:** `plugins/infra/loader.ts`, the `scope === "branch"` filter after the pagination loop
 
-## 2. Re-read the token after an authentication failure
+**Problem:** To keep other people's fork PRs out of branch scope, the loader now keeps only PRs whose
+`headRepositoryOwner` matches the owner of the detected repository. That repository comes from `origin`, which is
+often the upstream repository. In a common contributor setup, `origin` points at `org/project` and the branch is
+pushed to a personal fork such as `me/project`. The PR's head owner is `me`, not `org`, so **branch scope no longer
+shows your own PR**. Before this change it did. This regression came from the previous version of this doc's
+suggestion, and the fix was implemented as suggested.
 
-**Where:** `plugins/infra/octokit.ts`, `getOctokit` and the `cached` client
+`totalCount` still counts the PRs that were filtered out, so the page counter can also overstate the number of
+pages.
 
-**Problem:** The plugin reads the token once and keeps it for the life of the process. `cached?.token` is reused
-even when the client is rebuilt. After `gh auth refresh`, a token rotation or an expiry, every request fails with
-401 and the panel shows **GitHub sign-in failed** until OpenCode restarts.
+**Suggested fix:** Compare the head owner with the remote the branch actually pushes to, not with the detected
+repository's owner. Read `branch.<name>.pushRemote`, then `remote.pushDefault`, then `branch.<name>.remote`, and take
+the owner from that remote's URL using the existing rewrite and alias resolution. If none of these resolves, keep
+every PR that matches the branch name, which is the old behaviour. When PRs are filtered out on the client, take
+them off `totalCount` too.
 
-**Suggested fix:** Clear `cached` (token included) when a request fails with 401, and on the next refresh try
-`getAuthToken()` again. Also consider not reusing the old token when `baseUrl` changes, because a github.com token is
-the wrong token for an Enterprise host.
+## 2. The keymap guard never takes effect
 
-## 3. Declare host-provided libraries as peer dependencies
+**Where:** `plugins/pr-dashboard.tui.tsx`, the `app` slot's `render`
 
-**Where:** `package.json`
+**Problem:** `api.keymap.layer()` is typed to return `void`
+(`node_modules/@opencode/plugin/dist/tui/context.d.ts:377`). So `typeof keymapLayer === "function"` is never true,
+`unregisterKeymap` is never set, and the `if (!unregisterKeymap)` guard registers the layer on every render, just
+as before. The `unregisterKeymap?.()` in cleanup also does nothing. Because `layer()` returns nothing, it's probably
+scoped to the Solid owner it's called in and disposed along with the slot. If so, the original code was already
+correct and this change adds no protection.
 
-**Problem:** `@opencode/plugin`, `@opencode/theme`, `@opentui/core`, `@opentui/solid` and `solid-js` are pinned as
-regular `dependencies` to the 2.0.20 / 0.6.6 line. If the plugin gets its own copy of Solid or OpenTUI alongside the
-host's copy, Solid reactivity can break without any error. The comment at the top of `plugins/app/usePRData.ts`
-shows how fragile Solid loading already is. CI passes on 2.0–2.3 today, but this is the most likely thing to break
-when OpenCode updates.
+**Suggested fix:** Check how OpenCode disposes keymap layers. If they're scoped to the owner, remove the guard and
+the disposer variable and add a comment saying why. If they aren't, use a plain `let registered = false` flag so the
+layer registers only once.
 
-**Suggested fix:** Move the host-provided packages to `peerDependencies` with a range such as `>=2.0.20 <3`, and
-keep them in `devDependencies` for tests. Keep `@octokit/*` and `open` as regular dependencies.
+## 3. The SSH alias test needs an `ssh` binary
 
-## 4. Apply the timeout to each request, not the whole batch
+**Where:** `tests/unit/git.test.ts`, "resolves SSH host aliases to GitHub using ssh configuration"
 
-**Where:** `plugins/app/usePRData.ts`, `timeoutRace`
+**Problem:** The test relies on `ssh -G` actually running. Where `ssh` isn't installed, as in minimal containers or
+some CI images, `sshHostName` returns `null` and the test fails. The plugin itself handles this correctly by falling
+back to "not recognised". Only the test assumes `ssh` is installed.
 
-**Problem:** `requestTimeoutMs` is already passed to Octokit for each request. `timeoutRace` applies the same
-value again, this time to the whole `repositoryPRs` call. That call can cover several GraphQL pages, short retries,
-and now the legacy-query fallback for older Enterprise servers. When it fires, the underlying requests keep running
-in the background because nothing cancels them. With a large `pageSize` or a slow network, this gives spurious
-**Request timed out** errors.
+**Suggested fix:** Skip the test when `ssh` isn't installed, for example with
+`test.skipIf(!Bun.which("ssh"))`. Or make the `ssh -G` runner injectable and test the parsing with a stub.
 
-**Suggested fix:** Drop the outer race and rely on the Octokit timeout. Or pass an `AbortSignal` through
-`repositoryPRs` and give the batch its own, more generous deadline.
+## 4. `ssh -G` still runs synchronously on the TUI thread
 
-## 5. Recognise SSH host aliases and `insteadOf` rewrites
+**Where:** `plugins/infra/git.ts`, `sshHostName`
 
-**Where:** `plugins/infra/git.ts`, `parseGitHubRemote` and `remoteUrls`
+**Problem:** The `gh` lookup is now asynchronous, but SSH alias resolution added a new `spawnSync("ssh", ...)`. It
+has a 500 ms timeout and its result is cached for each host, including failures, so the cost is at most once per
+host per process. That's acceptable, but:
 
-**Problem:** Remotes such as `git@github-work:org/repo.git`, which use a `Host` alias from `~/.ssh/config`, aren't
-recognised. Neither are remotes that rely on `url.<base>.insteadOf` rewrites. People with several GitHub accounts
-commonly use both, and today they see **No GitHub repo**.
+- It also runs for SCP-style remotes on other hosts (for example `git@gitlab.com:...`), because any remote that
+  doesn't parse as GitHub is tried as an alias.
+- `ssh -G` evaluates `Match exec` blocks in the user's SSH config, which can run arbitrary commands, and those may be
+  slow.
 
-**Suggested fix:**
-- Apply `insteadOf` rules from the git config before parsing the remote.
-- Optionally run `ssh -G <alias>` to resolve the real hostname, or add a `remoteHosts` option that lists extra host
-  aliases to treat as GitHub.
+**Suggested fix:** Make `detectRepo` asynchronous and use `execFile`. Also skip alias resolution for hosts that are
+clearly not aliases, for example names that contain a dot and are already a public hostname.
 
-## 6. Fill the remaining gaps in PR data
+## 5. Check how OpenCode installs peer dependencies
 
-**Where:** `plugins/infra/queries.ts` and `plugins/infra/mappers.ts`
+**Where:** `package.json` and the README's install sections
 
-- **Branch scope matches forks:** branch scope filters on `headRefName` alone, so a PR from a fork with the same
-  branch name also appears. Also fetch `headRepositoryOwner { login }`, and drop PRs whose owner isn't the detected
-  repository's owner.
-- **Truncated counts:** `contexts(first: 100)` and `reviewThreads(first: 100)` silently stop counting at 100.
-  Fetch `totalCount` on both connections and show "100+", or fall back to the rollup `state` when there are more.
+**Problem:** Moving the host packages to `peerDependencies` is right, but the result depends on how OpenCode
+installs npm plugins. Package managers that install peer dependencies automatically (npm 7 and later, and Bun)
+could still put a second copy of `solid-js` or `@opentui/*` next to the plugin, if the host's copy isn't where they
+look. CI only tests source installs, where `bun install` installs the dev dependencies.
 
-## 7. Tidy the published package
+**Suggested fix:** Add an end-to-end job that installs the packed tarball (`npm pack`) through OpenCode's own
+`plugins: ["opencode-github-pr"]` path and checks that the panel renders and updates. Then the published install is
+tested, not only the source install.
 
-**Where:** `package.json`
+## Next: release 0.3.0
 
-- `files` includes `demo/demo.gif` (about 100 KB), which the plugin doesn't need at runtime. The README image can
-  use the GitHub URL instead, or the GIF can be left out of the package. Keep `demo/fixtures.ts`, because demo mode
-  imports it.
-- `@types/bun` and `bun-types` are set to `latest`. Pin them to a version range so a fresh install without the
-  lockfile still builds the same way.
-
-## 8. Register the keymap layer once and remove it during cleanup
-
-**Where:** `plugins/pr-dashboard.tui.tsx`
-
-**Problem:** `api.keymap.layer(...)` is called inside the `app` slot's `render` function, and the plugin's cleanup
-function only removes the slot, not the layer. If the slot re-renders, or the plugin is reloaded with `/reload`, the
-commands could be registered more than once. This hasn't been confirmed.
-
-**Suggested fix:** Keep the disposer the call returns and call it during cleanup, and make sure it registers only
-once, for example by checking a flag before registering.
-
-## 9. Silence `MaxListenersExceededWarning` in the integration tests
-
-**Where:** `tests/integration/` (seen in `dashboard-render.test.tsx`)
-
-**Problem:** The integration tests print `MaxListenersExceededWarning` from `TerminalConsoleCache`. This is likely
-because a test renderer isn't destroyed between tests. It's harmless, but it hides real warnings.
-
-**Suggested fix:** Destroy each test renderer in `afterEach`, and check that the warning goes away.
-
-## After these: release 0.3.0
-
-`package.json` is still at `0.2.0` and the repository has no tags. Everything merged since then justifies a
-`0.3.0` release: better error handling, rate-limit cooldowns, merge readiness, team review requests and the
-Enterprise fallback. The release workflow already handles publishing. Run the end-to-end CI matrix on the release
-commit, since the reviews couldn't run it.
+`package.json` is still at `0.2.0` and the repository has no tags. Fix item 1 first, since it's a regression in
+everyday use. Then release `0.3.0`, and run the full end-to-end CI matrix on the release commit.
