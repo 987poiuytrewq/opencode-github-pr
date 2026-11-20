@@ -4,8 +4,6 @@ import { testRender } from "@opentui/solid"
 import { installOctokitMock, mockOctokitDefault, clearOctokitMocks } from "../helpers/octokit-mock"
 import { makeFakeRepo, makeSearchResponse, makeThreadCountResponse } from "../helpers/graphql-mock"
 import { createMockTuiApi } from "../helpers/tui-api-mock"
-import { DashboardStatus } from "../../plugins/domain/types"
-
 const plugin_mod = await import("../../plugins/pr-dashboard.tui")
 const plugin = plugin_mod.default
 

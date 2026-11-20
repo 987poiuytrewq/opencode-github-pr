@@ -10,7 +10,6 @@ import {
 } from "../../plugins/domain/pr-status"
 import { toHex } from "../../plugins/app/theme"
 import { truncateTitle, formatAge } from "../../plugins/domain/format"
-import type { PR } from "../../plugins/domain/types"
 import { makeTUIPR } from "../helpers/tui-fixtures"
 
 
