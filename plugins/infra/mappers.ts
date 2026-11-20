@@ -1,6 +1,4 @@
-// PR shape mappers: convert raw GitHub GraphQL and REST pull objects into
-// the shared PR domain type. Both mappers live
-// here so that changes to PR only need to be reflected in one place.
+// Maps raw GitHub GraphQL pull requests into the shared PR domain type.
 
 import type { PR } from "../domain/types"
 
@@ -67,55 +65,17 @@ export function mapPullFromGraphQL(value: unknown): PR {
       ? reviewThreads.nodes.map((thread) => ({ isResolved: record(thread).isResolved === true }))
       : null,
     reviewRequests: array(reviewRequests.nodes)
-      .map((node) => string(record(record(node).requestedReviewer).login))
-      .filter(Boolean)
-      .map((login) => ({ login })),
+      .map((node) => record(record(node).requestedReviewer))
+      .flatMap<NonNullable<PR["reviewRequests"]>[number]>((reviewer) => {
+        const login = string(reviewer.login)
+        if (login) return [{ type: "user" as const, login }]
+        const slug = string(reviewer.slug)
+        return slug ? [{ type: "team" as const, slug }] : []
+      }),
     latestReviews: array(latestReviews.nodes).map((value) => {
       const review = record(value)
       return {
         author: { login: string(record(review.author).login) },
-        state: string(review.state),
-      }
-    }),
-  }
-}
-
-// Maps a REST `pulls.get` response data object to PR.  REST doesn't
-// provide statusCheckRollup, so the field is null.
-export function mapPullFromREST(value: unknown): PR {
-  const p = record(value)
-  const head = record(p.head)
-  const base = record(p.base)
-  const user = record(p.user)
-  return {
-    number: number(p.number),
-    title: string(p.title),
-    url: string(p.html_url),
-    isDraft: p.draft === true,
-    isMerged: p.merged === true,
-    isClosed: p.state === "closed" || p.merged === true,
-    headRefName: string(head.ref),
-    authorLogin: string(user.login),
-    assigneeLogins: array(p.assignees)
-      .map((assignee) => string(record(assignee).login))
-      .filter(Boolean),
-    additions: number(p.additions),
-    deletions: number(p.deletions),
-    baseRefName: string(base.ref),
-    mergeable: p.mergeable === true ? "MERGEABLE" : p.mergeable === false ? "CONFLICTING" : "UNKNOWN",
-    mergeStateStatus: "UNKNOWN",
-    reviewDecision: null,
-    statusCheckRollup: null,
-    checkStatuses: null,
-    reviewThreads: null,
-    reviewRequests: array(p.requested_reviewers)
-      .map((reviewer) => string(record(reviewer).login))
-      .filter(Boolean)
-      .map((login) => ({ login })),
-    latestReviews: array(p.latest_reviews).map((value) => {
-      const review = record(value)
-      return {
-        author: { login: string(record(review.user).login) },
         state: string(review.state),
       }
     }),

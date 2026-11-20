@@ -3,13 +3,13 @@ import {
   clearOctokitMocks,
   installOctokitMock,
   mockOctokitDefault,
-  mockOctokitOp,
 } from "../helpers/octokit-mock";
 import {
   DEFAULT_PR_BATCH_SIZE,
   repositoryPRs,
-  fetchOnePR,
 } from "../../plugins/infra/loader";
+import * as loader from "../../plugins/infra/loader";
+import * as mappers from "../../plugins/infra/mappers";
 import { createOctokit, setOctokit } from "../../plugins/infra/octokit";
 
 installOctokitMock();
@@ -23,6 +23,11 @@ afterEach(() => {
 });
 
 describe("repositoryPRs", () => {
+  test("does not expose the unused REST fetcher or mapper", () => {
+    expect("fetchOnePR" in loader).toBe(false);
+    expect("mapPullFromREST" in mappers).toBe(false);
+  });
+
   test("loads all available pages and maps viewer, author, assignee, branch, and state data", async () => {
     const paramsSeen: any[] = [];
     mockOctokitDefault((op, params) => {
@@ -703,6 +708,173 @@ describe("repositoryPRs", () => {
     expect(calls).toBe(2);
   });
 
+  test("keeps usable search results when the optional recent-PR connection errors", async () => {
+    mockOctokitDefault((op) => {
+      if (op !== "graphql") return null;
+      const error = Object.assign(new Error("Recent PRs are not accessible"), {
+        data: {
+          viewer: { login: "octocat" },
+          repository: { recentPullRequests: null },
+          search: {
+            issueCount: 1,
+            pageInfo: { hasNextPage: false, endCursor: null },
+            nodes: [
+              {
+                number: 7,
+                title: "Search result",
+                state: "OPEN",
+                author: { login: "octocat" },
+              },
+            ],
+          },
+        },
+        errors: [
+          {
+            type: "NOT_FOUND",
+            path: ["repository", "recentPullRequests"],
+            message: "Recent pull requests are unavailable",
+          },
+        ],
+      });
+      throw error;
+    });
+
+    const result = await repositoryPRs(
+      { owner: "foo", repo: "bar" },
+      10,
+      15_000,
+      "open",
+      null,
+      "author",
+    );
+    expect(result.prs.map((pr) => pr.number)).toEqual([7]);
+    expect(result.totalCount).toBe(1);
+  });
+
+  test("keeps required search-connection errors fatal", async () => {
+    mockOctokitDefault((op) => {
+      if (op !== "graphql") return null;
+      throw Object.assign(new Error("Search is unavailable"), {
+        data: {
+          viewer: { login: "octocat" },
+          repository: { recentPullRequests: { nodes: [] } },
+          search: null,
+        },
+        errors: [
+          {
+            type: "NOT_FOUND",
+            path: ["search"],
+            message: "Search is unavailable",
+          },
+        ],
+      });
+    });
+
+    await expect(
+      repositoryPRs(
+        { owner: "foo", repo: "bar" },
+        10,
+        15_000,
+        "open",
+        null,
+        "author",
+      ),
+    ).rejects.toThrow("Search is unavailable");
+  });
+
+  test("keeps required repository listing errors fatal", async () => {
+    mockOctokitDefault((op) => {
+      if (op !== "graphql") return null;
+      throw Object.assign(new Error("Pull request listing is unavailable"), {
+        data: {
+          viewer: { login: "octocat" },
+          repository: { pullRequests: null },
+        },
+        errors: [
+          {
+            type: "FORBIDDEN",
+            path: ["repository", "pullRequests"],
+            message: "Pull request listing is unavailable",
+          },
+        ],
+      });
+    });
+
+    await expect(
+      repositoryPRs({ owner: "foo", repo: "bar" }, 1),
+    ).rejects.toThrow("Pull request listing is unavailable");
+  });
+
+  test("retries once without unsupported status fields on older GHES", async () => {
+    const queries: string[] = [];
+    mockOctokitDefault((op, params) => {
+      if (op !== "graphql") return null;
+      queries.push(params.query);
+      if (queries.length === 1) {
+        throw Object.assign(new Error("Validation failed"), {
+          status: 422,
+          errors: [
+            {
+              message:
+                "Field 'mergeStateStatus' doesn't exist on type 'PullRequest'",
+            },
+            {
+              message:
+                "Cannot query field 'reviewDecision' on type 'PullRequest'",
+            },
+          ],
+        });
+      }
+      const secondPage = params.params.after === "cursor-1";
+      return {
+        viewer: { login: "octocat" },
+        repository: {
+          pullRequests: {
+            totalCount: 2,
+            pageInfo: secondPage
+              ? { hasNextPage: false, endCursor: null }
+              : { hasNextPage: true, endCursor: "cursor-1" },
+            nodes: [
+              {
+                number: secondPage ? 4 : 3,
+                title: secondPage ? "Second GHES PR" : "GHES PR",
+                state: "OPEN",
+              },
+            ],
+          },
+        },
+      };
+    });
+
+    const result = await repositoryPRs({ owner: "foo", repo: "bar" }, 2);
+    expect(queries).toHaveLength(3);
+    expect(queries[0]).toContain("mergeStateStatus");
+    expect(queries[1]).not.toContain("mergeStateStatus");
+    expect(queries[1]).not.toContain("reviewDecision");
+    expect(queries[2]).not.toContain("mergeStateStatus");
+    expect(result.prs.map((pr) => pr.number)).toEqual([3, 4]);
+    expect(result.prs[0]?.mergeStateStatus).toBe("UNKNOWN");
+  });
+
+  test("does not retry unrelated GraphQL 422 errors", async () => {
+    let calls = 0;
+    mockOctokitDefault((op) => {
+      if (op !== "graphql") return null;
+      calls++;
+      throw Object.assign(new Error("Validation failed"), {
+        status: 422,
+        errors: [
+          { message: "Unknown argument 'headRefName' on field 'pullRequests'" },
+        ],
+      });
+    });
+
+    await expect(
+      repositoryPRs({ owner: "foo", repo: "bar" }, 1),
+    ).rejects.toThrow("Validation failed");
+    expect(calls).toBe(1);
+  });
+
   test("surfaces a secondary rate limit without advancing pagination", async () => {
     let calls = 0;
     const fetchWithRateLimit: typeof fetch = Object.assign(
@@ -733,74 +905,5 @@ describe("repositoryPRs", () => {
       repositoryPRs({ owner: "foo", repo: "bar" }, 2),
     ).rejects.toThrow("secondary rate limit");
     expect(calls).toBe(1);
-  });
-});
-
-describe("fetchOnePR", () => {
-  test("maps REST pulls.get response to PR", async () => {
-    const restPR = {
-      number: 42,
-      title: "REST PR",
-      html_url: "https://github.com/foo/bar/pull/42",
-      draft: false,
-      user: { login: "alice" },
-      head: { ref: "feature" },
-      base: { ref: "main" },
-      review_decision: "APPROVED",
-      mergeable: true,
-      merged: false,
-      additions: 9,
-      deletions: 2,
-      mergeable_state: "clean",
-      created_at: "2024-01-01T00:00:00Z",
-      updated_at: "2024-01-02T00:00:00Z",
-      status_check_rollup: null,
-      requested_reviewers: [{ login: "bob" }],
-      latest_reviews: [],
-      assignees: [],
-    };
-    let captured: any = null;
-    mockOctokitOp("pulls.get", (params) => {
-      captured = params;
-      return { data: restPR };
-    });
-    const pr = await fetchOnePR({ owner: "foo", repo: "bar" }, 42);
-    expect(captured).toMatchObject({
-      owner: "foo",
-      repo: "bar",
-      pull_number: 42,
-    });
-    expect(pr.number).toBe(42);
-    expect(pr.title).toBe("REST PR");
-    expect(pr.url).toBe("https://github.com/foo/bar/pull/42");
-    expect(pr.baseRefName).toBe("main");
-    expect(pr.mergeable).toBe("MERGEABLE");
-    expect(pr.isMerged).toBe(false);
-    expect(pr.headRefName).toBe("feature");
-    expect(pr.authorLogin).toBe("alice");
-    expect(pr.assigneeLogins).toEqual([]);
-    expect(pr.additions).toBe(9);
-    expect(pr.deletions).toBe(2);
-    expect(pr.reviewRequests).toEqual([{ login: "bob" }]);
-  });
-
-  test("maps mergeable=false to CONFLICTING", async () => {
-    mockOctokitOp("pulls.get", () => ({
-      data: {
-        number: 1,
-        title: "x",
-        html_url: "u",
-        draft: false,
-        user: { login: "a" },
-        head: { ref: "f" },
-        base: { ref: "m" },
-        mergeable: false,
-        mergeable_state: "dirty",
-        created_at: "x",
-        updated_at: "x",
-      },
-    }));
-    const pr = await fetchOnePR({ owner: "foo", repo: "bar" }, 1);
-    expect(pr.mergeable).toBe("CONFLICTING");
   });
 });

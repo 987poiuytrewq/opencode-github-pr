@@ -7,12 +7,11 @@ export type StatusCategory = "pass" | "fail" | "pending" | "neutral" | "none"
 export type StatusGroup = { status: StatusCategory; count: number }
 
 export function mergeReadiness(pr: PR): StatusCategory {
+  if (pr.reviewDecision === "CHANGES_REQUESTED") return "fail"
   if (pr.mergeStateStatus === "DIRTY") return "fail"
-  if (pr.mergeStateStatus === "CLEAN") {
+  if (pr.reviewDecision === "REVIEW_REQUIRED") return "pending"
+  if (pr.mergeStateStatus === "CLEAN" || pr.mergeStateStatus === "HAS_HOOKS") {
     if (pr.reviewDecision === null || pr.reviewDecision === "APPROVED") return "pass"
-    if (pr.reviewDecision === "REVIEW_REQUIRED" || pr.reviewDecision === "CHANGES_REQUESTED") {
-      return "pending"
-    }
     return "neutral"
   }
   if (["BLOCKED", "BEHIND", "UNSTABLE"].includes(pr.mergeStateStatus)) return "pending"
@@ -101,15 +100,21 @@ export function reviewSummary(pr: PR): {
   pending: number
   commented: number
 } {
-  const pendingLogins = new Set(
-    (pr.reviewRequests ?? []).map((r) => r.login.toLowerCase()).filter(Boolean),
-  )
+  const pendingUsers = new Set<string>()
+  const pendingTeams = new Set<string>()
+  for (const request of pr.reviewRequests ?? []) {
+    if (request.type === "team") {
+      if (request.slug) pendingTeams.add(request.slug.toLowerCase())
+    } else if (request.login) {
+      pendingUsers.add(request.login.toLowerCase())
+    }
+  }
   const approved = new Set<string>()
   const changes = new Set<string>()
   const commented = new Set<string>()
   for (const r of pr.latestReviews ?? []) {
     const login = r.author?.login
-    if (!login || pendingLogins.has(login.toLowerCase())) continue
+    if (!login || pendingUsers.has(login.toLowerCase())) continue
     if (r.state === "APPROVED") approved.add(login)
     else if (r.state === "CHANGES_REQUESTED") changes.add(login)
     else if (r.state === "COMMENTED") commented.add(login)
@@ -117,7 +122,7 @@ export function reviewSummary(pr: PR): {
   return {
     approved: approved.size,
     changes: changes.size,
-    pending: pendingLogins.size,
+    pending: pendingUsers.size + pendingTeams.size,
     commented: commented.size,
   }
 }

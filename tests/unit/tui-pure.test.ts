@@ -55,7 +55,7 @@ describe("status groups", () => {
         { author: { login: "bob" }, state: "CHANGES_REQUESTED" },
         { author: { login: "carol" }, state: "COMMENTED" },
       ],
-      reviewRequests: [{ login: "dana" }],
+      reviewRequests: [{ type: "user", login: "dana" }],
     })
     expect(reviewStatusGroups(pr)).toEqual([
       { status: "pass", count: 1 },
@@ -78,7 +78,7 @@ describe("mergeReadiness", () => {
     expect(mergeReadiness(makeTUIPR({ mergeStateStatus: "CLEAN", reviewDecision: "APPROVED" }))).toBe("pass")
     expect(mergeReadiness(makeTUIPR({ mergeStateStatus: "CLEAN", reviewDecision: null }))).toBe("pass")
   })
-  test("keeps a clean PR yellow while review is required or changes are requested", () => {
+  test("keeps a clean PR yellow while review is required and colors requested changes red", () => {
     expect(mergeReadiness(makeTUIPR({
       mergeStateStatus: "CLEAN",
       reviewDecision: "REVIEW_REQUIRED",
@@ -86,7 +86,12 @@ describe("mergeReadiness", () => {
     expect(mergeReadiness(makeTUIPR({
       mergeStateStatus: "CLEAN",
       reviewDecision: "CHANGES_REQUESTED",
-    }))).toBe("pending")
+    }))).toBe("fail")
+  })
+  test("treats HAS_HOOKS like CLEAN for approved or unneeded reviews", () => {
+    expect(mergeReadiness(makeTUIPR({ mergeStateStatus: "HAS_HOOKS", reviewDecision: "APPROVED" }))).toBe("pass")
+    expect(mergeReadiness(makeTUIPR({ mergeStateStatus: "HAS_HOOKS", reviewDecision: null }))).toBe("pass")
+    expect(mergeReadiness(makeTUIPR({ mergeStateStatus: "HAS_HOOKS", reviewDecision: "REVIEW_REQUIRED" }))).toBe("pending")
   })
   test("colors dirty red, blocked states yellow, and unknown states neutral", () => {
     expect(mergeReadiness(makeTUIPR({ mergeStateStatus: "DIRTY" }))).toBe("fail")
@@ -106,7 +111,7 @@ describe("reviewSummary", () => {
         { author: { login: "b" }, state: "CHANGES_REQUESTED" },
         { author: { login: "c" }, state: "COMMENTED" },
       ],
-      reviewRequests: [{ login: "d" }, { login: "e" }],
+      reviewRequests: [{ type: "user", login: "d" }, { type: "user", login: "e" }],
     })
     const r = reviewSummary(pr)
     expect(r.approved).toBe(1)
@@ -133,9 +138,22 @@ describe("reviewSummary", () => {
         { author: { login: "alice" }, state: "APPROVED" },
         { author: { login: "bob" }, state: "COMMENTED" },
       ],
-      reviewRequests: [{ login: "Alice" }, { login: "carol" }],
+      reviewRequests: [{ type: "user", login: "Alice" }, { type: "user", login: "carol" }],
     }))
     expect(r).toEqual({ approved: 0, changes: 0, pending: 2, commented: 1 })
+  })
+
+  test("counts pending team requests separately from user logins", () => {
+    const r = reviewSummary(makeTUIPR({
+      latestReviews: [{ author: { login: "platform" }, state: "APPROVED" }],
+      reviewRequests: [
+        { type: "user", login: "platform" },
+        { type: "team", slug: "platform" },
+        { type: "team", slug: "platform" },
+        { type: "team", slug: "frontend" },
+      ],
+    }))
+    expect(r).toEqual({ approved: 0, changes: 0, pending: 3, commented: 0 })
   })
 
   test("handles null latestReviews and reviewRequests", () => {
@@ -149,7 +167,11 @@ describe("reviewSummary", () => {
   test("filters empty login from reviewRequests", () => {
     const r = reviewSummary(
       makeTUIPR({
-        reviewRequests: [{ login: "alice" }, { login: "" as any }, { login: "bob" }],
+        reviewRequests: [
+          { type: "user", login: "alice" },
+          { type: "user", login: "" as any },
+          { type: "user", login: "bob" },
+        ],
       }),
     )
     expect(r.pending).toBe(2)

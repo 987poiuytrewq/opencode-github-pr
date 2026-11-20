@@ -4,8 +4,13 @@
 
 import { getOctokit } from "./octokit"
 import { type Repo, type PR, type PRScope, type PRStatusFilter } from "../domain/types"
-import { mapPullFromGraphQL, mapPullFromREST } from "./mappers"
-import { PULL_REQUESTS_QUERY, PULL_REQUESTS_SEARCH_QUERY } from "./queries"
+import { mapPullFromGraphQL } from "./mappers"
+import {
+  PULL_REQUESTS_QUERY,
+  PULL_REQUESTS_QUERY_LEGACY,
+  PULL_REQUESTS_SEARCH_QUERY,
+  PULL_REQUESTS_SEARCH_QUERY_LEGACY,
+} from "./queries"
 
 export type { Repo, PR }
 
@@ -90,14 +95,33 @@ async function graphqlPartial(
   query: string,
   vars: Record<string, unknown>,
   requestTimeoutMs: number,
+  options: {
+    requiredConnection: "pullRequests" | "search"
+    optionalRecentPullRequests?: boolean
+    fallbackQuery?: string
+    onLegacyFallback?: () => void
+  },
 ): Promise<unknown> {
   try {
     return await getOctokit(requestTimeoutMs).graphql(query, vars)
   } catch (e: unknown) {
+    if (isRecord(e) && options.fallbackQuery && reportsUnknownPullRequestStatusFields(e)) {
+      options.onLegacyFallback?.()
+      return graphqlPartial(
+        options.fallbackQuery,
+        vars,
+        requestTimeoutMs,
+        {
+          requiredConnection: options.requiredConnection,
+          optionalRecentPullRequests: options.optionalRecentPullRequests,
+        },
+      )
+    }
     if (isRecord(e) && "data" in e && e.data) {
       const data = isRecord(e.data) ? e.data : {}
       const errors = Array.isArray(e.errors) ? e.errors : []
       const hasFatalType = errors.some((error) => {
+        if (isOptionalRecentPullRequestsError(error, options.optionalRecentPullRequests)) return false
         if (!isRecord(error) || typeof error.type !== "string") return false
         if (error.type === "RATE_LIMITED") return true
         if (error.type !== "NOT_FOUND" && error.type !== "FORBIDDEN") return false
@@ -108,21 +132,42 @@ async function graphqlPartial(
       const root = isRecord(data.repository) ? data.repository : null
       const hasRootFailure =
         data.repository === null ||
+        (options.requiredConnection === "search" && data.search === null) ||
         errors.some((error) => {
           if (!isRecord(error) || !Array.isArray(error.path)) return false
+          if (isOptionalRecentPullRequestsError(error, options.optionalRecentPullRequests)) return false
           const path = error.path
           return (
             (path.length === 1 && (path[0] === "repository" || path[0] === "search")) ||
             (path.length === 2 &&
               path[0] === "repository" &&
-              path[1] === "pullRequests" &&
-              !query.includes("recentPullRequests:"))
+              path[1] === "pullRequests") ||
+            (options.requiredConnection === "search" &&
+              path.length <= 2 &&
+              path[0] === "search")
           )
         })
       if (!hasFatalType && !hasRootFailure && root !== null) return e.data
     }
     throw e
   }
+}
+
+function isOptionalRecentPullRequestsError(
+  error: unknown,
+  optionalRecentPullRequests = false,
+): boolean {
+  if (!optionalRecentPullRequests || !isRecord(error) || !Array.isArray(error.path)) return false
+  return error.path[0] === "repository" && error.path[1] === "recentPullRequests"
+}
+
+function reportsUnknownPullRequestStatusFields(error: Record<string, unknown>): boolean {
+  if (!Array.isArray(error.errors) || error.errors.length === 0) return false
+  const unknownStatusField =
+    /(?:Cannot query field|Field)\s+['"]?(mergeStateStatus|reviewDecision)['"]?.*(?:doesn't exist|does not exist|on type|is not defined|unknown).*PullRequest/i
+  return error.errors.every(
+    (item) => isRecord(item) && typeof item.message === "string" && unknownStatusField.test(item.message),
+  )
 }
 
 export async function repositoryPRs(
@@ -198,6 +243,7 @@ export async function repositoryPRs(
   let hasNextPage = false
   let endCursor: string | null = null
   let remainingRecords = requestedRecords
+  let legacyStatusFieldsUnsupported = false
   let consecutiveEmptyPages = 0
   const seenCursors = new Set<string>(cursor ? [cursor] : [])
   do {
@@ -207,8 +253,11 @@ export async function repositoryPRs(
       recentPRsLimit > 0 &&
       !cursor &&
       resultsAlreadyFetched === 0
-    const data = isSearch
-      ? await graphqlPartial(PULL_REQUESTS_SEARCH_QUERY, {
+    const query = isSearch
+      ? legacyStatusFieldsUnsupported ? PULL_REQUESTS_SEARCH_QUERY_LEGACY : PULL_REQUESTS_SEARCH_QUERY
+      : legacyStatusFieldsUnsupported ? PULL_REQUESTS_QUERY_LEGACY : PULL_REQUESTS_QUERY
+    const legacyQuery = isSearch ? PULL_REQUESTS_SEARCH_QUERY_LEGACY : PULL_REQUESTS_QUERY_LEGACY
+    const data = await graphqlPartial(query, isSearch ? {
           owner: repo.owner,
           name: repo.repo,
           states: LISTING_STATES[listing],
@@ -217,15 +266,19 @@ export async function repositoryPRs(
           first,
           recentPRsLimit: Math.min(MAX_RECENT_PRS_LIMIT, Math.max(1, Math.floor(recentPRsLimit))),
           includeRecentPRs,
-        }, requestTimeoutMs)
-      : await graphqlPartial(PULL_REQUESTS_QUERY, {
+        } : {
           owner: repo.owner,
           name: repo.repo,
           states: LISTING_STATES[listing],
           head: scope === "branch" ? scopeValue : null,
           after: cursor,
           first,
-        }, requestTimeoutMs)
+        }, requestTimeoutMs, {
+          requiredConnection: isSearch ? "search" : "pullRequests",
+          optionalRecentPullRequests: isSearch,
+          fallbackQuery: legacyStatusFieldsUnsupported ? undefined : legacyQuery,
+          onLegacyFallback: () => { legacyStatusFieldsUnsupported = true },
+        })
     const page = readPullRequestPage(data, isSearch ? "search" : "pullRequests")
     nodes.push(...page.nodes)
     if (isSearch) {
@@ -280,14 +333,4 @@ export async function repositoryPRs(
     endCursor,
     limitReached,
   }
-}
-
-export async function fetchOnePR(repo: Repo, pullNumber: number): Promise<PR> {
-  const octokit = getOctokit()
-  const { data } = await octokit.pulls.get({
-    owner: repo.owner,
-    repo: repo.repo,
-    pull_number: pullNumber,
-  })
-  return mapPullFromREST(data)
 }
