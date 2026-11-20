@@ -175,7 +175,6 @@ export function DashboardView(props: {
     <box
       ref={(element) => { view = element }}
       flexDirection="column"
-      paddingTop={1}
       paddingBottom={1}
       gap={0}
       width="100%"

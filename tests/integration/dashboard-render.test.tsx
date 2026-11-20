@@ -392,8 +392,8 @@ describe("DashboardView mouse interaction", () => {
       onOpen: (n) => { opened.push(n) },
     })
     await r.flush()
-    // First PR title is at row 3, after the blank line under the heading.
-    await r.mockMouse.click(4, 3)
+    const firstPR = r.captureCharFrame().split("\n").findIndex((line) => line.includes("Add login flow"))
+    await r.mockMouse.click(4, firstPR)
     await r.flush()
     expect(opened).toEqual([10])
   })
@@ -407,12 +407,12 @@ describe("DashboardView mouse interaction", () => {
     })
     await r.flush()
     const header = r.captureCharFrame().split("\n").find((line) => line.includes("Pull Requests")) ?? ""
-    await r.mockMouse.click(header.indexOf("branch"), 1)
+    await r.mockMouse.click(header.indexOf("branch"), 0)
     await r.flush()
     expect(scopeCycles).toBe(1)
     expect(statusCycles).toBe(0)
 
-    await r.mockMouse.click(header.indexOf("open"), 1)
+    await r.mockMouse.click(header.indexOf("open"), 0)
     await r.flush()
     expect(scopeCycles).toBe(1)
     expect(statusCycles).toBe(1)
@@ -431,13 +431,13 @@ describe("DashboardView mouse interaction", () => {
     expect(statusDefault).toBeDefined()
 
     const header = r.captureCharFrame().split("\n").find((line) => line.includes("Pull Requests")) ?? ""
-    await r.mockMouse.moveTo(header.indexOf("branch"), 1)
+    await r.mockMouse.moveTo(header.indexOf("branch"), 0)
     await r.flush()
     expect(filterSpan("branch")?.fg).not.toEqual(scopeDefault?.fg)
     expect(filterSpan(dashboardOptions().icons.scope)?.fg).toEqual(scopeIconDefault?.fg)
     expect(filterSpan("open")?.fg).toEqual(statusDefault?.fg)
 
-    await r.mockMouse.moveTo(header.indexOf("open"), 1)
+    await r.mockMouse.moveTo(header.indexOf("open"), 0)
     await r.flush()
     expect(filterSpan("branch")?.fg).toEqual(scopeDefault?.fg)
     expect(filterSpan("open")?.fg).not.toEqual(statusDefault?.fg)
@@ -463,8 +463,8 @@ describe("DashboardView mouse interaction", () => {
       onOpen: (number, target) => { opened.push({ number, target }) },
     })
     await r.flush()
-    // First PR row starts at y=3; the status icon is its first character.
-    await r.mockMouse.click(0, 3)
+    const firstPR = r.captureCharFrame().split("\n").findIndex((line) => line.includes("Add login flow"))
+    await r.mockMouse.click(0, firstPR)
     await r.flush()
     expect(opened).toEqual([{ number: 10, target: "mergeStatus" }])
   })
