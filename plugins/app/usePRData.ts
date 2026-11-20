@@ -14,7 +14,7 @@ import {
   type PRScope,
   type PRStatusFilter,
 } from "../domain/types"
-import { currentBranch, detectRepo } from "../infra/git"
+import { currentBranch, detectPushRemoteOwner, detectRepo } from "../infra/git"
 import {
   DEFAULT_RECENT_PRS_LIMIT,
   repositoryPRs,
@@ -123,7 +123,12 @@ export function useDashboard(
       let scopeValue: string | null = null
       try {
         const directory = await cwd()
-        const repo = detectRepo(directory)
+        const [repo, branchPushOwner] = await Promise.all([
+          detectRepo(directory),
+          scope === "branch"
+            ? detectPushRemoteOwner(directory, currentBranch(directory))
+            : Promise.resolve(null),
+        ])
         const branch = currentBranch(directory)
         scopeValue = scope === "branch" ? branch : null
         const isFirstLoad = prev.fetchedAt === null
@@ -178,6 +183,7 @@ export function useDashboard(
           scopeValue,
           0,
           recentPRsLimit,
+          branchPushOwner,
         )
         if (isStale()) return
         setState((s) => ({
@@ -274,6 +280,9 @@ export function useDashboard(
 
     const promise = (async () => {
       try {
+        const branchPushOwner = scope === "branch"
+          ? await detectPushRemoteOwner(await cwd(), before.currentBranch)
+          : null
         const result = await repositoryPRs(
           repo,
           pageBatchSize,
@@ -284,6 +293,7 @@ export function useDashboard(
           scopeValue,
           before.pagination.searchResultsFetched,
           recentPRsLimit,
+          branchPushOwner,
         )
         setState((s) => {
           const sameRepo = s.repo?.owner === repo.owner && s.repo.repo === repo.repo
@@ -307,7 +317,11 @@ export function useDashboard(
               hasMore: result.hasMore,
               totalCount: s.pagination.supplementalPRCount > 0
                 ? s.pagination.totalCount
-                : result.totalCount ?? s.pagination.totalCount,
+                : scope === "branch"
+                  ? s.pagination.totalCount === null
+                    ? null
+                    : Math.max(0, s.pagination.totalCount - result.filteredPRCount)
+                  : result.totalCount ?? s.pagination.totalCount,
               pagesLoaded: s.pagination.pagesLoaded + result.fetchedPages,
               searchResultsFetched: s.pagination.searchResultsFetched + result.searchResultsFetched,
               supplementalPRCount: s.pagination.supplementalPRCount,

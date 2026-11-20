@@ -112,6 +112,87 @@ describe("repositoryPRs", () => {
     ]);
   });
 
+  test("filters branch-scope fork PRs and decrements totalCount for each fetched batch", async () => {
+    mockOctokitDefault((op, params) => {
+      if (op !== "graphql") return null;
+      const secondPage = params.params.after === "cursor-1";
+      return {
+        repository: {
+          pullRequests: {
+            totalCount: 3,
+            pageInfo: {
+              hasNextPage: true,
+              endCursor: secondPage ? "cursor-2" : "cursor-1",
+            },
+            nodes: [
+              {
+                number: secondPage ? 2 : 1,
+                title: "Branch PR",
+                state: "OPEN",
+                headRefName: "feature",
+                headRepositoryOwner: {
+                  login: secondPage ? "upstream" : "personal",
+                },
+                author: { login: "octocat" },
+              },
+            ],
+          },
+        },
+      };
+    });
+
+    const firstBatch = await repositoryPRs(
+      { owner: "upstream", repo: "repo" },
+      1,
+      15_000,
+      "open",
+      null,
+      "branch",
+      "feature",
+      0,
+      5,
+      "personal",
+    );
+    expect(firstBatch.prs.map((pr) => pr.number)).toEqual([1]);
+    expect(firstBatch.totalCount).toBe(3);
+    expect(firstBatch.filteredPRCount).toBe(0);
+
+    const secondBatch = await repositoryPRs(
+      { owner: "upstream", repo: "repo" },
+      1,
+      15_000,
+      "open",
+      firstBatch.endCursor,
+      "branch",
+      "feature",
+      0,
+      5,
+      "personal",
+    );
+    expect(secondBatch.prs).toEqual([]);
+    expect(secondBatch.totalCount).toBe(2);
+    expect(secondBatch.filteredPRCount).toBe(1);
+    expect(
+      Math.max(0, (firstBatch.totalCount ?? 0) - secondBatch.filteredPRCount),
+    ).toBe(2);
+
+    const unfiltered = await repositoryPRs(
+      { owner: "upstream", repo: "repo" },
+      1,
+      15_000,
+      "open",
+      null,
+      "branch",
+      "feature",
+      0,
+      5,
+      null,
+    );
+    expect(unfiltered.prs.map((pr) => pr.number)).toEqual([1]);
+    expect(unfiltered.totalCount).toBe(3);
+    expect(unfiltered.filteredPRCount).toBe(0);
+  });
+
   test("loads the default four-PR batch and reports that more PRs are available", async () => {
     let calls = 0;
     mockOctokitDefault((op) => {

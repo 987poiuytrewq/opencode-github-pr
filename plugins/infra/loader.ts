@@ -35,6 +35,7 @@ export type RepositoryPRsResult = {
   prs: PR[]
   viewerLogin: string | null
   totalCount: number | null
+  filteredPRCount: number
   searchResultsFetched: number
   supplementalPRCount: number
   hasMore: boolean
@@ -182,12 +183,14 @@ export async function repositoryPRs(
   scopeValue: string | null = null,
   resultsAlreadyFetched = 0,
   recentPRsLimit = DEFAULT_RECENT_PRS_LIMIT,
+  branchOwner: string | null = repo?.owner ?? null,
 ): Promise<RepositoryPRsResult> {
   if (!repo) {
     return {
       prs: [],
       viewerLogin: null,
       totalCount: 0,
+      filteredPRCount: 0,
       searchResultsFetched: 0,
       supplementalPRCount: 0,
       hasMore: false,
@@ -201,6 +204,7 @@ export async function repositoryPRs(
       prs: [],
       viewerLogin: null,
       totalCount: 0,
+      filteredPRCount: 0,
       searchResultsFetched: 0,
       supplementalPRCount: 0,
       hasMore: false,
@@ -218,6 +222,7 @@ export async function repositoryPRs(
       prs: [],
       viewerLogin: null,
       totalCount: isSearch ? Math.min(resultsAlreadyFetched, MAX_SEARCH_RESULTS) : null,
+      filteredPRCount: 0,
       searchResultsFetched: 0,
       supplementalPRCount: 0,
       hasMore: false,
@@ -308,10 +313,15 @@ export async function repositoryPRs(
     if (consecutiveEmptyPages >= 3) break
   } while (hasNextPage && remainingRecords > 0)
   const mappedPRs = nodes.map(mapPullFromGraphQL)
-  const searchPRs = scope === "branch"
+  const filteredPRs = scope === "branch" && branchOwner
     ? mappedPRs.filter(
-        (pr) => !pr.headRepositoryOwnerLogin || pr.headRepositoryOwnerLogin.toLowerCase() === repo.owner.toLowerCase(),
+        (pr) => !!pr.headRepositoryOwnerLogin &&
+          pr.headRepositoryOwnerLogin.toLowerCase() !== branchOwner.toLowerCase(),
       )
+    : []
+  const filteredNumbers = new Set(filteredPRs.map((pr) => pr.number))
+  const searchPRs = filteredNumbers.size > 0
+    ? mappedPRs.filter((pr) => !filteredNumbers.has(pr.number))
     : mappedPRs
   let supplementalPRs: PR[] = []
   if (isSearch && recentNodes.length > 0 && viewerLogin) {
@@ -332,7 +342,10 @@ export async function repositoryPRs(
   return {
     prs: [...supplementalPRs, ...searchPRs],
     viewerLogin,
-    totalCount: totalCount === null ? null : totalCount + supplementalPRs.length,
+    totalCount: totalCount === null
+      ? null
+      : Math.max(0, totalCount - filteredNumbers.size) + supplementalPRs.length,
+    filteredPRCount: filteredNumbers.size,
     searchResultsFetched,
     supplementalPRCount: supplementalPRs.length,
     hasMore: hasNextPage && !limitReached,
