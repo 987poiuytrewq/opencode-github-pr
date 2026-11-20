@@ -124,7 +124,7 @@ and removed, and on the right, the unresolved comment count, review status and c
 
 | Element | Meaning | Click opens |
 | --- | --- | --- |
-| PR icon | Green: ready to merge. Red: merge conflict. Grey: draft, closed or unknown. Your theme's info colour: merged ([use GitHub's purple](#colours) instead). | Merge status panel |
+| PR icon | Green: ready to merge (including `HAS_HOOKS` when reviews are approved or not required). Red: merge conflict or changes requested. Yellow: blocked, behind, unstable or review required. Grey: draft, closed or unknown. Your theme's info colour: merged ([use GitHub's purple](#colours) instead). | Merge status panel |
 | Title | The PR title, shortened to fit the sidebar. | PR overview |
 | `#128` | PR number. | PR overview |
 | `+42 -7` | Lines added and removed. | Files changed |
@@ -134,6 +134,10 @@ and removed, and on the right, the unresolved comment count, review status and c
 
 When reviews or checks are in more than one state, each state gets its own icon with a count, for example three green
 dots and one red dot for three passing checks and one failing.
+
+On older GitHub Enterprise Server versions that report `mergeStateStatus` or `reviewDecision` as unknown GraphQL fields,
+the dashboard retries once without those fields and continues with the remaining PR data. It does not retry unrelated
+GraphQL errors, including other `422` responses.
 
 ### Filters
 

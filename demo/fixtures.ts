@@ -50,7 +50,7 @@ const demoPRs: PR[] = [
     assigneeLogins: ["mia"],
     statusCheckRollup: { state: "FAILURE" },
     checkStatuses: ["SUCCESS", "FAILURE"],
-    reviewRequests: [{ login: "alex" }],
+    reviewRequests: [{ type: "user", login: "alex" }],
     reviewThreads: [{ isResolved: false }, { isResolved: true }],
   }),
   demoPR({
@@ -78,7 +78,7 @@ const demoPRs: PR[] = [
     deletions: 6,
     statusCheckRollup: { state: "PENDING" },
     checkStatuses: ["QUEUED"],
-    reviewRequests: [{ login: "jules" }],
+    reviewRequests: [{ type: "user", login: "jules" }],
   }),
   demoPR({
     number: 243,
