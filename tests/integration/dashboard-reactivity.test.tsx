@@ -27,6 +27,8 @@ describe("DashboardView reactivity", () => {
           pageSize={dashboardOptions().pageSize}
           colors={dashboardOptions().colors}
           icons={dashboardOptions().icons}
+          spacing={dashboardOptions().spacing}
+          showSingleStatusCount={dashboardOptions().showSingleStatusCount}
         />
       ),
       { width: 80, height: 30 },

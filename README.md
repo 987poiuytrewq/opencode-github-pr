@@ -204,7 +204,13 @@ value:
         "refreshIntervalMs": 30000,
         "recentPRsLimit": 5,
         "defaultScope": "all",
-        "defaultStatusFilter": "open"
+        "defaultStatusFilter": "open",
+        "spacing": {
+          "iconToCount": 0,
+          "sameTypeGroups": 0,
+          "differentTypeGroups": 1
+        },
+        "showSingleStatusCount": false
       }
     }
   ]
@@ -224,9 +230,14 @@ value:
 | `iconStyle` | `"nerd"` | Icon set: `"nerd"` for Nerd Font glyphs, or `"unicode"` for standard Unicode symbols that work in any font. See [Icons](#icons). |
 | `colors` | Theme | Colour overrides. See [Colours](#colours). |
 | `icons` | From `iconStyle` | Overrides for individual icons. See [Icons](#icons). |
+| `spacing` | See below | Gaps, in terminal cells, between an indicator's icon and count, between same-type groups, and between comment/review/check types. Each gap is clamped to `0`–`4`. |
+| `showSingleStatusCount` | `false` | Show counts for review and check badges even when there is only one status group. |
 
-Most numeric options must be positive numbers. `recentPRsLimit` accepts `0` through `100`; invalid values fall back to
-the default.
+`spacing` accepts `iconToCount`, `sameTypeGroups` and `differentTypeGroups`. Its defaults are `0`, `0` and `1`,
+respectively. For example, set `iconToCount` to `1` to put one cell between each status icon and its count.
+
+Most numeric options must be positive numbers. `recentPRsLimit` accepts `0` through `100`, and spacing gaps accept
+`0` through `4`; invalid values fall back to their defaults.
 
 ### Colours
 

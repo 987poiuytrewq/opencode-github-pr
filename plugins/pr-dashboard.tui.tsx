@@ -146,6 +146,8 @@ async function setup(api: TuiPluginContext) {
         pageSize={options.pageSize}
         colors={options.colors}
         icons={options.icons}
+        spacing={options.spacing}
+        showSingleStatusCount={options.showSingleStatusCount}
       />
     ),
   })
