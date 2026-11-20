@@ -303,27 +303,45 @@ export function DashboardView(props: {
               paddingRight={1}
               width="100%"
             >
-              <text
-                fg={canGoPrevious() && previousHovered() ? sk.accent : sk.muted}
-                selectable={false}
+              <box
+                width={Bun.stringWidth(props.icons.previousPage) + 2}
+                marginLeft={-1}
+                marginRight={-1}
+                flexDirection="row"
+                justifyContent="center"
+                alignItems="center"
                 onMouseOver={() => canGoPrevious() && setPreviousHovered(true)}
                 onMouseOut={() => setPreviousHovered(false)}
                 onMouseUp={() => canGoPrevious() && setPage(currentPage() - 1)}
               >
-                {props.icons.previousPage}
-              </text>
+                <text
+                  fg={canGoPrevious() && previousHovered() ? sk.accent : sk.muted}
+                  selectable={false}
+                >
+                  {props.icons.previousPage}
+                </text>
+              </box>
               <text fg={sk.muted} selectable={false}>
                 {`${currentPage() + 1} of ${totalPageCount() ?? pageCount()}${totalPageCount() === null && filtersMatch() && props.state.pagination.hasMore ? "+" : ""}`}
               </text>
-              <text
-                fg={canGoNext() && nextHovered() ? sk.accent : sk.muted}
-                selectable={false}
+              <box
+                width={Bun.stringWidth(props.icons.nextPage) + 2}
+                marginLeft={-1}
+                marginRight={-1}
+                flexDirection="row"
+                justifyContent="center"
+                alignItems="center"
                 onMouseOver={() => canGoNext() && setNextHovered(true)}
                 onMouseOut={() => setNextHovered(false)}
                 onMouseUp={() => canGoNext() && void goNext()}
               >
-                {props.icons.nextPage}
-              </text>
+                <text
+                  fg={canGoNext() && nextHovered() ? sk.accent : sk.muted}
+                  selectable={false}
+                >
+                  {props.icons.nextPage}
+                </text>
+              </box>
             </box>
           </Show>
           <Show when={filtersMatch() && props.state.pagination.limitReached}>

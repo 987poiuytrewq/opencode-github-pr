@@ -569,13 +569,22 @@ describe("DashboardView mouse interaction", () => {
     }), { scope: "all", statusFilter: "all" })
     await r.flush()
 
-    const clickArrow = async (pageLabel: string, arrow: string) => {
+    const clickArrow = async (
+      pageLabel: string,
+      arrow: string,
+      edge?: "before" | "after",
+    ) => {
       const frame = r.captureCharFrame()
       const lines = frame.split("\n")
       const y = lines.findIndex((line) => line.includes(pageLabel))
       expect(y).toBeGreaterThanOrEqual(0)
-      const x = lines[y].indexOf(arrow)
-      expect(x).toBeGreaterThanOrEqual(0)
+      const arrowX = lines[y].indexOf(arrow)
+      expect(arrowX).toBeGreaterThanOrEqual(0)
+      const x = edge === "before"
+        ? arrowX - 1
+        : edge === "after"
+          ? arrowX + Bun.stringWidth(arrow)
+          : arrowX
       await r.mockMouse.click(x, y)
       await r.flush()
     }
@@ -587,20 +596,42 @@ describe("DashboardView mouse interaction", () => {
     expect(frame).toContain(`${openPRIcon} PR 14`)
     expect(frame).not.toContain(`${openPRIcon} PR 15`)
 
+    const pagerLine = frame.split("\n").find((line) => line.includes("1 of 3"))!
+    const pageLabelX = pagerLine.indexOf("1 of 3")
+    const previousX = pagerLine.indexOf(dashboardOptions().icons.previousPage)
+    const nextX = pagerLine.indexOf(dashboardOptions().icons.nextPage)
+    expect(pageLabelX - previousX - Bun.stringWidth(dashboardOptions().icons.previousPage)).toBe(1)
+    expect(nextX - pageLabelX - Bun.stringWidth("1 of 3")).toBe(1)
+
+    const nextIconColor = () =>
+      r.captureSpans().lines.flatMap((line) => line.spans)
+        .find((span) => span.text.includes(dashboardOptions().icons.nextPage))?.fg
+    const defaultNextIconColor = nextIconColor()
+    const pagerY = r.captureCharFrame().split("\n").findIndex((line) => line.includes("1 of 3"))
+    await r.mockMouse.moveTo(nextX - 1, pagerY)
+    await r.flush()
+    expect(nextIconColor()).not.toEqual(defaultNextIconColor)
+    await r.mockMouse.moveTo(pageLabelX, pagerY)
+    await r.flush()
+    expect(nextIconColor()).toEqual(defaultNextIconColor)
+    await r.mockMouse.moveTo(nextX + Bun.stringWidth(dashboardOptions().icons.nextPage), pagerY)
+    await r.flush()
+    expect(nextIconColor()).not.toEqual(defaultNextIconColor)
+
     await clickArrow("1 of 3", dashboardOptions().icons.previousPage)
     expect(r.captureCharFrame()).toContain("1 of 3")
 
-    await clickArrow("1 of 3", dashboardOptions().icons.nextPage)
+    await clickArrow("1 of 3", dashboardOptions().icons.nextPage, "before")
     frame = r.captureCharFrame()
     expect(frame).toContain("2 of 3")
     expect(frame).toContain(`${openPRIcon} PR 15`)
     expect(frame).not.toContain(`${openPRIcon} PR 14`)
 
-    await clickArrow("2 of 3", dashboardOptions().icons.nextPage)
+    await clickArrow("2 of 3", dashboardOptions().icons.nextPage, "after")
     expect(r.captureCharFrame()).toContain("3 of 3")
     await clickArrow("3 of 3", dashboardOptions().icons.nextPage)
     expect(r.captureCharFrame()).toContain("3 of 3")
-    await clickArrow("3 of 3", dashboardOptions().icons.previousPage)
+    await clickArrow("3 of 3", dashboardOptions().icons.previousPage, "before")
     expect(r.captureCharFrame()).toContain("2 of 3")
   })
 
