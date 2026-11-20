@@ -5,6 +5,8 @@
 // the caller fall back to a "no repo" / "no branch PR" state.
 
 import { existsSync, readFileSync, statSync } from "node:fs"
+import { spawnSync } from "node:child_process"
+import { homedir } from "node:os"
 import { join, resolve } from "node:path"
 import type { Repo } from "../domain/types"
 import { enterpriseHostname } from "./github-enterprise"
@@ -12,6 +14,8 @@ import { enterpriseHostname } from "./github-enterprise"
 export type { Repo }
 
 const HEAD_REF_PREFIX = "ref: refs/heads/"
+const SSH_CONFIG_TIMEOUT_MS = 500
+const sshHostCache = new Map<string, string | null>()
 
 export function currentBranch(cwd: string): string | null {
   const paths = gitPaths(cwd)
@@ -30,7 +34,10 @@ export function currentBranch(cwd: string): string | null {
 function remoteUrls(cwd: string): Array<{ name: string; url: string }> {
   const paths = gitPaths(cwd)
   if (!paths) return []
-  for (const configPath of new Set([join(paths.commonDir, "config"), join(paths.gitDir, "config")])) {
+  for (const configPath of new Set([
+    join(paths.commonDir, "config"),
+    join(paths.gitDir, "config"),
+  ])) {
     try {
       if (!existsSync(configPath)) continue
       const text = readFileSync(configPath, "utf8")
@@ -127,13 +134,22 @@ function isBareGitDir(directory: string): boolean {
   }
 }
 
-export function parseGitHubRemote(url: string, enterpriseUrl?: string): Repo | null {
+export function parseGitHubRemote(
+  url: string,
+  enterpriseUrl?: string,
+): Repo | null {
   const remote = url.trim()
   const configuredHost = enterpriseHostname(enterpriseUrl)
-  const supportedHosts = configuredHost ? [configuredHost] : ["github.com", "ssh.github.com"]
-  const hostPattern = supportedHosts.map((host) => host.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")).join("|")
+  const supportedHosts = configuredHost
+    ? [configuredHost]
+    : ["github.com", "ssh.github.com"]
+  const hostPattern = supportedHosts
+    .map((host) => host.replace(/[.*+?^${}()|[\]\\]/g, "\\$&"))
+    .join("|")
   // Git accepts both URI-style SSH URLs and scp-style SSH URLs.
-  const scp = new RegExp(`^(?:git@)?(?:${hostPattern}):([^?#]+)$`, "i").exec(remote)
+  const scp = new RegExp(`^(?:git@)?(?:${hostPattern}):([^?#]+)$`, "i").exec(
+    remote,
+  )
   if (scp) return splitOwnerRepo(scp[1])
 
   try {
@@ -144,7 +160,11 @@ export function parseGitHubRemote(url: string, enterpriseUrl?: string): Repo | n
     ) {
       return null
     }
-    if (!configuredHost && parsed.hostname.toLowerCase() === "ssh.github.com" && parsed.protocol !== "ssh:") {
+    if (
+      !configuredHost &&
+      parsed.hostname.toLowerCase() === "ssh.github.com" &&
+      parsed.protocol !== "ssh:"
+    ) {
       return null
     }
     return splitOwnerRepo(parsed.pathname)
@@ -158,15 +178,150 @@ export function detectRepo(
   enterpriseUrl = process.env.GITHUB_ENTERPRISE_URL,
 ): Repo | null {
   const remotes = remoteUrls(cwd)
+  const rewrites = urlRewriteRules(cwd)
   const preferred = [
     ...remotes.filter(({ name }) => name === "origin"),
     ...remotes.filter(({ name }) => name !== "origin"),
   ]
   for (const { url } of preferred) {
-    const repo = parseGitHubRemote(url, enterpriseUrl)
+    const rewritten = rewriteRemoteUrl(url, rewrites)
+    const repo =
+      parseGitHubRemote(rewritten, enterpriseUrl) ??
+      parseGitHubRemote(resolveSshAlias(rewritten), enterpriseUrl)
     if (repo) return repo
   }
   return null
+}
+
+type UrlRewrite = { prefix: string; base: string }
+
+function urlRewriteRules(cwd: string): UrlRewrite[] {
+  const paths = gitPaths(cwd)
+  if (!paths) return []
+
+  const configPaths: string[] = []
+  if (process.env.GIT_CONFIG_NOSYSTEM !== "1") {
+    configPaths.push(process.env.GIT_CONFIG_SYSTEM || "/etc/gitconfig")
+  }
+  const home = homedir()
+  const xdgConfigHome = process.env.XDG_CONFIG_HOME || join(home, ".config")
+  configPaths.push(join(xdgConfigHome, "git", "config"))
+  if (process.env.GIT_CONFIG_GLOBAL) {
+    configPaths.push(process.env.GIT_CONFIG_GLOBAL)
+  } else {
+    configPaths.push(join(home, ".gitconfig"))
+  }
+  configPaths.push(
+    join(paths.commonDir, "config"),
+    join(paths.gitDir, "config"),
+  )
+
+  const rewrites: UrlRewrite[] = []
+  for (const configPath of new Set(configPaths)) {
+    try {
+      if (!existsSync(configPath)) continue
+      const text = readFileSync(configPath, "utf8")
+      const sectionRe = /^\s*\[url\s+"((?:\\.|[^"])*)"\]\s*$/gim
+      let section: RegExpExecArray | null
+      while ((section = sectionRe.exec(text)) !== null) {
+        const start = sectionRe.lastIndex
+        const nextSection = /^\s*\[/gm
+        nextSection.lastIndex = start
+        const end = nextSection.exec(text)?.index ?? text.length
+        const base = unquoteConfigValue(`"${section[1]}"`)
+        const sectionText = text.slice(start, end)
+        const prefixRe = /^\s*insteadOf\s*=\s*(.*?)\s*$/gim
+        let prefix: RegExpExecArray | null
+        while ((prefix = prefixRe.exec(sectionText)) !== null) {
+          const value = unquoteConfigValue(prefix[1])
+          if (base && value) rewrites.push({ base, prefix: value })
+        }
+      }
+    } catch {
+      // Missing or unreadable config scopes do not prevent local detection.
+    }
+  }
+  return rewrites
+}
+
+function rewriteRemoteUrl(url: string, rewrites: UrlRewrite[]): string {
+  let best: UrlRewrite | null = null
+  for (const rewrite of rewrites) {
+    if (
+      url.startsWith(rewrite.prefix) &&
+      (!best || rewrite.prefix.length > best.prefix.length)
+    ) {
+      best = rewrite
+    }
+  }
+  return best ? `${best.base}${url.slice(best.prefix.length)}` : url
+}
+
+function resolveSshAlias(url: string): string {
+  const scp = /^(?:([^@/:]+)@)?([A-Za-z0-9._-]+):([^?#]+)$/.exec(url)
+  if (scp && !scp[2].startsWith("-")) {
+    const hostName = sshHostName(scp[2])
+    return hostName ? `${scp[1] ? `${scp[1]}@` : ""}${hostName}:${scp[3]}` : url
+  }
+
+  try {
+    const parsed = new URL(url)
+    if (
+      parsed.protocol !== "ssh:" ||
+      !/^[A-Za-z0-9._-]+$/.test(parsed.hostname) ||
+      parsed.hostname.startsWith("-")
+    ) {
+      return url
+    }
+    const hostName = sshHostName(parsed.hostname)
+    if (hostName) parsed.hostname = hostName
+    return parsed.toString()
+  } catch {
+    return url
+  }
+}
+
+function sshHostName(host: string): string | null {
+  const normalized = host.toLowerCase()
+  if (sshHostCache.has(normalized)) return sshHostCache.get(normalized) ?? null
+  // `ssh -G` prints effective client configuration and exits without opening a
+  // connection. Keep it bounded; this path is only used to resolve HostName.
+  try {
+    const userConfig = join(process.env.HOME || homedir(), ".ssh", "config")
+    const args = existsSync(userConfig)
+      ? ["-G", "-o", "CanonicalizeHostname=no", "-F", userConfig, host]
+      : ["-G", "-o", "CanonicalizeHostname=no", host]
+    const result = spawnSync("ssh", args, {
+      encoding: "utf8",
+      timeout: SSH_CONFIG_TIMEOUT_MS,
+      maxBuffer: 64 * 1024,
+      stdio: ["ignore", "pipe", "ignore"],
+      windowsHide: true,
+    })
+    if (
+      result.error ||
+      result.status !== 0 ||
+      typeof result.stdout !== "string"
+    ) {
+      sshHostCache.set(normalized, null)
+      return null
+    }
+    const match = /^hostname\s+(\S+)\s*$/im.exec(result.stdout)
+    const hostName = match?.[1]
+    if (
+      !hostName ||
+      hostName.toLowerCase() === normalized ||
+      !/^[A-Za-z0-9.-]+$/.test(hostName)
+    ) {
+      sshHostCache.set(normalized, null)
+      return null
+    }
+    sshHostCache.set(normalized, hostName)
+    return hostName
+  } catch {
+    sshHostCache.set(normalized, null)
+    return null
+  }
 }
 
 function splitOwnerRepo(path: string): Repo | null {

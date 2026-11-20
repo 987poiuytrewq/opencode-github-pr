@@ -2,7 +2,11 @@ import { describe, expect, test } from "bun:test"
 import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs"
 import { tmpdir } from "node:os"
 import { join } from "node:path"
-import { currentBranch, parseGitHubRemote, detectRepo } from "../../plugins/infra/git"
+import {
+  currentBranch,
+  parseGitHubRemote,
+  detectRepo,
+} from "../../plugins/infra/git"
 import { makeFakeRepo } from "../helpers/graphql-mock"
 
 describe("parseGitHubRemote", () => {
@@ -26,27 +30,49 @@ describe("parseGitHubRemote", () => {
   })
 
   test("parses GitHub SSH over port 443", () => {
-    expect(parseGitHubRemote("ssh://git@ssh.github.com:443/foo/bar.git")).toEqual({ owner: "foo", repo: "bar" })
+    expect(
+      parseGitHubRemote("ssh://git@ssh.github.com:443/foo/bar.git"),
+    ).toEqual({ owner: "foo", repo: "bar" })
   })
 
   test("parses GitHub Enterprise HTTPS and SSH remotes when configured", () => {
     const enterpriseUrl = "https://github.example.test"
-    expect(parseGitHubRemote("https://github.example.test/acme/widgets.git", enterpriseUrl)).toEqual({
+    expect(
+      parseGitHubRemote(
+        "https://github.example.test/acme/widgets.git",
+        enterpriseUrl,
+      ),
+    ).toEqual({
       owner: "acme",
       repo: "widgets",
     })
-    expect(parseGitHubRemote("ssh://git@github.example.test/acme/widgets.git", enterpriseUrl)).toEqual({
+    expect(
+      parseGitHubRemote(
+        "ssh://git@github.example.test/acme/widgets.git",
+        enterpriseUrl,
+      ),
+    ).toEqual({
       owner: "acme",
       repo: "widgets",
     })
-    expect(parseGitHubRemote("git@github.example.test:acme/widgets.git", enterpriseUrl)).toEqual({
+    expect(
+      parseGitHubRemote(
+        "git@github.example.test:acme/widgets.git",
+        enterpriseUrl,
+      ),
+    ).toEqual({
       owner: "acme",
       repo: "widgets",
     })
   })
 
   test("does not mistake a github.com remote for a configured enterprise host", () => {
-    expect(parseGitHubRemote("https://github.com/acme/widgets.git", "https://github.example.test")).toBeNull()
+    expect(
+      parseGitHubRemote(
+        "https://github.com/acme/widgets.git",
+        "https://github.example.test",
+      ),
+    ).toBeNull()
   })
 
   test("parses HTTPS URLs with credentials and trailing slash", () => {
@@ -98,7 +124,10 @@ describe("detectRepo", () => {
     const outer = makeFakeRepo("outer", "repo")
     const inner = join(outer, "packages", "inner")
     mkdirSync(join(inner, ".git"), { recursive: true })
-    writeFileSync(join(inner, ".git", "config"), `[remote "origin"]\n\turl = git@github.com:inner/repo.git\n`)
+    writeFileSync(
+      join(inner, ".git", "config"),
+      `[remote "origin"]\n\turl = git@github.com:inner/repo.git\n`,
+    )
     writeFileSync(join(inner, ".git", "HEAD"), "ref: refs/heads/inner-branch\n")
     const nested = join(inner, "src", "deep")
     mkdirSync(nested, { recursive: true })
@@ -120,9 +149,15 @@ describe("detectRepo", () => {
     mkdirSync(worktreeGitDir, { recursive: true })
     writeFileSync(join(worktree, ".git"), `gitdir: ${worktreeGitDir}\n`)
     writeFileSync(join(worktreeGitDir, "commondir"), "../..\n")
-    writeFileSync(join(commonGitDir, "config"), `[remote "origin"]\n\turl = git@github.com:foo/bar.git\n`)
+    writeFileSync(
+      join(commonGitDir, "config"),
+      `[remote "origin"]\n\turl = git@github.com:foo/bar.git\n`,
+    )
     writeFileSync(join(commonGitDir, "HEAD"), "ref: refs/heads/main\n")
-    writeFileSync(join(worktreeGitDir, "HEAD"), "ref: refs/heads/e2e-plugin-install\n")
+    writeFileSync(
+      join(worktreeGitDir, "HEAD"),
+      "ref: refs/heads/e2e-plugin-install\n",
+    )
 
     try {
       const nested = join(worktree, "src", "nested")
@@ -187,9 +222,54 @@ describe("detectRepo", () => {
   test("finds a GitHub remote when origin is absent", () => {
     const dir = mkdtempSync(join(tmpdir(), "pr-dash-"))
     mkdirSync(join(dir, ".git"))
-    writeFileSync(join(dir, ".git", "config"), `[remote "upstream"]\n\turl = ssh://git@github.com/foo/bar.git\n`)
+    writeFileSync(
+      join(dir, ".git", "config"),
+      `[remote "upstream"]\n\turl = ssh://git@github.com/foo/bar.git\n`,
+    )
     try {
       expect(detectRepo(dir)).toEqual({ owner: "foo", repo: "bar" })
+    } finally {
+      rmSync(dir, { recursive: true, force: true })
+    }
+  })
+
+  test("resolves SSH host aliases to GitHub using ssh configuration", () => {
+    const root = mkdtempSync(join(tmpdir(), "pr-dash-ssh-alias-"))
+    const home = join(root, "home")
+    const checkout = join(root, "checkout")
+    mkdirSync(join(home, ".ssh"), { recursive: true })
+    mkdirSync(join(checkout, ".git"), { recursive: true })
+    writeFileSync(
+      join(home, ".ssh", "config"),
+      `Host github-work-test\n  HostName github.com\n  User git\n`,
+    )
+    writeFileSync(
+      join(checkout, ".git", "config"),
+      `[remote "origin"]\n\turl = git@github-work-test:org/repo.git\n`,
+    )
+    const previousHome = process.env.HOME
+    process.env.HOME = home
+
+    try {
+      expect(detectRepo(checkout)).toEqual({ owner: "org", repo: "repo" })
+    } finally {
+      if (previousHome === undefined) delete process.env.HOME
+      else process.env.HOME = previousHome
+      rmSync(root, { recursive: true, force: true })
+    }
+  })
+
+  test("applies the longest matching Git insteadOf rewrite", () => {
+    const dir = mkdtempSync(join(tmpdir(), "pr-dash-insteadof-"))
+    mkdirSync(join(dir, ".git"))
+    writeFileSync(
+      join(dir, ".git", "config"),
+      `[remote "origin"]\n\turl = code:org/repo.git\n` +
+        `[url "https://github.com/"]\n\tinsteadOf = code:\n` +
+        `[url "git@github.com:octocat/"]\n\tinsteadOf = code:org/\n`,
+    )
+    try {
+      expect(detectRepo(dir)).toEqual({ owner: "octocat", repo: "repo" })
     } finally {
       rmSync(dir, { recursive: true, force: true })
     }
