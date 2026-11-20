@@ -23,8 +23,8 @@ describe("DashboardView reactivity", () => {
           statusFilter="open"
           onCycleScope={() => {}}
           onCycleStatus={() => {}}
+          onLoadMore={async () => {}}
           pageSize={dashboardOptions().pageSize}
-          maxPRPages={dashboardOptions().maxPRPages}
           colors={dashboardOptions().colors}
           icons={dashboardOptions().icons}
         />

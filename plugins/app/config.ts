@@ -1,5 +1,6 @@
 import type { PRScope, PRStatusFilter } from "../domain/types"
 import { DEFAULT_SKIN, type Skin } from "./theme"
+import { DEFAULT_TUI_PAGES_PER_BATCH, MIN_PAGES_PER_BATCH } from "../infra/loader"
 
 export const DEFAULT_ICONS = {
   openPR: "",
@@ -38,7 +39,7 @@ export type DashboardIcons = Record<keyof typeof DEFAULT_ICONS, string>
 export type DashboardOptions = {
   enabled: boolean
   pageSize: number
-  maxPRPages: number
+  pagesPerBatch: number
   refreshIntervalMs: number
   requestTimeoutMs: number
   defaultScope: PRScope
@@ -51,7 +52,7 @@ export type DashboardOptions = {
 type DashboardOptionsInput = {
   enabled?: unknown
   pageSize?: unknown
-  maxPRPages?: unknown
+  pagesPerBatch?: unknown
   refreshIntervalMs?: unknown
   requestTimeoutMs?: unknown
   defaultScope?: unknown
@@ -65,7 +66,7 @@ const scopes: PRScope[] = ["branch", "author", "assignee", "all"]
 const statusFilters: PRStatusFilter[] = ["open", "closed", "all"]
 
 export const DEFAULT_PAGE_SIZE = 5
-export const DEFAULT_MAX_PR_PAGES = 1
+export const DEFAULT_PAGES_PER_BATCH = DEFAULT_TUI_PAGES_PER_BATCH
 export const DEFAULT_REFRESH_INTERVAL_MS = 60_000
 export const DEFAULT_REQUEST_TIMEOUT_MS = 15_000
 
@@ -100,7 +101,7 @@ export function dashboardOptions(input: DashboardOptionsInput = {}): DashboardOp
   return {
     enabled: input.enabled !== false,
     pageSize: positiveNumber(input.pageSize, DEFAULT_PAGE_SIZE),
-    maxPRPages: positiveNumber(input.maxPRPages, DEFAULT_MAX_PR_PAGES),
+    pagesPerBatch: Math.max(MIN_PAGES_PER_BATCH, positiveNumber(input.pagesPerBatch, DEFAULT_PAGES_PER_BATCH)),
     refreshIntervalMs: positiveNumber(input.refreshIntervalMs, DEFAULT_REFRESH_INTERVAL_MS),
     requestTimeoutMs: positiveNumber(input.requestTimeoutMs, DEFAULT_REQUEST_TIMEOUT_MS),
     defaultScope: scopes.includes(input.defaultScope as PRScope) ? (input.defaultScope as PRScope) : "author",

@@ -1,5 +1,5 @@
 /** @jsxImportSource @opentui/solid */
-import { createSignal, For, onCleanup, onMount, Show } from "solid-js"
+import { createEffect, createSignal, For, onCleanup, onMount, Show } from "solid-js"
 import type { ResolvedTheme } from "@opencode/theme/tui"
 import type { BoxRenderable } from "@opentui/core"
 import { useRenderer } from "@opentui/solid"
@@ -18,9 +18,6 @@ import { PRRow } from "./PRRow"
 import type { DashboardIcons } from "./config"
 import { StatusMessage } from "./StatusMessage"
 
-// GitHub returns up to 100 PRs per GraphQL page (see PULL_REQUESTS_QUERY).
-const PRS_PER_PAGE = 100
-
 function withIcon(icon: string, label: string): string {
   return icon ? `${icon} ${label}` : label
 }
@@ -34,8 +31,8 @@ export function DashboardView(props: {
   statusFilter: PRStatusFilter
   onCycleScope: () => void
   onCycleStatus: () => void
+  onLoadMore: () => Promise<void>
   pageSize: number
-  maxPRPages: number
   colors: Partial<Skin>
   icons: DashboardIcons
 }) {
@@ -48,6 +45,10 @@ export function DashboardView(props: {
   let view: BoxRenderable | undefined
   const [titleWidth, setTitleWidth] = createSignal(48)
   const renderer = useRenderer()
+  createEffect(() => {
+    props.statusFilter
+    setPage(0)
+  })
   onMount(() => {
     const updateTitleWidth = () => {
       if (!view) return
@@ -77,20 +78,40 @@ export function DashboardView(props: {
   const currentPage = () => Math.min(page(), pageCount() - 1)
   const pagePRs = () =>
     prs().slice(currentPage() * props.pageSize, (currentPage() + 1) * props.pageSize)
+  const filtersMatch = () =>
+    props.state.pagination.listing === props.statusFilter &&
+    props.state.pagination.scope === props.scope &&
+    props.state.pagination.scopeValue === (props.scope === "branch" ? props.state.currentBranch : null)
   const canGoPrevious = () => currentPage() > 0
-  const canGoNext = () => currentPage() < pageCount() - 1
+  const canGoNext = () =>
+    currentPage() < pageCount() - 1 ||
+    (filtersMatch() &&
+      props.state.pagination.hasMore &&
+      !props.state.pagination.loading)
   const listIsAvailable = () =>
     props.state.status === DashboardStatus.Ok ||
     (props.state.status === DashboardStatus.Error && props.state.prs.length > 0)
-  // Closed PRs load the first time a status filter shows them.
-  const closedPending = () =>
-    props.statusFilter !== "open" && !props.state.closedLoaded && props.state.status === DashboardStatus.Ok
-  const truncationNotice = () => {
-    const open = props.statusFilter !== "closed" && props.state.truncated.open
-    const closed = props.statusFilter !== "open" && props.state.truncated.closed
-    if (!open && !closed) return null
-    const which = open && closed ? "open and closed" : open ? "open" : "closed"
-    return `Showing ${props.maxPRPages * PRS_PER_PAGE} newest ${which} PRs`
+  const listingPending = () => !filtersMatch()
+
+  const goNext = async () => {
+    if (currentPage() < pageCount() - 1) {
+      const next = currentPage() + 1
+      setPage(next)
+      if (
+        filtersMatch() &&
+        props.state.pagination.hasMore
+      ) void props.onLoadMore()
+      return
+    }
+    if (
+      !filtersMatch() ||
+      !props.state.pagination.hasMore ||
+      props.state.pagination.loading
+    ) return
+
+    const previousPage = currentPage()
+    await props.onLoadMore()
+    if (pageCount() > previousPage + 1) setPage(previousPage + 1)
   }
 
   const errorPresentation = (): { title: string; description: string } => {
@@ -194,16 +215,11 @@ export function DashboardView(props: {
         </box>
       </Show>
 
-      <Show when={closedPending()}>
+      <Show when={listingPending()}>
         <box flexDirection="column" paddingLeft={1} paddingTop={1} paddingRight={1}>
-          <text fg={sk.muted} selectable={false}>{withIcon(props.icons.loading, "Loading closed PRs")}</text>
-        </box>
-      </Show>
-
-      <Show when={truncationNotice()}>
-        <box flexDirection="column" paddingLeft={1}>
-          <text fg={sk.warning} selectable={false}>{truncationNotice()}</text>
-          <text fg={sk.muted} selectable={false}>  More exist; raise maxPRPages to load them.</text>
+          <text fg={sk.muted} selectable={false}>
+            {withIcon(props.icons.loading, `Loading ${props.statusFilter} PRs`)}
+          </text>
         </box>
       </Show>
 
@@ -227,7 +243,8 @@ export function DashboardView(props: {
       <Show
         when={
           listIsAvailable() &&
-          !closedPending() &&
+          !listingPending() &&
+          filtersMatch() &&
           prs().length === 0 &&
           (props.state.status === DashboardStatus.Ok || props.state.prs.length > 0)
         }
@@ -241,7 +258,7 @@ export function DashboardView(props: {
         />
       </Show>
 
-      <Show when={listIsAvailable() && prs().length > 0}>
+      <Show when={listIsAvailable() && filtersMatch() && prs().length > 0}>
         <box flexDirection="column" gap={0} width="100%">
           <box flexDirection="column" gap={1} paddingTop={1} width="100%">
             <For each={pagePRs()}>
@@ -266,15 +283,13 @@ export function DashboardView(props: {
               )}
             </For>
           </box>
-          <Show when={pageCount() > 1}>
+          <Show when={pageCount() > 1 || (filtersMatch() && props.state.pagination.hasMore)}>
             <box
               flexDirection="row"
               justifyContent="flex-end"
               gap={1}
               paddingTop={1}
               width="100%"
-              border={["top"]}
-              borderColor={previousHovered() || nextHovered() ? sk.borderActive : sk.border}
             >
               <text
                 fg={canGoPrevious() && previousHovered() ? sk.accent : sk.muted}
@@ -285,17 +300,25 @@ export function DashboardView(props: {
               >
                 {props.icons.previousPage}
               </text>
-              <text fg={sk.muted} selectable={false}>{`${currentPage() + 1} of ${pageCount()}`}</text>
+              <text fg={sk.muted} selectable={false}>
+                {`${currentPage() + 1} of ${pageCount()}${filtersMatch() && props.state.pagination.hasMore ? "+" : ""}`}
+              </text>
               <text
                 fg={canGoNext() && nextHovered() ? sk.accent : sk.muted}
                 selectable={false}
                 onMouseOver={() => canGoNext() && setNextHovered(true)}
                 onMouseOut={() => setNextHovered(false)}
-                onMouseUp={() => canGoNext() && setPage(currentPage() + 1)}
+                onMouseUp={() => canGoNext() && void goNext()}
               >
                 {props.icons.nextPage}
               </text>
             </box>
+          </Show>
+          <Show when={filtersMatch() && props.state.pagination.loading}>
+            <text fg={sk.muted} selectable={false}>{props.icons.loading} Loading more PRs…</text>
+          </Show>
+          <Show when={filtersMatch() && props.state.pagination.limitReached}>
+            <text fg={sk.warning} selectable={false}>GitHub search is limited to 1,000 matching PRs</text>
           </Show>
         </box>
       </Show>

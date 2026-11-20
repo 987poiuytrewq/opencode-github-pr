@@ -1,13 +1,18 @@
 /** @jsxImportSource @opentui/solid */
 import { createSignal } from "solid-js"
 import type { Context as TuiPluginContext } from "@opencode/plugin/tui/context"
-import { DashboardStatus, type DashboardState } from "../../plugins/domain/types"
+import { DashboardStatus, type DashboardState, type PRScope, type PRStatusFilter } from "../../plugins/domain/types"
 import { useDashboard } from "../../plugins/app/usePRData"
 
 // Creates a dashboard with reactive signals. Must live in a .tsx file so
 // that Bun's @opentui/solid plugin rewrites solid-js imports to the
 // reactive build (not the SSR build that .ts files get).
-export function createDashboard(api: TuiPluginContext, includeClosed: () => boolean = () => false) {
+export function createDashboard(
+  api: TuiPluginContext,
+  statusFilter: () => PRStatusFilter = () => "open",
+  scopeFilter: () => PRScope = () => "all",
+  pageSize = 5,
+) {
   const [state, setState] = createSignal<DashboardState>({
     status: DashboardStatus.Loading,
     repo: null,
@@ -15,10 +20,18 @@ export function createDashboard(api: TuiPluginContext, includeClosed: () => bool
     currentBranch: null,
     viewerLogin: null,
     fetchedAt: null,
-    closedLoaded: false,
-    truncated: { open: false, closed: false },
+    pagination: {
+      listing: "open",
+      scope: "all",
+      scopeValue: null,
+      cursor: null,
+      hasMore: false,
+      pagesLoaded: 0,
+      loading: false,
+      limitReached: false,
+    },
   })
-  const dash = useDashboard(api, state, setState, undefined, undefined, includeClosed)
+  const dash = useDashboard(api, state, setState, undefined, undefined, statusFilter, scopeFilter, pageSize)
   dash.refresh()
   return { state, ...dash }
 }

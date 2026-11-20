@@ -12,22 +12,26 @@ import {
   DashboardStatus,
   type DashboardState,
   type Repo,
+  type PRScope,
+  type PRStatusFilter,
 } from "../domain/types"
 import { currentBranch, detectRepo } from "../infra/git"
-import { repositoryPRs, fetchOnePR } from "../infra/loader"
+import { repositoryPRs, fetchOnePR, MIN_PAGES_PER_BATCH } from "../infra/loader"
 import { prListErrorKind, prListErrorMessage, parseRateLimitError } from "../domain/messages"
-import { DEFAULT_MAX_PR_PAGES, DEFAULT_REQUEST_TIMEOUT_MS } from "./config"
+import { DEFAULT_PAGES_PER_BATCH, DEFAULT_PAGE_SIZE, DEFAULT_REQUEST_TIMEOUT_MS } from "./config"
 
 export function useDashboard(
   api: TuiPluginContext,
   state: () => DashboardState,
   setState: (fn: (s: DashboardState) => DashboardState) => void,
   requestTimeoutMs = DEFAULT_REQUEST_TIMEOUT_MS,
-  maxPRPages = DEFAULT_MAX_PR_PAGES,
-  // Whether the status filter shows closed PRs, so they need loading.
-  includeClosed: () => boolean = () => false,
+  pagesPerBatch = DEFAULT_PAGES_PER_BATCH,
+  statusFilter: () => PRStatusFilter = () => "open",
+  scopeFilter: () => PRScope = () => "all",
+  pageSize = DEFAULT_PAGE_SIZE,
 ): {
   refresh: () => Promise<void>
+  loadMore: () => Promise<void>
   refreshOne: (n: number) => Promise<void>
 } {
   // Resolve the working directory explicitly when the TUI exposes it, so
@@ -51,16 +55,18 @@ export function useDashboard(
   }
 
   let inFlight: Promise<void> | null = null
-  let inFlightIncludesClosed = false
+  let inFlightFilterKey: string | null = null
+  const loadMoreInFlight = new Map<string, Promise<void>>()
   let refreshToken = 0
   let currentRefreshToken = 0
+  const pageBatchSize = pageSize * Math.max(MIN_PAGES_PER_BATCH, pagesPerBatch)
 
   const refresh = async (): Promise<void> => {
-    const wantClosed = includeClosed()
+    const listing = statusFilter()
+    const scope = scopeFilter()
+    const filterKey = `${listing}:${scope}`
     if (inFlight) {
-      // A refresh that skipped closed PRs can't serve a filter that needs
-      // them; run another once it lands.
-      if (wantClosed && !inFlightIncludesClosed) return inFlight.then((): Promise<void> => refresh())
+      if (filterKey !== inFlightFilterKey) return inFlight.then((): Promise<void> => refresh())
       return inFlight
     }
     const prev = state()
@@ -70,13 +76,22 @@ export function useDashboard(
     }
     const promise = (async () => {
       const isStale = () => token !== refreshToken
+      let scopeValue: string | null = null
       try {
         const directory = await cwd()
         const repo = detectRepo(directory)
+        const branch = currentBranch(directory)
+        scopeValue = scope === "branch" ? branch : null
         const isFirstLoad = prev.fetchedAt === null
         const isDirChange =
           !!prev.repo && !!repo && (prev.repo.owner !== repo.owner || prev.repo.repo !== repo.repo)
-        const showLoading = isFirstLoad || isDirChange || prev.status === DashboardStatus.Loading
+        const showLoading =
+          isFirstLoad ||
+          isDirChange ||
+          prev.status === DashboardStatus.Loading ||
+          prev.pagination.listing !== listing ||
+          prev.pagination.scope !== scope ||
+          prev.pagination.scopeValue !== scopeValue
         if (showLoading && prev.status !== DashboardStatus.Loading) {
           if (isStale()) return
           setState((s) => ({ ...s, error: undefined, status: DashboardStatus.Loading }))
@@ -90,48 +105,47 @@ export function useDashboard(
             prs: [],
             currentBranch: null,
             viewerLogin: null,
-            closedLoaded: false,
-            truncated: { open: false, closed: false },
+            pagination: {
+              listing,
+              scope,
+              scopeValue,
+              cursor: null,
+              hasMore: false,
+              pagesLoaded: 0,
+              loading: false,
+              limitReached: false,
+            },
             error: undefined,
             errorKind: undefined,
             fetchedAt: Date.now(),
           }))
           return
         }
-        const [open, closed] = await timeoutRace(requestTimeoutMs, () =>
-          Promise.all([
-            repositoryPRs(repo, maxPRPages, requestTimeoutMs, "open"),
-            wantClosed ? repositoryPRs(repo, maxPRPages, requestTimeoutMs, "closed") : Promise.resolve(null),
-          ]),
+        const result = await timeoutRace(requestTimeoutMs, () =>
+          repositoryPRs(repo, pageBatchSize, requestTimeoutMs, listing, null, scope, scopeValue),
         )
         if (isStale()) return
-        setState((s) => {
-          // Keep closed PRs from an earlier load of the same repository, so
-          // switching back to a closed view is instant.
-          const sameRepo = s.repo?.owner === repo.owner && s.repo?.repo === repo.repo
-          const keptClosed = sameRepo && s.closedLoaded
-          const openNumbers = new Set(open.prs.map((pr) => pr.number))
-          // A kept PR that has since been reopened is in the open list.
-          const closedPRs = closed ? closed.prs : keptClosed
-            ? s.prs.filter((pr) => pr.isClosed && !openNumbers.has(pr.number))
-            : []
-          return {
-            ...s,
-            status: DashboardStatus.Ok,
-            repo,
-            prs: [...open.prs, ...closedPRs],
-            currentBranch: currentBranch(directory),
-            viewerLogin: open.viewerLogin ?? closed?.viewerLogin ?? null,
-            closedLoaded: closed !== null || keptClosed,
-            truncated: {
-              open: open.listingTruncated,
-              closed: closed ? closed.listingTruncated : keptClosed && s.truncated.closed,
-            },
-            error: undefined,
-            errorKind: undefined,
-            fetchedAt: Date.now(),
-          }
-        })
+        setState((s) => ({
+          ...s,
+          status: DashboardStatus.Ok,
+          repo,
+          prs: result.prs,
+          currentBranch: branch,
+          viewerLogin: result.viewerLogin ?? s.viewerLogin,
+          pagination: {
+            listing,
+            scope,
+            scopeValue,
+            cursor: result.endCursor,
+            hasMore: result.hasMore,
+            pagesLoaded: result.fetchedPages,
+            loading: false,
+            limitReached: result.limitReached,
+          },
+          error: undefined,
+          errorKind: undefined,
+          fetchedAt: Date.now(),
+        }))
       } catch (e: unknown) {
         if (isStale()) return
         const rl = parseRateLimitError(e)
@@ -139,9 +153,27 @@ export function useDashboard(
           ...s,
           status: DashboardStatus.Error,
           repo: s.repo,
-          prs: rl.isRateLimit ? s.prs : [],
-          closedLoaded: rl.isRateLimit ? s.closedLoaded : false,
-          truncated: rl.isRateLimit ? s.truncated : { open: false, closed: false },
+          prs: rl.isRateLimit &&
+              s.pagination.listing === listing &&
+              s.pagination.scope === scope &&
+              s.pagination.scopeValue === scopeValue
+            ? s.prs
+            : [],
+          pagination: rl.isRateLimit &&
+              s.pagination.listing === listing &&
+              s.pagination.scope === scope &&
+              s.pagination.scopeValue === scopeValue
+            ? { ...s.pagination, loading: false }
+            : {
+                listing,
+                scope,
+                scopeValue,
+                cursor: null,
+                hasMore: false,
+                pagesLoaded: 0,
+                loading: false,
+                limitReached: false,
+              },
           error: rl.message ?? prListErrorMessage(e),
           errorKind: rl.isRateLimit ? "rate-limit" : prListErrorKind(e),
           fetchedAt: Date.now(),
@@ -150,9 +182,102 @@ export function useDashboard(
     })()
     currentRefreshToken = token
     inFlight = promise
-    inFlightIncludesClosed = wantClosed
+    inFlightFilterKey = filterKey
     promise.finally(release)
     return inFlight
+  }
+
+  const loadMore = async (): Promise<void> => {
+    const before = state()
+    const listing = statusFilter()
+    const scope = scopeFilter()
+    const repo = before.repo
+    const cursor = before.pagination.cursor
+    if (
+      !repo ||
+      before.pagination.listing !== listing ||
+      before.pagination.scope !== scope ||
+      before.pagination.scopeValue !== (scope === "branch" ? before.currentBranch : null) ||
+      !before.pagination.hasMore ||
+      !cursor
+    ) return
+    const scopeValue = before.pagination.scopeValue
+    const requestKey = `${repo.owner}/${repo.repo}:${listing}:${scope}:${scopeValue ?? ""}:${cursor}`
+    const existingRequest = loadMoreInFlight.get(requestKey)
+    if (existingRequest) return existingRequest
+
+    setState((s) => s.pagination.listing === listing && s.pagination.cursor === cursor
+      ? { ...s, pagination: { ...s.pagination, loading: true } }
+      : s)
+
+    const promise = (async () => {
+      try {
+        const result = await timeoutRace(requestTimeoutMs, () =>
+          repositoryPRs(
+            repo,
+            pageBatchSize,
+            requestTimeoutMs,
+            listing,
+            cursor,
+            scope,
+            scopeValue,
+            before.prs.length,
+          ),
+        )
+        setState((s) => {
+          const sameRepo = s.repo?.owner === repo.owner && s.repo.repo === repo.repo
+          if (
+            !sameRepo ||
+            s.pagination.listing !== listing ||
+            s.pagination.scope !== scope ||
+            s.pagination.scopeValue !== scopeValue ||
+            s.pagination.cursor !== cursor
+          ) return s
+          const knownNumbers = new Set(s.prs.map((pr) => pr.number))
+          return {
+            ...s,
+            status: DashboardStatus.Ok,
+            prs: [...s.prs, ...result.prs.filter((pr) => !knownNumbers.has(pr.number))],
+            pagination: {
+              listing,
+              scope,
+              scopeValue,
+              cursor: result.endCursor,
+              hasMore: result.hasMore,
+              pagesLoaded: s.pagination.pagesLoaded + result.fetchedPages,
+              loading: false,
+              limitReached: result.limitReached,
+            },
+            viewerLogin: result.viewerLogin ?? s.viewerLogin,
+            fetchedAt: Date.now(),
+            error: undefined,
+            errorKind: undefined,
+          }
+        })
+      } catch (e: unknown) {
+        const rl = parseRateLimitError(e)
+        setState((s) =>
+          s.pagination.listing === listing &&
+            s.pagination.scope === scope &&
+            s.pagination.scopeValue === scopeValue &&
+            s.pagination.cursor === cursor
+          ? {
+              ...s,
+              status: DashboardStatus.Error,
+              pagination: { ...s.pagination, loading: false },
+              error: rl.message ?? prListErrorMessage(e),
+              errorKind: rl.isRateLimit ? "rate-limit" : prListErrorKind(e),
+              fetchedAt: Date.now(),
+            }
+          : s)
+      }
+    })()
+    loadMoreInFlight.set(requestKey, promise)
+    try {
+      await promise
+    } finally {
+      if (loadMoreInFlight.get(requestKey) === promise) loadMoreInFlight.delete(requestKey)
+    }
   }
 
   const refreshOne = async (n: number) => {
@@ -177,7 +302,7 @@ export function useDashboard(
     } catch {}
   }
 
-  return { refresh, refreshOne }
+  return { refresh, loadMore, refreshOne }
 }
 
 function timeoutRace<T>(ms: number, fn: () => Promise<T>): Promise<T> {
