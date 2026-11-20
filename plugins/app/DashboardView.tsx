@@ -20,6 +20,10 @@ import type { DashboardIcons } from "./config"
 // GitHub returns up to 100 PRs per GraphQL page (see PULL_REQUESTS_QUERY).
 const PRS_PER_PAGE = 100
 
+function withIcon(icon: string, label: string): string {
+  return icon ? `${icon} ${label}` : label
+}
+
 export function DashboardView(props: {
   theme: ResolvedTheme
   state: DashboardState
@@ -168,7 +172,7 @@ export function DashboardView(props: {
             onMouseOut={() => setScopeHovered(false)}
             onMouseUp={() => props.onCycleScope()}
           >
-            {`${props.icons.scope} ${props.scope}`}
+            {withIcon(props.icons.scope, props.scope)}
           </text>
           <text
             fg={statusHovered() ? sk.accent : sk.muted}
@@ -177,21 +181,21 @@ export function DashboardView(props: {
             onMouseOut={() => setStatusHovered(false)}
             onMouseUp={() => props.onCycleStatus()}
           >
-            {`${props.icons.status} ${props.statusFilter}`}
+            {props.statusFilter}
           </text>
         </box>
       </box>
 
       <Show when={props.state.status === DashboardStatus.Loading}>
         <box flexDirection="column" paddingLeft={1} paddingTop={1} paddingRight={1}>
-          <text fg={sk.muted} selectable={false}>{props.icons.loading} Loading PRs</text>
+          <text fg={sk.muted} selectable={false}>{withIcon(props.icons.loading, "Loading PRs")}</text>
           <text fg={sk.muted} selectable={false}>  Checking GitHub…</text>
         </box>
       </Show>
 
       <Show when={closedPending()}>
         <box flexDirection="column" paddingLeft={1} paddingTop={1} paddingRight={1}>
-          <text fg={sk.muted} selectable={false}>{props.icons.loading} Loading closed PRs</text>
+          <text fg={sk.muted} selectable={false}>{withIcon(props.icons.loading, "Loading closed PRs")}</text>
         </box>
       </Show>
 
@@ -204,14 +208,14 @@ export function DashboardView(props: {
 
       <Show when={props.state.status === DashboardStatus.NoRepo}>
         <box flexDirection="column" paddingLeft={1} paddingTop={1} paddingRight={1}>
-          <text fg={sk.muted} selectable={false}>{props.icons.info} No GitHub repo</text>
+          <text fg={sk.muted} selectable={false}>{withIcon(props.icons.info, "No GitHub repo")}</text>
           <text fg={sk.muted} selectable={false}>  Add a GitHub remote or switch to the right project.</text>
         </box>
       </Show>
 
       <Show when={props.state.status === DashboardStatus.Error}>
         <box flexDirection="column" paddingLeft={1} paddingTop={1} paddingRight={1}>
-          <text fg={sk.error} selectable={false}>{props.icons.error} {errorPresentation().title}</text>
+          <text fg={sk.error} selectable={false}>{withIcon(props.icons.error, errorPresentation().title)}</text>
           <box paddingLeft={2} width="100%">
             <text fg={sk.muted} selectable={false}>{errorPresentation().description}</text>
           </box>
@@ -227,7 +231,7 @@ export function DashboardView(props: {
         }
       >
         <box flexDirection="column" paddingLeft={1} paddingTop={1} paddingRight={1}>
-          <text fg={sk.muted} selectable={false}>{props.icons.info} {errorMessages.noMatchingPRs}</text>
+          <text fg={sk.muted} selectable={false}>{withIcon(props.icons.info, errorMessages.noMatchingPRs)}</text>
           <text fg={sk.muted} selectable={false}>  Try a different scope or status.</text>
         </box>
       </Show>

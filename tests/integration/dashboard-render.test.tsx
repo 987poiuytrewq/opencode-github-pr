@@ -103,7 +103,7 @@ describe("DashboardView render", () => {
     const descriptionLines = lines.slice(descriptionStart).filter((line) => line.trim().length > 0).slice(0, 2)
     const spans = r.captureSpans().lines.flatMap((line) => line.spans)
     const description = spans.find((span) => span.text.includes("Check your internet"))
-    const muted = spans.find((span) => span.text.includes(" branch"))
+    const muted = spans.find((span) => span.text.includes("branch"))
 
     expect(descriptionStart).toBeGreaterThanOrEqual(0)
     expect(descriptionLines).toHaveLength(2)
@@ -162,13 +162,13 @@ describe("DashboardView render", () => {
     }), { statusFilter: "closed" })
     await r.flush()
     const frame = captureFrame(r)
-    expect(frame).toContain(" Merged feature")
+    expect(frame).toContain("• Merged feature")
     const mergedIcon = r.captureSpans().lines.flatMap((line) => line.spans)
-      .find((span) => span.text.includes(""))
+      .find((span) => span.text.includes("•"))
     expect(mergedIcon?.fg?.toInts()).toEqual([94, 168, 245, 255])
     expect(frame).toContain("#42 +17 -4")
     expect(frame).toContain("●")
-    expect(frame).not.toContain("󰅺0")
+    expect(frame).not.toContain("■0")
     expect(frame).not.toContain("")
   })
 
@@ -180,8 +180,8 @@ describe("DashboardView render", () => {
     }))
     await r.flush()
     const frame = captureFrame(r)
-    expect(frame).toContain("󰅺 1")
-    expect(frame).not.toContain("󰅺1")
+    expect(frame).toContain("■ 1")
+    expect(frame).not.toContain("■1")
     expect(frame).not.toContain("")
   })
 
@@ -204,7 +204,7 @@ describe("DashboardView render", () => {
     }), {}, 24)
     await r.flush()
     const lines = r.captureCharFrame().split("\n")
-    const titleLine = lines.find((line) => line.includes(" A"))
+    const titleLine = lines.find((line) => line.includes("• A"))
 
     expect(titleLine).toContain("A very long pull…")
     expect(lines.filter((line) => line.includes("request title")).length).toBe(0)
@@ -254,7 +254,7 @@ describe("DashboardView render", () => {
     await r.flush()
     const frame = captureFrame(r)
     expect(frame).toContain("S all")
-    expect(frame).toContain("F all")
+    expect(frame).not.toContain("F all")
     expect(frame).toContain("P First")
     expect(frame).toContain("1 of 2")
     expect(frame).not.toContain("P Third")
@@ -267,8 +267,18 @@ describe("DashboardView render", () => {
     const r = await renderState(okState())
     await r.flush()
     const heading = r.captureCharFrame().split("\n").find((line) => line.includes("Pull Requests"))
-    expect(heading).toContain(" branch   open")
+    expect(heading).toContain("branch  open")
     expect(heading?.trimEnd().length).toBe(50)
+  })
+
+  test("does not leave leading spaces when scope and status icons are hidden", async () => {
+    const r = await renderState(okState(), { options: { icons: { scope: "", status: "" } } })
+    await r.flush()
+    const heading = r.captureSpans().lines.find((line) => line.spans.some((span) => span.text.includes("Pull Requests")))
+    const filterLabels = heading?.spans.map((span) => span.text).filter((text) => text.includes("branch") || text.includes("open"))
+
+    expect(filterLabels).toContain("branch")
+    expect(filterLabels).toContain("open")
   })
 
   test("status groups render comments, reviews, then mixed checks with single spaces", async () => {
@@ -286,7 +296,7 @@ describe("DashboardView render", () => {
     }))
     await r.flush()
     const frame = captureFrame(r)
-    expect(frame).toContain("󰅺 1 1 1 ●3 ●1")
+    expect(frame).toContain("■ 1 ✓1 ✓1 ●3 ●1")
     expect(frame).not.toContain("")
   })
 
@@ -318,8 +328,8 @@ describe("DashboardView render", () => {
     }))
     await r.flush()
     const frame = r.captureCharFrame()
-    expect(frame).toContain("")
-    expect(frame).toContain("󰅺 1")
+    expect(frame).toContain("✓")
+    expect(frame).toContain("■ 1")
     expect(frame).not.toContain("")
   })
 
@@ -356,12 +366,13 @@ describe("DashboardView mouse interaction", () => {
       onCycleStatus: () => { statusCycles++ },
     })
     await r.flush()
-    await r.mockMouse.click(36, 1)
+    const header = r.captureCharFrame().split("\n").find((line) => line.includes("Pull Requests")) ?? ""
+    await r.mockMouse.click(header.indexOf("branch"), 1)
     await r.flush()
     expect(scopeCycles).toBe(1)
     expect(statusCycles).toBe(0)
 
-    await r.mockMouse.click(46, 1)
+    await r.mockMouse.click(header.indexOf("open"), 1)
     await r.flush()
     expect(scopeCycles).toBe(1)
     expect(statusCycles).toBe(1)
@@ -372,20 +383,21 @@ describe("DashboardView mouse interaction", () => {
     await r.flush()
     const filterSpan = (label: string) =>
       r.captureSpans().lines.flatMap((line) => line.spans).find((span) => span.text.includes(label))
-    const scopeDefault = filterSpan(" branch")
-    const statusDefault = filterSpan(" open")
+    const scopeDefault = filterSpan("branch")
+    const statusDefault = filterSpan("open")
     expect(scopeDefault).toBeDefined()
     expect(statusDefault).toBeDefined()
 
-    await r.mockMouse.moveTo(36, 1)
+    const header = r.captureCharFrame().split("\n").find((line) => line.includes("Pull Requests")) ?? ""
+    await r.mockMouse.moveTo(header.indexOf("branch"), 1)
     await r.flush()
-    expect(filterSpan(" branch")?.fg).not.toEqual(scopeDefault?.fg)
-    expect(filterSpan(" open")?.fg).toEqual(statusDefault?.fg)
+    expect(filterSpan("branch")?.fg).not.toEqual(scopeDefault?.fg)
+    expect(filterSpan("open")?.fg).toEqual(statusDefault?.fg)
 
-    await r.mockMouse.moveTo(46, 1)
+    await r.mockMouse.moveTo(header.indexOf("open"), 1)
     await r.flush()
-    expect(filterSpan(" branch")?.fg).toEqual(scopeDefault?.fg)
-    expect(filterSpan(" open")?.fg).not.toEqual(statusDefault?.fg)
+    expect(filterSpan("branch")?.fg).toEqual(scopeDefault?.fg)
+    expect(filterSpan("open")?.fg).not.toEqual(statusDefault?.fg)
   })
 
   test("clicking the PR number opens the overview without triggering the row click twice", async () => {
@@ -439,9 +451,9 @@ describe("DashboardView mouse interaction", () => {
 
     await clickLabel("●")
     expect(opened).toEqual([{ number: 42, target: "checks" }])
-    await clickLabel("")
+    await clickLabel("✓")
     expect(opened.at(-1)).toEqual({ number: 42, target: "overview" })
-    await clickLabel("󰅺")
+    await clickLabel("■")
     expect(opened.at(-1)).toEqual({ number: 42, target: "files" })
     await clickLabel("+42")
     expect(opened.at(-1)).toEqual({ number: 42, target: "files" })
@@ -467,24 +479,24 @@ describe("DashboardView mouse interaction", () => {
 
     let frame = r.captureCharFrame()
     expect(frame).toContain("1 of 3")
-    expect(frame).toContain(" PR 10")
-    expect(frame).toContain(" PR 14")
-    expect(frame).not.toContain(" PR 15")
+    expect(frame).toContain("• PR 10")
+    expect(frame).toContain("• PR 14")
+    expect(frame).not.toContain("• PR 15")
 
-    await clickArrow("1 of 3", "")
+    await clickArrow("1 of 3", "◀")
     expect(r.captureCharFrame()).toContain("1 of 3")
 
-    await clickArrow("1 of 3", "")
+    await clickArrow("1 of 3", "▶")
     frame = r.captureCharFrame()
     expect(frame).toContain("2 of 3")
-    expect(frame).toContain(" PR 15")
-    expect(frame).not.toContain(" PR 14")
+    expect(frame).toContain("• PR 15")
+    expect(frame).not.toContain("• PR 14")
 
-    await clickArrow("2 of 3", "")
+    await clickArrow("2 of 3", "▶")
     expect(r.captureCharFrame()).toContain("3 of 3")
-    await clickArrow("3 of 3", "")
+    await clickArrow("3 of 3", "▶")
     expect(r.captureCharFrame()).toContain("3 of 3")
-    await clickArrow("3 of 3", "")
+    await clickArrow("3 of 3", "◀")
     expect(r.captureCharFrame()).toContain("2 of 3")
   })
 })
