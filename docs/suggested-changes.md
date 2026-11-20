@@ -1,96 +1,121 @@
 # Suggested changes
 
-These findings come from a review of v0.2.0, based on commit `5c96e59`. That commit includes the fixes from
-`opencode-github-pr#59`, `#60` and `#61`. When the review was done, typecheck passed, along with 91 unit tests and
-99 integration tests. The end-to-end tests weren't run.
+These findings come from a review of v0.2.0, based on commit `eb3b07b`. They were first raised in the initial
+review and confirmed as still open after `opencode-github-pr#59` to `#65` were merged. Those PRs fixed every
+finding from the second and third reviews: errors for inaccessible repositories, rate-limit handling, merge
+readiness, team review requests, theme reactivity and unused code.
 
-## Fixed since the previous review
+When this list was written, typecheck passed, along with 93 unit tests and 109 integration tests. The end-to-end
+tests weren't run because the review environment had no tmux or OpenCode binary.
 
-- **Inaccessible repositories now show an error.** They used to show an empty list. `graphqlPartial` now rethrows
-  root-level `NOT_FOUND`, `FORBIDDEN` and `RATE_LIMITED` errors.
-- **Long primary rate limits now reach the dashboard.** The throttling plugin only retries waits of 5 seconds or
-  less, and scheduled refreshes stop until the limit resets.
-- **The secondary rate-limit message uses the right time.** It now comes from `retry-after`.
-- **The PR icon colour comes from `mergeStateStatus` and `reviewDecision`.**
-- **Re-requested reviewers are counted once,** and `reviewRequests` is raised to 100.
-- **The palette is reactive.** The page also resets when the scope changes, and the loading and sign-in messages are
-  fixed.
-- **Most of the unused code is removed.**
+The items are listed with the most important first. Items 1–3 affect people using the plugin every day. The rest
+are polish.
 
-The open items are below, most important first.
+## 1. Don't block the TUI while reading the `gh` token
 
-## 1. Filter changes during a rate limit show "Loading" until the limit resets
+**Where:** `plugins/infra/octokit.ts`, `readGhAuthToken`
 
-**Where:** `plugins/app/usePRData.ts` (`refresh` and `loadMore`) and `plugins/pr-dashboard.tui.tsx`
+**Problem:** When no token is set in the environment, the plugin runs `gh auth token` with `execFileSync`. This runs
+in the TUI process with a 5-second timeout. If `gh` is slow or hangs (for example on a keychain prompt or a slow
+network), the whole TUI freezes until it returns.
 
-**Problem:** While a primary rate limit is active, `refresh()` returns straight away without changing state. If the
-user then clicks the scope or status filter, the filter changes but the loaded list stays tagged with the old
-filter. `DashboardView` sees that they don't match, so it hides the list and shows **Loading author PRs** (or
-similar) next to the rate-limit error. This can last up to an hour. `/pr-refresh` also shows a "Refreshing PRs…"
-toast but does nothing. This comes from reading the code and hasn't been reproduced.
+**Suggested fix:** Use `execFile` from `node:child_process/promises`, or `Bun.spawn`, and make `getAuthToken` and
+`getOctokit` async. The callers in `infra/loader.ts` already await, so the change stays small.
 
-**Suggested fix:** When `primaryLimitActive()` is true, still update `pagination.listing`, `scope` and `scopeValue`
-for a filter change. Re-filter the PRs already loaded, or show the rate-limit message in place of the list instead
-of "Loading". Make `/pr-refresh` show a toast that includes the reset time instead of "Refreshing PRs…".
+## 2. Re-read the token after an authentication failure
 
-## 2. Back off during secondary rate limits too
+**Where:** `plugins/infra/octokit.ts`, `getOctokit` and the `cached` client
 
-**Where:** `plugins/app/usePRData.ts`, `recordPrimaryRateLimit`
+**Problem:** The plugin reads the token once and keeps it for the life of the process. `cached?.token` is reused
+even when the client is rebuilt. After `gh auth refresh`, a token rotation or an expiry, every request fails with
+401 and the panel shows **GitHub sign-in failed** until OpenCode restarts.
 
-**Problem:** Only primary limits pause refreshing. During a secondary rate limit, the dashboard keeps sending a
-request every 60 seconds, on each `session.idle` and on each page change. GitHub's guidance is to stop until
-`retry-after` has passed, and it can lengthen secondary limits for clients that keep sending requests.
+**Suggested fix:** Clear `cached` (token included) when a request fails with 401, and on the next refresh try
+`getAuthToken()` again. Also consider not reusing the old token when `baseUrl` changes, because a github.com token is
+the wrong token for an Enterprise host.
 
-**Suggested fix:** Record `resetAt` for secondary limits as well. It already comes from `retry-after`, so it's
-usually short. Rename the guard to something like `rateLimitActive()`.
+## 3. Declare host-provided libraries as peer dependencies
 
-## 3. Fix the remaining gaps in the merge-readiness colour
+**Where:** `package.json`
 
-**Where:** `plugins/domain/pr-status.ts`, `mergeReadiness`, and the README's "Reading a row" table
+**Problem:** `@opencode/plugin`, `@opencode/theme`, `@opentui/core`, `@opentui/solid` and `solid-js` are pinned as
+regular `dependencies` to the 2.0.20 / 0.6.6 line. If the plugin gets its own copy of Solid or OpenTUI alongside the
+host's copy, Solid reactivity can break without any error. The comment at the top of `plugins/app/usePRData.ts`
+shows how fragile Solid loading already is. CI passes on 2.0–2.3 today, but this is the most likely thing to break
+when OpenCode updates.
 
-- **`HAS_HOOKS` shows grey:** this state means the PR can be merged and its pre-receive hooks pass, but it falls
-  through to `"none"`, which is grey. Treat it like `CLEAN`.
-- **Changes requested shows yellow:** `CLEAN` with `reviewDecision: "CHANGES_REQUESTED"` maps to `"pending"`.
-  Red (`"fail"`) would match how the review icon shows requested changes.
-- **The README is out of date:** it still says "Green: ready to merge. Red: merge conflict. Grey: draft, closed or
-  unknown." It doesn't mention yellow for `BLOCKED`, `BEHIND` and `UNSTABLE`, or for reviews still required.
-- **Older Enterprise servers are a risk:** `mergeStateStatus` and `reviewDecision` are now in the shared fragment
-  used by every query. On a GitHub Enterprise Server version that doesn't have one of these fields, the whole query
-  fails and the panel only shows **Invalid request**. This hasn't been checked against specific GHES versions.
-  Confirm the minimum GHES version, document it, or fall back to a query without these fields when a `422` or
-  "Field doesn't exist" error comes back.
+**Suggested fix:** Move the host-provided packages to `peerDependencies` with a range such as `>=2.0.20 <3`, and
+keep them in `devDependencies` for tests. Keep `@octokit/*` and `open` as regular dependencies.
 
-## 4. Recolour PR icons when the theme changes
+## 4. Apply the timeout to each request, not the whole batch
 
-**Where:** `plugins/app/PRRow.tsx`
+**Where:** `plugins/app/usePRData.ts`, `timeoutRace`
 
-**Problem:** The `createMemo` in `DashboardView` now makes the palette reactive. But `PRRow` computes `icon`,
-`iconColor`, `checks`, `reviews` and `comments` once, as plain constants in the component body. After a theme change,
-the PR icon keeps its old colour until the next refresh rebuilds the rows. Colours passed directly as JSX attributes
-do update.
+**Problem:** `requestTimeoutMs` is already passed to Octokit for each request. `timeoutRace` applies the same
+value again, this time to the whole `repositoryPRs` call. That call can cover several GraphQL pages, short retries,
+and now the legacy-query fallback for older Enterprise servers. When it fires, the underlying requests keep running
+in the background because nothing cancels them. With a large `pageSize` or a slow network, this gives spurious
+**Request timed out** errors.
 
-**Suggested fix:** Turn them into accessors, for example `const iconColor = () => ...`, and call them in the JSX.
+**Suggested fix:** Drop the outer race and rely on the Octokit timeout. Or pass an `AbortSignal` through
+`repositoryPRs` and give the batch its own, more generous deadline.
 
-## 5. Check the first title width
+## 5. Recognise SSH host aliases and `insteadOf` rewrites
 
-**Where:** `plugins/app/DashboardView.tsx`, `onMount`
+**Where:** `plugins/infra/git.ts`, `parseGitHubRemote` and `remoteUrls`
 
-**Problem:** `updateTitleWidth()` now runs once in `onMount` and then only on `resize` events, where before it ran on
-every frame. If the box hasn't been laid out when `onMount` runs, `view.width` is 0 and titles are cut to `…` until
-the first `resize`. Whether that `resize` always arrives after the first layout depends on OpenTUI and hasn't been
-confirmed. An end-to-end test that checks a title on the first frame would settle it.
+**Problem:** Remotes such as `git@github-work:org/repo.git`, which use a `Host` alias from `~/.ssh/config`, aren't
+recognised. Neither are remotes that rely on `url.<base>.insteadOf` rewrites. People with several GitHub accounts
+commonly use both, and today they see **No GitHub repo**.
 
-## 6. Small leftovers
+**Suggested fix:**
+- Apply `insteadOf` rules from the git config before parsing the remote.
+- Optionally run `ssh -G <alias>` to resolve the real hostname, or add a `remoteHosts` option that lists extra host
+  aliases to treat as GitHub.
 
-- **Errors on the supplementary query fail the whole search:** in `graphqlPartial`, any `NOT_FOUND` or `FORBIDDEN`
-  error with a path of length 2 or less is fatal, including `["repository", "recentPullRequests"]`. An error on that
-  optional connection fails the whole `author` or `assignee` search, which could still have been shown on its own.
-  Also, the `!query.includes("recentPullRequests:")` check in `hasRootFailure` relies on the query text. Passing an
-  explicit flag would be sturdier.
-- **More unused code:** `refreshOne`, `fetchOnePR` and `mapPullFromREST` are still unused, and #60 gave `refreshOne`
-  rate-limit handling. Remove them, or use them.
-- **Team review requests:** `reviewRequests` still only selects `... on User`, so pending team reviews aren't
-  counted. Add `... on Team { slug }`.
-- **Clock skew:** `primaryLimitActive` compares GitHub's `x-ratelimit-reset`, which uses the server's clock, with
-  the local `Date.now()`. If the local clock is behind, refreshing stays paused after the limit has reset. Adding a
-  few seconds of margin, or using `retryAfter` from the throttling callback, would avoid it.
+## 6. Fill the remaining gaps in PR data
+
+**Where:** `plugins/infra/queries.ts` and `plugins/infra/mappers.ts`
+
+- **Branch scope matches forks:** branch scope filters on `headRefName` alone, so a PR from a fork with the same
+  branch name also appears. Also fetch `headRepositoryOwner { login }`, and drop PRs whose owner isn't the detected
+  repository's owner.
+- **Truncated counts:** `contexts(first: 100)` and `reviewThreads(first: 100)` silently stop counting at 100.
+  Fetch `totalCount` on both connections and show "100+", or fall back to the rollup `state` when there are more.
+
+## 7. Tidy the published package
+
+**Where:** `package.json`
+
+- `files` includes `demo/demo.gif` (about 100 KB), which the plugin doesn't need at runtime. The README image can
+  use the GitHub URL instead, or the GIF can be left out of the package. Keep `demo/fixtures.ts`, because demo mode
+  imports it.
+- `@types/bun` and `bun-types` are set to `latest`. Pin them to a version range so a fresh install without the
+  lockfile still builds the same way.
+
+## 8. Register the keymap layer once and remove it during cleanup
+
+**Where:** `plugins/pr-dashboard.tui.tsx`
+
+**Problem:** `api.keymap.layer(...)` is called inside the `app` slot's `render` function, and the plugin's cleanup
+function only removes the slot, not the layer. If the slot re-renders, or the plugin is reloaded with `/reload`, the
+commands could be registered more than once. This hasn't been confirmed.
+
+**Suggested fix:** Keep the disposer the call returns and call it during cleanup, and make sure it registers only
+once, for example by checking a flag before registering.
+
+## 9. Silence `MaxListenersExceededWarning` in the integration tests
+
+**Where:** `tests/integration/` (seen in `dashboard-render.test.tsx`)
+
+**Problem:** The integration tests print `MaxListenersExceededWarning` from `TerminalConsoleCache`. This is likely
+because a test renderer isn't destroyed between tests. It's harmless, but it hides real warnings.
+
+**Suggested fix:** Destroy each test renderer in `afterEach`, and check that the warning goes away.
+
+## After these: release 0.3.0
+
+`package.json` is still at `0.2.0` and the repository has no tags. Everything merged since then justifies a
+`0.3.0` release: better error handling, rate-limit cooldowns, merge readiness, team review requests and the
+Enterprise fallback. The release workflow already handles publishing. Run the end-to-end CI matrix on the release
+commit, since the reviews couldn't run it.
