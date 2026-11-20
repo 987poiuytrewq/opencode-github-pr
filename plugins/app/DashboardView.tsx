@@ -47,21 +47,26 @@ export function DashboardView(props: {
     setPage(0)
   })
   onMount(() => {
+    const iconWidth = Math.max(
+      Bun.stringWidth(props.icons.openPR),
+      Bun.stringWidth(props.icons.closedPR),
+      Bun.stringWidth(props.icons.draftPR),
+      Bun.stringWidth(props.icons.mergedPR),
+    )
     const updateTitleWidth = () => {
-      if (!view) return
-      const iconWidth = Math.max(
-        Bun.stringWidth(props.icons.openPR),
-        Bun.stringWidth(props.icons.closedPR),
-        Bun.stringWidth(props.icons.draftPR),
-        Bun.stringWidth(props.icons.mergedPR),
-      )
-      const nextWidth = Math.max(1, Math.floor(view.width) - iconWidth - 1)
+      const measuredWidth = view?.width
+      const availableWidth = measuredWidth && measuredWidth > 0 ? measuredWidth : renderer.width
+      if (availableWidth <= 0) return
+      const nextWidth = Math.max(1, Math.floor(availableWidth) - iconWidth - 1)
       setTitleWidth((current) => current === nextWidth ? current : nextWidth)
     }
     updateTitleWidth()
+    const needsPostLayoutMeasurement = !view || view.width <= 0
+    if (needsPostLayoutMeasurement) renderer.once("frame", updateTitleWidth)
     view?.on("resize", updateTitleWidth)
     renderer.on("resize", updateTitleWidth)
     onCleanup(() => {
+      renderer.off("frame", updateTitleWidth)
       view?.off("resize", updateTitleWidth)
       renderer.off("resize", updateTitleWidth)
     })
