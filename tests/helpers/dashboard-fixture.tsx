@@ -28,6 +28,8 @@ export function createDashboard(
       hasMore: false,
       totalCount: null,
       pagesLoaded: 0,
+      searchResultsFetched: 0,
+      supplementalPRCount: 0,
       loading: false,
       limitReached: false,
     },

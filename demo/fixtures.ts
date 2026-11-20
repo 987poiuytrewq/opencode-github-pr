@@ -185,6 +185,8 @@ export function demoDashboardState(): DashboardState {
         "octocat",
       ).length,
       pagesLoaded: 1,
+      searchResultsFetched: 0,
+      supplementalPRCount: 0,
       loading: false,
       limitReached: false,
     },

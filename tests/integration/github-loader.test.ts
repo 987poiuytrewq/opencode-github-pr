@@ -263,9 +263,177 @@ describe("repositoryPRs", () => {
     expect(captured.params.searchQuery).toContain(
       "repo:foo/bar is:pr author:@me is:closed",
     );
+    expect(captured.params).toMatchObject({
+      recentPRsLimit: 5,
+      includeRecentPRs: true,
+    });
     expect(result.prs.map(({ number }) => number)).toEqual([7]);
     expect(result.viewerLogin).toBe("octocat");
     expect(result.totalCount).toBe(7);
+  });
+
+  test("supplements author search with recent matching PRs missing from the index", async () => {
+    let captured: any = null;
+    mockOctokitDefault((op, params) => {
+      if (op !== "graphql") return null;
+      captured = params;
+      return {
+        viewer: { login: "octocat" },
+        repository: {
+          recentPullRequests: {
+            nodes: [
+              {
+                number: 9,
+                title: "Recent authored PR",
+                state: "OPEN",
+                author: { login: "octocat" },
+              },
+              {
+                number: 8,
+                title: "Someone else's PR",
+                state: "OPEN",
+                author: { login: "alice" },
+              },
+              {
+                number: 7,
+                title: "Already indexed",
+                state: "OPEN",
+                author: { login: "octocat" },
+              },
+            ],
+          },
+        },
+        search: {
+          issueCount: 1,
+          pageInfo: { hasNextPage: false, endCursor: null },
+          nodes: [
+            {
+              number: 7,
+              title: "Already indexed",
+              state: "OPEN",
+              author: { login: "octocat" },
+            },
+          ],
+        },
+      };
+    });
+
+    const result = await repositoryPRs(
+      { owner: "foo", repo: "bar" },
+      4,
+      15_000,
+      "open",
+      null,
+      "author",
+      null,
+      0,
+      3,
+    );
+
+    expect(captured.params).toMatchObject({
+      owner: "foo",
+      name: "bar",
+      states: ["OPEN"],
+      recentPRsLimit: 3,
+      includeRecentPRs: true,
+    });
+    expect(captured.query).toContain("field: CREATED_AT, direction: DESC");
+    expect(result.prs.map(({ number }) => number)).toEqual([9, 7]);
+    expect(result.totalCount).toBe(2);
+    expect(result.searchResultsFetched).toBe(1);
+    expect(result.supplementalPRCount).toBe(1);
+  });
+
+  test("supplements assignee search only with recent PRs assigned to the viewer", async () => {
+    mockOctokitDefault((op) =>
+      op === "graphql"
+        ? {
+            viewer: { login: "octocat" },
+            repository: {
+              recentPullRequests: {
+                nodes: [
+                  {
+                    number: 11,
+                    title: "Assigned recent PR",
+                    state: "OPEN",
+                    assignees: { nodes: [{ login: "OctoCat" }] },
+                  },
+                  {
+                    number: 12,
+                    title: "Unassigned to viewer",
+                    state: "OPEN",
+                    assignees: { nodes: [{ login: "alice" }] },
+                  },
+                ],
+              },
+            },
+            search: {
+              issueCount: 0,
+              pageInfo: { hasNextPage: false, endCursor: null },
+              nodes: [],
+            },
+          }
+        : null,
+    );
+
+    const result = await repositoryPRs(
+      { owner: "foo", repo: "bar" },
+      4,
+      15_000,
+      "open",
+      null,
+      "assignee",
+    );
+
+    expect(result.prs.map(({ number }) => number)).toEqual([11]);
+    expect(result.totalCount).toBe(1);
+    expect(result.supplementalPRCount).toBe(1);
+  });
+
+  test("does not request recent PRs when disabled or while continuing search pagination", async () => {
+    const paramsSeen: any[] = [];
+    mockOctokitDefault((op, params) => {
+      if (op !== "graphql") return null;
+      paramsSeen.push(params.params);
+      return {
+        viewer: { login: "octocat" },
+        search: {
+          issueCount: 10,
+          pageInfo: { hasNextPage: false, endCursor: "next" },
+          nodes: [
+            { number: paramsSeen.length, title: "Indexed PR", state: "OPEN" },
+          ],
+        },
+      };
+    });
+
+    await repositoryPRs(
+      { owner: "foo", repo: "bar" },
+      1,
+      15_000,
+      "open",
+      null,
+      "author",
+      null,
+      0,
+      0,
+    );
+    await repositoryPRs(
+      { owner: "foo", repo: "bar" },
+      1,
+      15_000,
+      "open",
+      "cursor-1",
+      "author",
+      null,
+      1,
+      5,
+    );
+
+    expect(paramsSeen.map(({ includeRecentPRs }) => includeRecentPRs)).toEqual([
+      false,
+      false,
+    ]);
   });
 
   test("uses the pull-request connection head filter for the branch scope", async () => {

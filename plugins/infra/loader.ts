@@ -13,6 +13,8 @@ export const MIN_PAGES_PER_BATCH = 4
 export const DEFAULT_TUI_PAGES_PER_BATCH = 4
 export const DEFAULT_PR_BATCH_SIZE = 4
 export const MAX_SEARCH_RESULTS = 1_000
+export const DEFAULT_RECENT_PRS_LIMIT = 5
+export const MAX_RECENT_PRS_LIMIT = 100
 
 // Status is pushed into GitHub's GraphQL query so each listing has its own
 // cursor and closed PRs cannot displace open PRs (or vice versa).
@@ -28,6 +30,8 @@ export type RepositoryPRsResult = {
   prs: PR[]
   viewerLogin: string | null
   totalCount: number | null
+  searchResultsFetched: number
+  supplementalPRCount: number
   hasMore: boolean
   fetchedPages: number
   endCursor: string | null
@@ -63,6 +67,21 @@ function readPullRequestPage(value: unknown, connectionName: "pullRequests" | "s
   }
 }
 
+function readRecentPullRequests(value: unknown): unknown[] {
+  const root = isRecord(value) ? value : {}
+  const repository = isRecord(root.repository) ? root.repository : {}
+  const connection = isRecord(repository.recentPullRequests) ? repository.recentPullRequests : {}
+  return Array.isArray(connection.nodes) ? connection.nodes.filter((node) => node != null) : []
+}
+
+function matchesSearchScope(pr: PR, scope: PRScope, viewerLogin: string | null): boolean {
+  if (!viewerLogin) return false
+  const login = viewerLogin.toLowerCase()
+  return scope === "author"
+    ? pr.authorLogin.toLowerCase() === login
+    : scope === "assignee" && pr.assigneeLogins.some((assignee) => assignee.toLowerCase() === login)
+}
+
 // Wraps octokit.graphql to return partial data when some fields error.
 // GitHub's GraphQL API returns both `data` and `errors` when specific
 // fields are inaccessible. Octokit throws on any errors, but the partial
@@ -89,12 +108,33 @@ export async function repositoryPRs(
   scope: PRScope = "all",
   scopeValue: string | null = null,
   resultsAlreadyFetched = 0,
+  recentPRsLimit = DEFAULT_RECENT_PRS_LIMIT,
 ): Promise<RepositoryPRsResult> {
   if (!repo) {
-    return { prs: [], viewerLogin: null, totalCount: 0, hasMore: false, fetchedPages: 0, endCursor: null, limitReached: false }
+    return {
+      prs: [],
+      viewerLogin: null,
+      totalCount: 0,
+      searchResultsFetched: 0,
+      supplementalPRCount: 0,
+      hasMore: false,
+      fetchedPages: 0,
+      endCursor: null,
+      limitReached: false,
+    }
   }
   if (scope === "branch" && !scopeValue) {
-    return { prs: [], viewerLogin: null, totalCount: 0, hasMore: false, fetchedPages: 0, endCursor: null, limitReached: false }
+    return {
+      prs: [],
+      viewerLogin: null,
+      totalCount: 0,
+      searchResultsFetched: 0,
+      supplementalPRCount: 0,
+      hasMore: false,
+      fetchedPages: 0,
+      endCursor: null,
+      limitReached: false,
+    }
   }
   const isSearch = scope === "author" || scope === "assignee"
   const requestedRecords = isSearch
@@ -105,6 +145,8 @@ export async function repositoryPRs(
       prs: [],
       viewerLogin: null,
       totalCount: isSearch ? Math.min(resultsAlreadyFetched, MAX_SEARCH_RESULTS) : null,
+      searchResultsFetched: 0,
+      supplementalPRCount: 0,
       hasMore: false,
       fetchedPages: 0,
       endCursor: after,
@@ -125,6 +167,8 @@ export async function repositoryPRs(
   let viewerLogin: string | null = null
   let totalCount: number | null = null
   let fetchedPages = 0
+  let searchResultsFetched = 0
+  let recentNodes: unknown[] = []
   let hasNextPage = false
   let endCursor: string | null = null
   let remainingRecords = requestedRecords
@@ -132,11 +176,21 @@ export async function repositoryPRs(
   const seenCursors = new Set<string>(cursor ? [cursor] : [])
   do {
     const first = Math.min(100, remainingRecords)
+    const includeRecentPRs =
+      isSearch &&
+      recentPRsLimit > 0 &&
+      !cursor &&
+      resultsAlreadyFetched === 0
     const data = isSearch
       ? await graphqlPartial(PULL_REQUESTS_SEARCH_QUERY, {
+          owner: repo.owner,
+          name: repo.repo,
+          states: LISTING_STATES[listing],
           searchQuery,
           after: cursor,
           first,
+          recentPRsLimit: Math.min(MAX_RECENT_PRS_LIMIT, Math.max(1, Math.floor(recentPRsLimit))),
+          includeRecentPRs,
         }, requestTimeoutMs)
       : await graphqlPartial(PULL_REQUESTS_QUERY, {
           owner: repo.owner,
@@ -148,6 +202,10 @@ export async function repositoryPRs(
         }, requestTimeoutMs)
     const page = readPullRequestPage(data, isSearch ? "search" : "pullRequests")
     nodes.push(...page.nodes)
+    if (isSearch) {
+      searchResultsFetched += page.nodes.length
+      if (includeRecentPRs) recentNodes = readRecentPullRequests(data)
+    }
     remainingRecords -= page.nodes.length
     consecutiveEmptyPages = page.nodes.length === 0 ? consecutiveEmptyPages + 1 : 0
     if (page.viewerLogin) viewerLogin = page.viewerLogin
@@ -168,13 +226,29 @@ export async function repositoryPRs(
     cursor = nextCursor
     if (consecutiveEmptyPages >= 3) break
   } while (hasNextPage && remainingRecords > 0)
+  const searchPRs = nodes.map(mapPullFromGraphQL)
+  let supplementalPRs: PR[] = []
+  if (isSearch && recentNodes.length > 0 && viewerLogin) {
+    const knownNumbers = new Set(searchPRs.map((pr) => pr.number))
+    supplementalPRs = recentNodes
+      .map(mapPullFromGraphQL)
+      .filter((pr) => matchesSearchScope(pr, scope, viewerLogin) && !knownNumbers.has(pr.number))
+    const uniqueNumbers = new Set<number>()
+    supplementalPRs = supplementalPRs.filter((pr) => {
+      if (uniqueNumbers.has(pr.number)) return false
+      uniqueNumbers.add(pr.number)
+      return true
+    })
+  }
   const limitReached = isSearch &&
     hasNextPage &&
     resultsAlreadyFetched + nodes.length >= MAX_SEARCH_RESULTS
   return {
-    prs: nodes.map(mapPullFromGraphQL),
+    prs: [...supplementalPRs, ...searchPRs],
     viewerLogin,
-    totalCount,
+    totalCount: totalCount === null ? null : totalCount + supplementalPRs.length,
+    searchResultsFetched,
+    supplementalPRCount: supplementalPRs.length,
     hasMore: hasNextPage && !limitReached,
     fetchedPages,
     endCursor,

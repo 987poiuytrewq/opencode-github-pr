@@ -66,6 +66,8 @@ export type DashboardState = {
     hasMore: boolean
     totalCount: number | null
     pagesLoaded: number
+    searchResultsFetched: number
+    supplementalPRCount: number
     loading: boolean
     limitReached: boolean
   }

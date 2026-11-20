@@ -73,10 +73,16 @@ export const PULL_REQUESTS_QUERY = `query PullRequests($owner: String!, $name: S
 ${PULL_REQUEST_FIELDS}`
 
 // GitHub doesn't expose author or assignee filters on Repository.pullRequests,
-// so those scope filters use issue search, which supports both qualifiers.
-export const PULL_REQUESTS_SEARCH_QUERY = `query SearchPullRequests($searchQuery: String!, $after: String, $first: Int!) {
+// so those scopes use issue search. A small recent PR connection supplements
+// search while its index catches up.
+export const PULL_REQUESTS_SEARCH_QUERY = `query SearchPullRequests($owner: String!, $name: String!, $states: [PullRequestState!]!, $searchQuery: String!, $after: String, $first: Int!, $recentPRsLimit: Int!, $includeRecentPRs: Boolean!) {
   viewer {
     login
+  }
+  repository(owner: $owner, name: $name) {
+    recentPullRequests: pullRequests(first: $recentPRsLimit, states: $states, orderBy: {field: CREATED_AT, direction: DESC}) @include(if: $includeRecentPRs) {
+      nodes { ...DashboardPullRequestFields }
+    }
   }
   search(query: $searchQuery, type: ISSUE, first: $first, after: $after) {
     issueCount
