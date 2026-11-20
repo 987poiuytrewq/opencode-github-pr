@@ -1,5 +1,9 @@
 # opencode-github-pr
 
+[![npm](https://img.shields.io/npm/v/opencode-github-pr)](https://www.npmjs.com/package/opencode-github-pr)
+[![CI](https://github.com/987poiuytrewq/opencode-github-pr/actions/workflows/ci.yml/badge.svg)](https://github.com/987poiuytrewq/opencode-github-pr/actions/workflows/ci.yml)
+[![License: MIT](https://img.shields.io/badge/license-MIT-blue)](LICENSE)
+
 A GitHub pull request dashboard for the [OpenCode](https://opencode.ai) V2 sidebar. See your PRs for the current
 repository, their CI, review and merge status, and jump straight to the right page on GitHub, without leaving OpenCode.
 
@@ -14,6 +18,7 @@ repository, their CI, review and merge status, and jump straight to the right pa
 - **Filters:** show PRs for the current branch, authored by you, assigned to you, or all of them, and choose open,
   closed or all states.
 - **Follows your theme:** colours come from your active OpenCode theme, and every colour and icon can be overridden.
+- **Nerd Font or plain Unicode icons**, so it looks right whether or not your terminal font has Nerd Font glyphs.
 - **Works with GitHub.com and GitHub Enterprise Server**, over HTTPS or SSH remotes, including linked Git worktrees.
 
 ## Requirements
@@ -36,7 +41,23 @@ Add the package name to the `plugins` array in your OpenCode config, either glob
 }
 ```
 
-Restart OpenCode. The **Pull Requests** panel appears in the session sidebar.
+Restart OpenCode. It installs the package from npm and the **Pull Requests** panel appears in the session sidebar.
+
+To pass [options](#configuration), use the object form of the entry:
+
+```json
+{
+  "$schema": "https://opencode.ai/config.json",
+  "plugins": [
+    {
+      "package": "opencode-github-pr",
+      "options": {
+        "iconStyle": "unicode"
+      }
+    }
+  ]
+}
+```
 
 ## Install from source
 
@@ -65,7 +86,7 @@ Restart OpenCode. The **Pull Requests** panel appears in the session sidebar.
 
 3. Restart OpenCode. The **Pull Requests** panel appears in the session sidebar.
 
-Add the plugin to `opencode.json`, not `cli.json`. The package has a server part and a TUI part; the TUI loads its part
+However you install it, add the plugin to `opencode.json`, not `cli.json`. The package has a server part and a TUI part; the TUI loads its part
 from the server's plugin list, including when it is connected to a remote server.
 
 ## Authentication
@@ -100,7 +121,7 @@ and removed, and on the right, the unresolved comment count, review status and c
 
 | Element | Meaning | Click opens |
 | --- | --- | --- |
-| PR icon | Green: ready to merge. Red: merge conflict. Grey: draft, closed or unknown. Theme accent: merged. | Merge status panel |
+| PR icon | Green: ready to merge. Red: merge conflict. Grey: draft, closed or unknown. Merged colour (your theme's interactive hue): merged. | Merge status panel |
 | Title | The PR title, shortened to fit the sidebar. | PR overview |
 | `#128` | PR number. | PR overview |
 | `+42 -7` | Lines added and removed. | Files changed |
@@ -124,7 +145,9 @@ You can change the defaults with [`defaultScope` and `defaultStatusFilter`](#con
 
 ### Pages
 
-The panel shows five PRs at a time. When there are more, use the arrows at the bottom of the panel to page through them.
+The panel shows five PRs at a time, most recently updated first. When there are more, use the arrows at the bottom
+of the panel to page through them. The counter between the arrows shows the current page and the total, for example
+`2 of 7`. Change the number per page with [`pageSize`](#configuration).
 
 ### Commands
 
@@ -138,24 +161,34 @@ These commands are available as slash commands and in the command palette, under
 ### Refreshing
 
 The list refreshes when OpenCode starts, each time a session goes idle (for example after the agent finishes a task),
-and every 60 seconds while a session is open. Use `/pr-refresh` to reload it on demand.
+and every 60 seconds while a session is open. Use `/pr-refresh` to reload it on demand. Change the interval with
+[`refreshIntervalMs`](#configuration).
 
-GitHub applies both status and scope filters. Status can be `open`, `closed` (closed or merged), or `all`. Scope can
-be the current branch, PR author, assignee, or all PRs. The dashboard initially fetches four TUI pages of PRs. As
-you page forward, it fetches the next four TUI pages in the background. A batch may use multiple GitHub requests
-when it exceeds GitHub's 100-PR request size. If you reach the end of the loaded results, the TUI advances as soon
-as the new batch arrives. GitHub search limits author and assignee results to 1,000 PRs per filter.
+### How PRs are loaded
+
+The filters are applied by GitHub, so the dashboard only downloads PRs that match them:
+
+- `all` and `branch` use the repository's PR list, so new PRs appear on the next refresh.
+- `author` and `assignee` use GitHub search. Search can take a short while to index a new PR, so a PR you've just
+  opened may appear a refresh or two later. GitHub search also returns at most 1,000 PRs; when you reach that limit,
+  the panel says so.
+
+PRs load in batches. The first batch holds four pages' worth (20 PRs with the default page size). Moving to another
+page starts loading the next batch in the background, so paging stays quick. If you reach the last loaded page
+before the next batch arrives, the panel moves on as soon as it does. Changing a filter loads that filter's first
+batch. Use [`pageSize` and `pagesPerBatch`](#configuration) to change how much is loaded at a time.
 
 ## Configuration
 
-Pass options in the plugin entry's `options` object. Every option is optional:
+Pass options in the plugin entry's `options` object. Every option is optional. If you installed from source, use
+the clone's path as the `package` value instead:
 
 ```json
 {
   "$schema": "https://opencode.ai/config.json",
   "plugins": [
     {
-      "package": "/absolute/path/to/opencode-github-pr",
+      "package": "opencode-github-pr",
       "options": {
         "pageSize": 8,
         "refreshIntervalMs": 30000,
@@ -171,14 +204,14 @@ Pass options in the plugin entry's `options` object. Every option is optional:
 | --- | --- | --- |
 | `enabled` | `true` | Set to `false` to turn the dashboard off without uninstalling it. |
 | `pageSize` | `5` | PRs shown per page. |
-| `pagesPerBatch` | `4` | TUI pages to fetch per batch. Each batch contains `pageSize × pagesPerBatch` PRs (at least four TUI pages); additional batches load as you page forward. |
+| `pagesPerBatch` | `4` | Pages of PRs to load from GitHub at a time, so each batch is `pageSize × pagesPerBatch` PRs. The minimum is `4`; lower values are raised to it. See [How PRs are loaded](#how-prs-are-loaded). |
 | `refreshIntervalMs` | `60000` | How often the list refreshes while a session is open, in milliseconds. |
 | `requestTimeoutMs` | `15000` | How long to wait for a GitHub request before giving up, in milliseconds. |
 | `defaultScope` | `"author"` | Scope filter at startup: `branch`, `author`, `assignee` or `all`. |
 | `defaultStatusFilter` | `"open"` | Status filter at startup: `open`, `closed` or `all`. |
-| `iconStyle` | `"nerd"` | Icon set to use: `"nerd"` or `"unicode"`. |
+| `iconStyle` | `"nerd"` | Icon set: `"nerd"` for Nerd Font glyphs, or `"unicode"` for standard Unicode symbols that work in any font. See [Icons](#icons). |
 | `colors` | Theme | Colour overrides. See [Colours](#colours). |
-| `icons` | Nerd Font glyphs | Icon overrides. See [Icons](#icons). |
+| `icons` | From `iconStyle` | Overrides for individual icons. See [Icons](#icons). |
 
 Numeric options must be positive numbers. Invalid values fall back to the default.
 
@@ -189,10 +222,7 @@ By default, colours come from your active OpenCode theme. Override any of them w
 
 | Key | Used for | Default theme token |
 | --- | --- | --- |
-| `panel` | Panel background | Background |
 | `panelAlt` | Background of each row's second line | Raised background |
-| `border` | Divider above the page controls | Border |
-| `borderActive` | Divider while a page arrow is hovered | Primary action text |
 | `text` | PR titles and the panel heading | Text |
 | `muted` | Secondary text, neutral states | Muted text |
 | `accent` | Hovered filters and page arrows | Primary action text |
@@ -201,6 +231,9 @@ By default, colours come from your active OpenCode theme. Override any of them w
 | `error` | Failing checks, requested changes, conflicts, deletions, errors | Error text |
 | `draft` | Draft PR icon | Muted text |
 | `merged` | Merged PR icon | Interactive hue (`hue.interactive.200`) |
+
+The panel has no background of its own; it uses the sidebar's. The `panel`, `border` and `borderActive` keys are
+still accepted but currently have no effect.
 
 Colour and icon overrides go inside the plugin entry's `options`, next to the other options:
 
@@ -217,57 +250,37 @@ Colour and icon overrides go inside the plugin entry's `options`, next to the ot
 
 ### Icons
 
-Every icon can be replaced with a string. An empty string hides the icon; whitespace-only strings are ignored. The
-Unicode set is available by setting `iconStyle` to `"unicode"`:
-
-| Key | Default | Used for |
-| --- | --- | --- |
-| `openPR` | `•` | Open, draft and closed PRs |
-| `mergedPR` | `•` | Merged PRs |
-| `review` | `✓` | Review status |
-| `openComment` | `■` | Unresolved review threads |
-| `check` | `●` | CI check status |
-| `scope` | *(none)* | Shared filter icon; hidden in Unicode style |
-| `status` | *(none)* | No separate status-filter icon |
-| `loading` | `…` | Loading message |
-| `info` | `ℹ` | Informational messages |
-| `error` | `⚠` | Error messages |
-| `previousPage` | `◀` | Previous page arrow |
-| `nextPage` | `▶` | Next page arrow |
-
-#### Nerd Font icons
-
-Nerd Font glyphs are the default. Set `iconStyle` to `"nerd"` explicitly to keep using this set:
+`iconStyle` picks the icon set. Nerd Font glyphs are the default; set `"unicode"` if your terminal font doesn't have
+them:
 
 ```json
 {
   "options": {
-    "iconStyle": "nerd"
+    "iconStyle": "unicode"
   }
 }
 ```
 
-| Key | Nerd Font glyph | Code point |
-| --- | --- | --- |
-| `openPR` | `` | `U+E726` |
-| `mergedPR` | `` | `U+E727` |
-| `review` | `` | `U+F4FF` |
-| `openComment` | `󰅺` | `U+F017A` |
-| `check` | `●` | — |
-| `scope` | `` | `U+F4D7` |
-| `status` | *(none)* | — |
-| `loading` | `󰔟` | `U+F051F` |
-| `info` | `` | `U+F129` |
-| `error` | `` | `U+E654` |
-| `previousPage` | `` | `U+EB6F` |
-| `nextPage` | `` | `U+EB70` |
+| Key | Nerd Font (default) | Unicode | Used for |
+| --- | --- | --- | --- |
+| `openPR` | `U+E726` | `•` | Open, draft and closed PRs |
+| `mergedPR` | `U+E727` | `•` | Merged PRs |
+| `review` | `U+F4FF` | `✓` | Review status |
+| `openComment` | `U+F017A` | `■` | Unresolved review threads |
+| `check` | `●` | `●` | CI check status |
+| `scope` | `U+F4D7` | *(none)* | Icon before the filter labels |
+| `loading` | `U+F051F` | `…` | Loading messages |
+| `info` | `U+F129` | `ℹ` | Informational messages |
+| `error` | `U+E654` | `⚠` | Error messages |
+| `previousPage` | `U+EB6F` | `◀` | Previous page arrow |
+| `nextPage` | `U+EB70` | `▶` | Next page arrow |
 
-Nerd Font mode uses one shared scope icon before both filters; Unicode mode has no filter icon. Explicit `icons` values
-override the selected style.
+To change individual icons, set them in `icons`. These override the chosen style. An empty string hides an icon;
+whitespace-only values are ignored. The `status` key is still accepted but currently has no effect.
 
 #### Plain-text icons
 
-You can also replace individual icons or the full icon set with ASCII characters:
+If neither set suits your font, replace every icon with ASCII characters:
 
 ```json
 {
@@ -279,7 +292,6 @@ You can also replace individual icons or the full icon set with ASCII characters
       "openComment": "C",
       "check": "*",
       "scope": "@",
-      "status": "~",
       "loading": "...",
       "info": "i",
       "error": "!",
@@ -306,14 +318,15 @@ unset for GitHub.com.
 
 | You see | What to do |
 | --- | --- |
-| No **Pull Requests** panel | Check that the plugin is in `opencode.json` (not `cli.json`), that `bun install` has run in the clone, and that `enabled` isn't `false`. Restart OpenCode. Plugin load errors are written to `~/.local/share/opencode/log/opencode.log`. |
-| Icons show as boxes or question marks | Your terminal font may not support a symbol. Try a different font, use `iconStyle: "nerd"` with a Nerd Font, or use [plain-text icons](#plain-text-icons). |
+| No **Pull Requests** panel | Check that the plugin is in `opencode.json` (not `cli.json`) and that `enabled` isn't `false`, then restart OpenCode. If you installed from source, check that `bun install` has run in the clone. Plugin load errors are written to `~/.local/share/opencode/log/opencode.log`. |
+| Icons show as boxes or question marks | Your terminal font doesn't have Nerd Font glyphs. Set `iconStyle` to `"unicode"`, install a Nerd Font, or use [plain-text icons](#plain-text-icons). |
 | **No GitHub repo** | The session's directory isn't a Git repository with a GitHub remote. Add a remote, or open a session in the right project. For Enterprise, check `GITHUB_ENTERPRISE_URL`. |
 | **GitHub sign-in failed** | No valid token was found. Run `gh auth login`, or set `GITHUB_TOKEN` where the OpenCode server starts. |
 | **Permission denied** or **Repo not found** | Your token can't read this repository. Check its scopes or fine-grained permissions, and SSO authorisation for organisation repositories. |
 | **Rate limit exceeded** | GitHub's API limit has been reached. The panel shows when you can try again. Raise `refreshIntervalMs` and avoid paging forward unnecessarily to use less quota. |
 | **Request timed out** or **Cannot reach GitHub** | Check your connection or proxy. On slow networks, raise `requestTimeoutMs`. |
-| **No matching PRs** | No PRs match the current filters. Click the scope or status label to widen them. |
+| **No matching PRs** | No PRs match the current filters. Click the scope or status label to widen them. Under `author` or `assignee`, a PR opened moments ago may not be in GitHub's search index yet; it appears on a later refresh. |
+| **GitHub search is limited to 1,000 matching PRs** | The `author` and `assignee` filters use GitHub search, which returns at most 1,000 PRs. Switch the status filter to `open` or the scope to `all` to see older PRs. |
 | `branch` scope is empty | The current branch has no PR, or the session is in detached HEAD. |
 
 ## Releasing
