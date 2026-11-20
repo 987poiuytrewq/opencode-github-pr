@@ -1,4 +1,5 @@
 import { afterEach, beforeEach, describe, expect, test } from "bun:test"
+import { createRoot, onCleanup } from "solid-js"
 import { clearOctokitMocks, installOctokitMock } from "../helpers/octokit-mock"
 import { createMockTuiApi } from "../helpers/tui-api-mock"
 
@@ -28,8 +29,12 @@ describe("V2 TUI plugin setup", () => {
   test("registers a sidebar slot", async () => {
     const { api, registry } = createMockTuiApi()
     const cleanup = await plugin.setup(api)
-    expect(registry.slots.map((slot) => slot.append)).toContain("sidebar.content")
-    expect(registry.slots.find((slot) => slot.append === "sidebar.content").render).toBeFunction()
+    expect(registry.slots.map((slot) => slot.append)).toContain(
+      "sidebar.content",
+    )
+    expect(
+      registry.slots.find((slot) => slot.append === "sidebar.content").render,
+    ).toBeFunction()
     cleanup?.()
     expect(registry.slots).toHaveLength(0)
   })
@@ -48,39 +53,44 @@ describe("V2 TUI plugin setup", () => {
     expect(ids).not.toContain("opencode-github-pr.add-reviewer")
     expect(ids).not.toContain("opencode-github-pr.rerequest-review")
     expect(ids).not.toContain("opencode-github-pr.add-current-branch-reviewer")
-    expect(commands.find((item: any) => item.id === "opencode-github-pr.refresh").slash.name).toBe("pr-refresh")
+    expect(
+      commands.find((item: any) => item.id === "opencode-github-pr.refresh")
+        .slash.name,
+    ).toBe("pr-refresh")
     cleanup?.()
   })
 
-  test("registers one keymap across app slot renders and disposes it on reload", async () => {
+  test("registers one keymap across app slot renders and disposes it with the slot on reload", async () => {
     const { api, registry } = createMockTuiApi()
-    let keymapDisposals = 0
-    ;(api as any).keymap.layer = (factory: () => unknown) => {
+    ;(api as any).keymap.layer = (factory: () => unknown): void => {
       const layer = factory()
       registry.keymaps.push(layer)
-      return () => {
-        keymapDisposals++
+      onCleanup(() => {
         const index = registry.keymaps.indexOf(layer)
         if (index >= 0) registry.keymaps.splice(index, 1)
-      }
+      })
     }
 
     for (let reload = 0; reload < 2; reload++) {
       const cleanup = await plugin.setup(api)
       const appSlot = registry.slots.find((slot) => slot.append === "app")
-      appSlot.render({})
-      appSlot.render({})
-      appSlot.render({})
+      let disposeSlot: () => void = () => {}
+      createRoot((dispose) => {
+        disposeSlot = dispose
+        appSlot.render({})
+        appSlot.render({})
+        appSlot.render({})
+      })
 
       expect(registry.keymaps).toHaveLength(1)
       expect(registry.events).toHaveLength(1)
-      cleanup?.()
+      // The host's Solid slot owner tears down the keymap layer.
+      disposeSlot()
       expect(registry.keymaps).toHaveLength(0)
+      cleanup?.()
       expect(registry.events).toHaveLength(0)
       expect(registry.slots).toHaveLength(0)
     }
-
-    expect(keymapDisposals).toBe(2)
   })
 
   test("subscribes to session idle and cleans up its subscription", async () => {
