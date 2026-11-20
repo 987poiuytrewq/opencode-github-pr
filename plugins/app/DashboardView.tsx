@@ -264,8 +264,7 @@ export function DashboardView(props: {
         <StatusMessage
           icon={props.icons.info}
           title={errorMessages.noMatchingPRs}
-          description="Try a different scope or status."
-          titleColor={sk.text}
+          titleColor={sk.muted}
           descriptionColor={sk.muted}
         />
       </Show>

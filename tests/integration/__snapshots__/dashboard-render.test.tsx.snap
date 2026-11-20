@@ -101,7 +101,7 @@ exports[`DashboardView render ok state with empty PRs 1`] = `
 Pull Requests                         branch open
 
  No matching PRs
-  Try a different scope or status.
+
 
 
 
