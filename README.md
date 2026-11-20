@@ -246,9 +246,6 @@ the other options:
 }
 ```
 
-The panel has no background of its own; it uses the sidebar's. The `panel`, `border` and `borderActive` keys are
-still accepted but currently have no effect.
-
 ### Icons
 
 `iconStyle` picks the icon set. Nerd Font glyphs are the default; set `"unicode"` if your terminal font doesn't have
@@ -277,7 +274,7 @@ them:
 | `nextPage` | `U+EB70` | `▶` | Next page arrow |
 
 To change individual icons, set them in `icons`. These override the chosen style. An empty string hides an icon;
-whitespace-only values are ignored. The `status` key is still accepted but currently has no effect.
+whitespace-only values are ignored.
 
 #### Plain-text icons
 

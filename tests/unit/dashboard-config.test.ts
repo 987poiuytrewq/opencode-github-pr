@@ -70,10 +70,16 @@ describe("dashboard options", () => {
   })
 
   test("allows empty icon overrides to hide individual icons", () => {
-    expect(dashboardOptions({ icons: { scope: "", status: "" } }).icons).toMatchObject({
-      scope: "",
-      status: "",
+    expect(dashboardOptions({ icons: { scope: "" } }).icons).toMatchObject({ scope: "" })
+  })
+
+  test("ignores colour and icon keys that no longer have an effect", () => {
+    const options = dashboardOptions({
+      colors: { panel: "#000000", border: "#111111", borderActive: "#222222" },
+      icons: { status: "X" },
     })
+    expect(options.colors).toEqual({})
+    expect(options.icons).not.toHaveProperty("status")
   })
 
   test("ignores invalid values and empty color/icon strings", () => {
@@ -100,6 +106,6 @@ describe("dashboard options", () => {
       colors: {},
       icons: DEFAULT_ICONS,
     })
-    expect(Object.keys(DEFAULT_SKIN)).toHaveLength(12)
+    expect(Object.keys(DEFAULT_SKIN)).toHaveLength(9)
   })
 })
