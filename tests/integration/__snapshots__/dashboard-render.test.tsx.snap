@@ -51,9 +51,9 @@ exports[`DashboardView render ok state with PRs 1`] = `
 exports[`DashboardView render no-repo state 1`] = `
 "Pull Requests                         branch open
 
-  No GitHub repo
+ No GitHub repo
   Add a GitHub remote or switch to the right
- project.
+  project.
 
 
 
