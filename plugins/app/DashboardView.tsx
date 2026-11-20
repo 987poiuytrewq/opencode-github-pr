@@ -1,5 +1,5 @@
 /** @jsxImportSource @opentui/solid */
-import { createEffect, createSignal, For, onCleanup, onMount, Show } from "solid-js"
+import { createEffect, createMemo, createSignal, For, onCleanup, onMount, Show } from "solid-js"
 import type { ResolvedTheme } from "@opencode/theme/tui"
 import type { BoxRenderable } from "@opentui/core"
 import { useRenderer } from "@opentui/solid"
@@ -32,7 +32,7 @@ export function DashboardView(props: {
   colors: Partial<Skin>
   icons: DashboardIcons
 }) {
-  const sk = skin(props.theme, props.colors)
+  const sk = createMemo(() => skin(props.theme, props.colors))
   const [scopeHovered, setScopeHovered] = createSignal(false)
   const [statusHovered, setStatusHovered] = createSignal(false)
   const [page, setPage] = createSignal(0)
@@ -43,6 +43,7 @@ export function DashboardView(props: {
   const renderer = useRenderer()
   createEffect(() => {
     props.statusFilter
+    props.scope
     setPage(0)
   })
   onMount(() => {
@@ -57,10 +58,11 @@ export function DashboardView(props: {
       const nextWidth = Math.max(1, Math.floor(view.width) - iconWidth - 1)
       setTitleWidth((current) => current === nextWidth ? current : nextWidth)
     }
-    renderer.on("frame", updateTitleWidth)
+    updateTitleWidth()
+    view?.on("resize", updateTitleWidth)
     renderer.on("resize", updateTitleWidth)
     onCleanup(() => {
-      renderer.off("frame", updateTitleWidth)
+      view?.off("resize", updateTitleWidth)
       renderer.off("resize", updateTitleWidth)
     })
   })
@@ -94,6 +96,9 @@ export function DashboardView(props: {
     props.state.status === DashboardStatus.Ok ||
     (props.state.status === DashboardStatus.Error && props.state.prs.length > 0)
   const listingPending = () => !filtersMatch()
+  const scopeListingPending = () =>
+    props.state.pagination.scope !== props.scope ||
+    props.state.pagination.scopeValue !== (props.scope === "branch" ? props.state.currentBranch : null)
 
   const goNext = async () => {
     if (currentPage() < pageCount() - 1) {
@@ -123,7 +128,7 @@ export function DashboardView(props: {
       case "authentication":
         return {
           title: "GitHub sign-in failed",
-          description: "Set GITHUB_TOKEN or GH_TOKEN.",
+          description: "Run gh auth login or set GITHUB_TOKEN or GH_TOKEN.",
         }
       case "forbidden":
         return {
@@ -183,7 +188,7 @@ export function DashboardView(props: {
         paddingLeft={0}
         paddingRight={0}
       >
-        <text fg={sk.text}>
+        <text fg={sk().text}>
           <b>Pull Requests</b>
         </text>
         <box flexGrow={1}></box>
@@ -196,14 +201,14 @@ export function DashboardView(props: {
             onMouseUp={() => props.onCycleScope()}
           >
             <Show when={props.icons.scope}>
-              <text fg={sk.muted} selectable={false}>{props.icons.scope}</text>
+              <text fg={sk().muted} selectable={false}>{props.icons.scope}</text>
             </Show>
-            <text fg={scopeHovered() ? sk.accent : sk.muted} selectable={false}>
+            <text fg={scopeHovered() ? sk().accent : sk().muted} selectable={false}>
               {props.scope}
             </text>
           </box>
           <text
-            fg={statusHovered() ? sk.accent : sk.muted}
+            fg={statusHovered() ? sk().accent : sk().muted}
             selectable={false}
             onMouseOver={() => setStatusHovered(true)}
             onMouseOut={() => setStatusHovered(false)}
@@ -218,17 +223,17 @@ export function DashboardView(props: {
         <StatusMessage
           icon={props.icons.loading}
           title="Loading PRs"
-          titleColor={sk.muted}
-          descriptionColor={sk.muted}
+          titleColor={sk().muted}
+          descriptionColor={sk().muted}
         />
       </Show>
 
       <Show when={listingPending() && props.state.status !== DashboardStatus.Loading}>
         <StatusMessage
           icon={props.icons.loading}
-          title={`Loading ${props.statusFilter} PRs`}
-          titleColor={sk.muted}
-          descriptionColor={sk.muted}
+          title={scopeListingPending() ? `Loading ${props.scope} PRs` : "Loading PRs"}
+          titleColor={sk().muted}
+          descriptionColor={sk().muted}
         />
       </Show>
 
@@ -237,8 +242,8 @@ export function DashboardView(props: {
           icon={props.icons.info}
           title="No GitHub repo"
           description="Add a GitHub remote or switch to the right project."
-          titleColor={sk.muted}
-          descriptionColor={sk.muted}
+          titleColor={sk().muted}
+          descriptionColor={sk().muted}
         />
       </Show>
 
@@ -247,8 +252,8 @@ export function DashboardView(props: {
           icon={props.icons.error}
           title={errorPresentation().title}
           description={errorPresentation().description}
-          titleColor={sk.error}
-          descriptionColor={sk.muted}
+          titleColor={sk().error}
+          descriptionColor={sk().muted}
         />
       </Show>
 
@@ -264,8 +269,8 @@ export function DashboardView(props: {
         <StatusMessage
           icon={props.icons.info}
           title={errorMessages.noMatchingPRs}
-          titleColor={sk.muted}
-          descriptionColor={sk.muted}
+          titleColor={sk().muted}
+          descriptionColor={sk().muted}
         />
       </Show>
 
@@ -277,18 +282,18 @@ export function DashboardView(props: {
                 <PRRow
                   pr={pr}
                   titleWidth={titleWidth()}
-                  secondaryBackground={sk.panelAlt}
+                  secondaryBackground={sk().panelAlt}
                   onClick={(target) => {
                     props.setSelectedIdx(currentPage() * props.pageSize + i())
                     props.onOpen(pr.number, target)
                   }}
-                  text={sk.text}
-                  muted={sk.muted}
-                  pass={sk.success}
-                  fail={sk.error}
-                  warn={sk.warning}
-                  draft={sk.draft}
-                  merged={sk.merged}
+                  text={sk().text}
+                  muted={sk().muted}
+                  pass={sk().success}
+                  fail={sk().error}
+                  warn={sk().warning}
+                  draft={sk().draft}
+                  merged={sk().merged}
                   icons={props.icons}
                 />
               )}
@@ -315,13 +320,13 @@ export function DashboardView(props: {
                 onMouseUp={() => canGoPrevious() && setPage(currentPage() - 1)}
               >
                 <text
-                  fg={canGoPrevious() && previousHovered() ? sk.accent : sk.muted}
+                  fg={canGoPrevious() && previousHovered() ? sk().accent : sk().muted}
                   selectable={false}
                 >
                   {props.icons.previousPage}
                 </text>
               </box>
-              <text fg={sk.muted} selectable={false}>
+              <text fg={sk().muted} selectable={false}>
                 {`${currentPage() + 1} of ${totalPageCount() ?? pageCount()}${totalPageCount() === null && filtersMatch() && props.state.pagination.hasMore ? "+" : ""}`}
               </text>
               <box
@@ -336,7 +341,7 @@ export function DashboardView(props: {
                 onMouseUp={() => canGoNext() && void goNext()}
               >
                 <text
-                  fg={canGoNext() && nextHovered() ? sk.accent : sk.muted}
+                  fg={canGoNext() && nextHovered() ? sk().accent : sk().muted}
                   selectable={false}
                 >
                   {props.icons.nextPage}
@@ -348,8 +353,8 @@ export function DashboardView(props: {
             <StatusMessage
               icon={props.icons.info}
               title="GitHub search is limited to 1,000 matching PRs"
-              titleColor={sk.muted}
-              descriptionColor={sk.muted}
+              titleColor={sk().muted}
+              descriptionColor={sk().muted}
             />
           </Show>
         </box>

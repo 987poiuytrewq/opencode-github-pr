@@ -1,5 +1,6 @@
 /** @jsxImportSource @opentui/solid */
 import { describe, expect, test } from "bun:test"
+import { createSignal } from "solid-js"
 import { testRender } from "@opentui/solid"
 import type { DashboardState, PRScope, PRStatusFilter, PRLinkTarget } from "../../plugins/domain/types"
 import { DashboardView } from "../../plugins/app/DashboardView"
@@ -98,6 +99,13 @@ describe("DashboardView render", () => {
     const r = await renderState(errorState())
     await r.flush()
     expect(captureFrame(r)).toMatchSnapshot()
+  })
+
+  test("authentication help includes the GitHub CLI sign-in command", async () => {
+    const r = await renderState(errorState({ errorKind: "authentication" }))
+    await r.flush()
+
+    expect(captureFrame(r)).toContain("gh auth login")
   })
 
   test("rate-limit error explains the limit and keeps cached PRs visible", async () => {
@@ -211,6 +219,135 @@ describe("DashboardView render", () => {
     expect(frame).not.toContain("No matching")
   })
 
+  test("shows the scope being loaded while a scope listing is changing", async () => {
+    const { api } = createMockTuiApi()
+    const options = dashboardOptions()
+    const [scope, setScope] = createSignal<PRScope>("branch")
+    const r = await testRender(
+      () => (
+        <DashboardView
+          theme={api.theme}
+          state={okState()}
+          setSelectedIdx={() => {}}
+          onOpen={() => {}}
+          scope={scope()}
+          statusFilter="open"
+          onCycleScope={() => {}}
+          onCycleStatus={() => {}}
+          onLoadMore={async () => {}}
+          pageSize={options.pageSize}
+          colors={options.colors}
+          icons={options.icons}
+        />
+      ),
+      { width: 50, height: 20 },
+    )
+    await r.flush()
+
+    setScope("all")
+    await r.flush()
+
+    expect(captureFrame(r)).toContain("Loading all PRs")
+    expect(captureFrame(r)).not.toContain("Loading open PRs")
+    await r.dispose()
+  })
+
+  test("resets to the first page when scope changes", async () => {
+    const { api } = createMockTuiApi()
+    const options = dashboardOptions({ pageSize: 1 })
+    const prs = [
+      makeTUIPR({ number: 11, title: "First PR" }),
+      makeTUIPR({ number: 12, title: "Second PR" }),
+      makeTUIPR({ number: 13, title: "Third PR" }),
+    ]
+    const initialState = okState({ prs })
+    initialState.pagination.totalCount = prs.length
+    const [scope, setScope] = createSignal<PRScope>("branch")
+    const [state, setState] = createSignal(initialState)
+    const r = await testRender(
+      () => (
+        <DashboardView
+          theme={api.theme}
+          state={state()}
+          setSelectedIdx={() => {}}
+          onOpen={() => {}}
+          scope={scope()}
+          statusFilter="open"
+          onCycleScope={() => {}}
+          onCycleStatus={() => {}}
+          onLoadMore={async () => {}}
+          pageSize={options.pageSize}
+          colors={options.colors}
+          icons={options.icons}
+        />
+      ),
+      { width: 50, height: 20 },
+    )
+    await r.flush()
+
+    let lines = r.captureCharFrame().split("\n")
+    let pagerY = lines.findIndex((line) => line.includes("1 of 3"))
+    await r.mockMouse.click(lines[pagerY].indexOf(options.icons.nextPage), pagerY)
+    await r.flush()
+    expect(r.captureCharFrame()).toContain("2 of 3")
+
+    setScope("all")
+    await r.flush()
+    setState((current) => ({
+      ...current,
+      pagination: { ...current.pagination, scope: "all", scopeValue: null },
+    }))
+    await r.flush()
+
+    const frame = r.captureCharFrame()
+    lines = frame.split("\n")
+    pagerY = lines.findIndex((line) => line.includes("1 of 3"))
+    expect(pagerY).toBeGreaterThanOrEqual(0)
+    expect(frame).toContain("First PR")
+    expect(frame).not.toContain("Second PR")
+    await r.dispose()
+  })
+
+  test("updates theme-derived colors without recreating the dashboard", async () => {
+    const { api } = createMockTuiApi()
+    const [theme, setTheme] = createSignal(api.theme)
+    const options = dashboardOptions()
+    const r = await testRender(
+      () => (
+        <DashboardView
+          theme={theme()}
+          state={loadingState()}
+          setSelectedIdx={() => {}}
+          onOpen={() => {}}
+          scope="branch"
+          statusFilter="open"
+          onCycleScope={() => {}}
+          onCycleStatus={() => {}}
+          onLoadMore={async () => {}}
+          pageSize={options.pageSize}
+          colors={options.colors}
+          icons={options.icons}
+        />
+      ),
+      { width: 50, height: 20 },
+    )
+    await r.flush()
+    const headingBefore = r.captureSpans().lines.flatMap((line) => line.spans)
+      .find((span) => span.text.includes("Pull Requests"))
+
+    setTheme({
+      ...api.theme,
+      text: { ...api.theme.text, base: api.theme.text.muted },
+    })
+    await r.flush()
+    const headingAfter = r.captureSpans().lines.flatMap((line) => line.spans)
+      .find((span) => span.text.includes("Pull Requests"))
+
+    expect(headingBefore?.fg?.toInts()).toEqual([229, 229, 229, 255])
+    expect(headingAfter?.fg?.toInts()).toEqual([136, 136, 136, 255])
+    await r.dispose()
+  })
+
   test("merged PR uses the merged icon and displays change totals", async () => {
     const r = await renderState(okState({
       prs: [makeTUIPR({
@@ -288,6 +425,20 @@ describe("DashboardView render", () => {
 
     expect(titleLine).toContain("A very long pull…")
     expect(lines.filter((line) => line.includes("request title")).length).toBe(0)
+  })
+
+  test("updates title width on terminal resize", async () => {
+    const title = "A pull request title that fits when wide"
+    const r = await renderState(okState({
+      prs: [makeTUIPR({ title })],
+    }), {}, 24)
+    await r.flush()
+
+    expect(captureFrame(r)).toContain("A pull request title…")
+    r.resize(60, 20)
+    await r.flush()
+
+    expect(captureFrame(r)).toContain(title)
   })
 
   test("keeps the title ellipsis visible when a configured PR icon is wider than one cell", async () => {
