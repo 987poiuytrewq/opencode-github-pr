@@ -452,9 +452,22 @@ describe("DashboardView render", () => {
     await r.flush()
     const frame = captureFrame(r)
     const commentIcon = dashboardOptions().icons.openComment
-    expect(frame).toContain(`${commentIcon} 1`)
-    expect(frame).not.toContain(`${commentIcon}1`)
+    expect(frame).toContain(`${commentIcon}1`)
+    expect(frame).not.toContain(`${commentIcon} 1`)
     expect(frame).not.toContain("")
+  })
+
+  test("renders the comment icon and count in adjacent cells", async () => {
+    const r = await renderState(okState({
+      prs: [makeTUIPR({ reviewThreads: [{ isResolved: false }] })],
+    }))
+    await r.flush()
+    const frame = captureFrame(r)
+    const commentIcon = dashboardOptions().icons.openComment
+    const commentLine = frame.split("\n").find((line) => line.includes(commentIcon))
+
+    expect(commentLine).toContain(`${commentIcon}1`)
+    expect(commentLine).not.toContain(`${commentIcon} 1`)
   })
 
   test("allows longer titles and truncates at a word boundary", async () => {
@@ -599,7 +612,7 @@ describe("DashboardView render", () => {
     const frame = captureFrame(r)
     const icons = dashboardOptions().icons
     expect(frame).toContain(
-      `${icons.openComment} 1 ${icons.review}1${icons.review}1 ${icons.check}3${icons.check}1`,
+      `${icons.openComment}1 ${icons.review}1${icons.review}1 ${icons.check}3${icons.check}1`,
     )
     expect(frame).not.toContain("")
   })
@@ -634,7 +647,7 @@ describe("DashboardView render", () => {
     const frame = r.captureCharFrame()
     const icons = dashboardOptions().icons
     expect(frame).toContain(icons.review)
-    expect(frame).toContain(`${icons.openComment} 1`)
+    expect(frame).toContain(`${icons.openComment}1`)
     expect(frame).not.toContain("")
   })
 

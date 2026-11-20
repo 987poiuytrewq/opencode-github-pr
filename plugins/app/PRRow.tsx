@@ -64,7 +64,7 @@ function ClickableComment(props: {
   return (
     <box
       flexDirection="row"
-      gap={1}
+      gap={0}
       onMouseOver={(event) => {
         event.stopPropagation()
         setHovered(true)
