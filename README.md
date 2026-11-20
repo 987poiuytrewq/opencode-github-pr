@@ -121,7 +121,7 @@ and removed, and on the right, the unresolved comment count, review status and c
 
 | Element | Meaning | Click opens |
 | --- | --- | --- |
-| PR icon | Green: ready to merge. Red: merge conflict. Grey: draft, closed or unknown. Merged colour (your theme's interactive hue): merged. | Merge status panel |
+| PR icon | Green: ready to merge. Red: merge conflict. Grey: draft, closed or unknown. Your theme's info colour: merged ([use GitHub's purple](#colours) instead). | Merge status panel |
 | Title | The PR title, shortened to fit the sidebar. | PR overview |
 | `#128` | PR number. | PR overview |
 | `+42 -7` | Lines added and removed. | Files changed |
@@ -230,23 +230,24 @@ By default, colours come from your active OpenCode theme. Override any of them w
 | `warning` | Pending checks, requested reviews, warnings | Warning text |
 | `error` | Failing checks, requested changes, conflicts, deletions, errors | Error text |
 | `draft` | Draft PR icon | Muted text |
-| `merged` | Merged PR icon | Interactive hue (`hue.interactive.200`) |
+| `merged` | Merged PR icon | Info text |
 
-The panel has no background of its own; it uses the sidebar's. The `panel`, `border` and `borderActive` keys are
-still accepted but currently have no effect.
-
-Colour and icon overrides go inside the plugin entry's `options`, next to the other options:
+To show merged PRs in GitHub's purple instead of your theme's info colour, set `merged` to `"#a371f7"` (GitHub's dark
+theme) or `"#8250df"` (GitHub's light theme). Colour and icon overrides go inside the plugin entry's `options`, next to
+the other options:
 
 ```json
 {
   "options": {
     "colors": {
-      "merged": "#a371f7",
-      "panelAlt": "#1d1d1d"
+      "merged": "#a371f7"
     }
   }
 }
 ```
+
+The panel has no background of its own; it uses the sidebar's. The `panel`, `border` and `borderActive` keys are
+still accepted but currently have no effect.
 
 ### Icons
 
