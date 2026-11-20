@@ -11,6 +11,8 @@ permissions:
 jobs:
   test:
     runs-on: ubuntu-latest
+    env:
+      OPENCODE_VERSION: 2.3.2
     steps:
       - name: Check out repository
         uses: actions/checkout@v4
@@ -22,6 +24,12 @@ jobs:
 
       - name: Install E2E system tools
         run: make ci-tools
+
+      - name: Verify OpenCode version
+        run: |
+          version="$(opencode --version)"
+          echo "$version"
+          [[ "$version" == *"$OPENCODE_VERSION"* ]]
 
       - name: Run formatting and full test suite
         run: make ci
