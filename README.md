@@ -7,7 +7,7 @@
 A GitHub pull request dashboard for the [OpenCode](https://opencode.ai) V2 sidebar. See your PRs for the current
 repository, their CI, review and merge status, and jump straight to the right page on GitHub, without leaving OpenCode.
 
-<img src="demo/demo.gif" alt="The PR dashboard in the OpenCode sidebar, paging through PRs and changing filters" width="552" />
+<img src="https://raw.githubusercontent.com/987poiuytrewq/opencode-github-pr/main/demo/demo.gif" alt="The PR dashboard in the OpenCode sidebar, paging through PRs and changing filters" width="552" />
 
 ## Features
 
