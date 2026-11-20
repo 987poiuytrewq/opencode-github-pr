@@ -1,5 +1,10 @@
 import { describe, expect, test } from "bun:test"
-import { dashboardOptions, DEFAULT_ICONS, UNICODE_ICONS } from "../../plugins/app/config"
+import {
+  dashboardOptions,
+  DEFAULT_ICONS,
+  DEFAULT_SPACING,
+  UNICODE_ICONS,
+} from "../../plugins/app/config"
 import { DEFAULT_SKIN } from "../../plugins/app/theme"
 
 describe("dashboard options", () => {
@@ -22,6 +27,8 @@ describe("dashboard options", () => {
       defaultScope: "author",
       defaultStatusFilter: "open",
       iconStyle: "nerd",
+      showSingleStatusCount: false,
+      spacing: DEFAULT_SPACING,
       colors: {},
       icons: { ...DEFAULT_ICONS },
     })
@@ -50,9 +57,30 @@ describe("dashboard options", () => {
       defaultScope: "assignee",
       defaultStatusFilter: "closed",
       iconStyle: "nerd",
+      showSingleStatusCount: false,
+      spacing: DEFAULT_SPACING,
       colors: { accent: "#123456", merged: "magenta" },
       icons: { ...DEFAULT_ICONS, openPR: "P", nextPage: ">" },
     })
+  })
+
+  test("validates indicator spacing and single-status count options", () => {
+    expect(dashboardOptions({
+      spacing: { iconToCount: 2.8, sameTypeGroups: 3, differentTypeGroups: 9 },
+      showSingleStatusCount: true,
+    })).toMatchObject({
+      spacing: { iconToCount: 2, sameTypeGroups: 3, differentTypeGroups: 4 },
+      showSingleStatusCount: true,
+    })
+
+    expect(dashboardOptions({
+      spacing: { iconToCount: -1, sameTypeGroups: "2", differentTypeGroups: Number.NaN },
+      showSingleStatusCount: "true",
+    })).toMatchObject({
+      spacing: DEFAULT_SPACING,
+      showSingleStatusCount: false,
+    })
+    expect(dashboardOptions({ spacing: [] })).toMatchObject({ spacing: DEFAULT_SPACING })
   })
 
   test("keeps each fetch batch at least four TUI pages", () => {

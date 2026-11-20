@@ -43,6 +43,20 @@ export type IconStyle = "nerd" | "unicode"
 
 export type DashboardIcons = Record<keyof typeof DEFAULT_ICONS, string>
 
+export type DashboardSpacing = {
+  iconToCount: number
+  sameTypeGroups: number
+  differentTypeGroups: number
+}
+
+export const DEFAULT_SPACING: DashboardSpacing = {
+  iconToCount: 0,
+  sameTypeGroups: 0,
+  differentTypeGroups: 1,
+}
+
+const MAX_SPACING_GAP = 4
+
 export type DashboardOptions = {
   enabled: boolean
   pageSize: number
@@ -53,6 +67,8 @@ export type DashboardOptions = {
   defaultScope: PRScope
   defaultStatusFilter: PRStatusFilter
   iconStyle: IconStyle
+  showSingleStatusCount: boolean
+  spacing: DashboardSpacing
   colors: Partial<Skin>
   icons: DashboardIcons
 }
@@ -67,6 +83,8 @@ type DashboardOptionsInput = {
   defaultScope?: unknown
   defaultStatusFilter?: unknown
   iconStyle?: unknown
+  showSingleStatusCount?: unknown
+  spacing?: unknown
   colors?: unknown
   icons?: unknown
 }
@@ -87,6 +105,20 @@ function nonNegativeInteger(value: unknown, fallback: number, max: number): numb
   return typeof value === "number" && Number.isFinite(value) && value >= 0
     ? Math.min(max, Math.floor(value))
     : fallback
+}
+
+function spacingOverrides(input: unknown): DashboardSpacing {
+  if (!input || typeof input !== "object" || Array.isArray(input)) return { ...DEFAULT_SPACING }
+  const values = input as Record<string, unknown>
+  return {
+    iconToCount: nonNegativeInteger(values.iconToCount, DEFAULT_SPACING.iconToCount, MAX_SPACING_GAP),
+    sameTypeGroups: nonNegativeInteger(values.sameTypeGroups, DEFAULT_SPACING.sameTypeGroups, MAX_SPACING_GAP),
+    differentTypeGroups: nonNegativeInteger(
+      values.differentTypeGroups,
+      DEFAULT_SPACING.differentTypeGroups,
+      MAX_SPACING_GAP,
+    ),
+  }
 }
 
 function stringOverrides<T extends Record<string, string>>(
@@ -125,6 +157,8 @@ export function dashboardOptions(input: DashboardOptionsInput = {}): DashboardOp
       ? (input.defaultStatusFilter as PRStatusFilter)
       : "open",
     iconStyle,
+    showSingleStatusCount: input.showSingleStatusCount === true,
+    spacing: spacingOverrides(input.spacing),
     colors: stringOverrides(DEFAULT_SKIN, input.colors),
     icons: mergeStrings(defaultIcons, input.icons, true),
   }

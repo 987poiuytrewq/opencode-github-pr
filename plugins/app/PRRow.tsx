@@ -9,6 +9,7 @@ import {
   reviewStatusGroups,
   type StatusCategory,
 } from "../domain/pr-status"
+import type { DashboardSpacing } from "./config"
 
 function statusColor(status: StatusCategory, props: {
   pass: string
@@ -54,17 +55,19 @@ function ClickableText(props: {
   )
 }
 
-function ClickableComment(props: {
+function ClickableIndicator(props: {
   icon: string
-  count: number | string
+  count?: number | string
+  gap: number
   color: string
+  target: PRLinkTarget
   onClick: (target: PRLinkTarget) => void
 }) {
   const [hovered, setHovered] = createSignal(false)
   return (
     <box
       flexDirection="row"
-      gap={0}
+      gap={props.count === undefined ? 0 : props.gap}
       onMouseOver={(event) => {
         event.stopPropagation()
         setHovered(true)
@@ -75,15 +78,17 @@ function ClickableComment(props: {
       }}
       onMouseUp={(event) => {
         event.stopPropagation()
-        props.onClick("files")
+        props.onClick(props.target)
       }}
     >
       <text fg={props.color} selectable={false}>
         {hovered() ? <u>{props.icon}</u> : props.icon}
       </text>
-      <text fg={props.color} selectable={false}>
-        {hovered() ? <u>{props.count}</u> : props.count}
-      </text>
+      <Show when={props.count !== undefined}>
+        <text fg={props.color} selectable={false}>
+          {hovered() ? <u>{props.count}</u> : props.count}
+        </text>
+      </Show>
     </box>
   )
 }
@@ -109,6 +114,8 @@ export function PRRow(props: {
     openComment: string
     check: string
   }
+  spacing: DashboardSpacing
+  showSingleStatusCount: boolean
 }) {
   const [titleHovered, setTitleHovered] = createSignal(false)
   const title = () => truncateTitle(props.pr.title, props.titleWidth)
@@ -178,41 +185,55 @@ export function PRRow(props: {
           onClick={props.onClick}
         />
         <box flexGrow={1}></box>
-        <Show when={commentStatuses().length > 0}>
-          <For each={commentStatuses()}>
-            {(comment) => (
-              <ClickableComment
-                icon={comment.icon}
-                count={comment.count}
-                color={props.muted}
-                onClick={props.onClick}
-              />
-            )}
-          </For>
-        </Show>
-        <box flexDirection="row" gap={0}>
-          <For each={reviews()}>
-            {(group) => (
-              <ClickableText
-                label={`${props.icons.review}${reviews().length > 1 ? group.count : ""}`}
-                color={statusColor(group.status, props)}
-                target="overview"
-                onClick={props.onClick}
-              />
-            )}
-          </For>
-        </box>
-        <box flexDirection="row" gap={0}>
-          <For each={checks()}>
-            {(group) => (
-              <ClickableText
-                label={`${props.icons.check}${checks().length > 1 ? group.count : ""}`}
-                color={statusColor(group.status, props)}
-                target="checks"
-                onClick={props.onClick}
-              />
-            )}
-          </For>
+        <box flexDirection="row" gap={props.spacing.differentTypeGroups}>
+          <Show when={commentStatuses().length > 0}>
+            <For each={commentStatuses()}>
+              {(comment) => (
+                <ClickableIndicator
+                  icon={comment.icon}
+                  count={comment.count}
+                  gap={props.spacing.iconToCount}
+                  color={props.muted}
+                  target="files"
+                  onClick={props.onClick}
+                />
+              )}
+            </For>
+          </Show>
+          <Show when={reviews().length > 0}>
+            <box flexDirection="row" gap={props.spacing.sameTypeGroups}>
+              <For each={reviews()}>
+                {(group) => (
+                  <ClickableIndicator
+                    icon={props.icons.review}
+                    count={reviews().length > 1 || (props.showSingleStatusCount && group.count > 0)
+                      ? group.count
+                      : undefined}
+                    gap={props.spacing.iconToCount}
+                    color={statusColor(group.status, props)}
+                    target="overview"
+                    onClick={props.onClick}
+                  />
+                )}
+              </For>
+            </box>
+          </Show>
+          <box flexDirection="row" gap={props.spacing.sameTypeGroups}>
+            <For each={checks()}>
+              {(group) => (
+                <ClickableIndicator
+                  icon={props.icons.check}
+                  count={checks().length > 1 || (props.showSingleStatusCount && group.count > 0)
+                    ? group.count
+                    : undefined}
+                  gap={props.spacing.iconToCount}
+                  color={statusColor(group.status, props)}
+                  target="checks"
+                  onClick={props.onClick}
+                />
+              )}
+            </For>
+          </box>
         </box>
       </box>
     </box>

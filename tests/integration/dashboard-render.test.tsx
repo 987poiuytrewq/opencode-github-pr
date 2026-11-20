@@ -59,6 +59,8 @@ async function renderState(state: DashboardState, handlers: Partial<{
         pageSize={options.pageSize}
         colors={options.colors}
         icons={options.icons}
+        spacing={options.spacing}
+        showSingleStatusCount={options.showSingleStatusCount}
       />
     ),
     { width, height: 20 },
@@ -252,6 +254,8 @@ describe("DashboardView render", () => {
           pageSize={options.pageSize}
           colors={options.colors}
           icons={options.icons}
+          spacing={options.spacing}
+          showSingleStatusCount={options.showSingleStatusCount}
         />
       ),
       { width: 50, height: 20 },
@@ -292,6 +296,8 @@ describe("DashboardView render", () => {
           pageSize={options.pageSize}
           colors={options.colors}
           icons={options.icons}
+          spacing={options.spacing}
+          showSingleStatusCount={options.showSingleStatusCount}
         />
       ),
       { width: 50, height: 20 },
@@ -339,6 +345,8 @@ describe("DashboardView render", () => {
           pageSize={options.pageSize}
           colors={options.colors}
           icons={options.icons}
+          spacing={options.spacing}
+          showSingleStatusCount={options.showSingleStatusCount}
         />
       ),
       { width: 50, height: 20 },
@@ -378,6 +386,8 @@ describe("DashboardView render", () => {
           pageSize={options.pageSize}
           colors={options.colors}
           icons={options.icons}
+          spacing={options.spacing}
+          showSingleStatusCount={options.showSingleStatusCount}
         />
       ),
       { width: 50, height: 20 },
@@ -615,6 +625,61 @@ describe("DashboardView render", () => {
       `${icons.openComment}1 ${icons.review}1${icons.review}1 ${icons.check}3${icons.check}1`,
     )
     expect(frame).not.toContain("")
+  })
+
+  test("configures indicator spacing and shows requested single-status counts", async () => {
+    const icons = { openComment: "C", review: "R", check: "K" }
+    const r = await renderState(okState({
+      prs: [makeTUIPR({
+        reviewThreads: [{ isResolved: false }],
+        latestReviews: [
+          { author: { login: "alice" }, state: "APPROVED" },
+          { author: { login: "bob" }, state: "CHANGES_REQUESTED" },
+        ],
+        checkStatuses: ["SUCCESS", "SUCCESS", "SUCCESS", "FAILURE"],
+      })],
+    }), {
+      options: {
+        icons,
+        spacing: { iconToCount: 2, sameTypeGroups: 1, differentTypeGroups: 3 },
+      },
+    })
+    await r.flush()
+    const frame = captureFrame(r)
+
+    expect(frame).toContain("C  1   R  1 R  1   K  3 K  1")
+
+    const singleStatus = await renderState(okState({
+      prs: [makeTUIPR({
+        latestReviews: [{ author: { login: "alice" }, state: "APPROVED" }],
+        checkStatuses: ["SUCCESS"],
+      })],
+    }), {
+      options: {
+        icons,
+        showSingleStatusCount: true,
+        spacing: { iconToCount: 1 },
+      },
+    })
+    await singleStatus.flush()
+    const singleStatusFrame = captureFrame(singleStatus)
+
+    expect(singleStatusFrame).toContain("R 1")
+    expect(singleStatusFrame).toContain("K 1")
+
+    const noCheckStatus = await renderState(okState({
+      prs: [makeTUIPR({})],
+    }), {
+      options: {
+        icons,
+        showSingleStatusCount: true,
+      },
+    })
+    await noCheckStatus.flush()
+    const noCheckStatusFrame = captureFrame(noCheckStatus)
+
+    expect(noCheckStatusFrame).toContain("K")
+    expect(noCheckStatusFrame).not.toContain("K 0")
   })
 
   test("spaces the heading, PR titles, and status rows as requested", async () => {
