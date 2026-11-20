@@ -84,7 +84,6 @@ export interface DashboardContext {
   state: () => DashboardState
   refresh: () => Promise<void>
   loadMore: () => Promise<void>
-  refreshOne: (n: number) => Promise<void>
   selectedIdx: () => number
   setSelectedIdx: (n: number) => void
 }

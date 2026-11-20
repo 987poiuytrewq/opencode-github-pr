@@ -145,6 +145,96 @@ describe("useDashboard rate limit handling", () => {
     }
   })
 
+  test("filter changes during cooldown keep the cached list and rate-limit state visible", async () => {
+    const cwd = makeFakeRepo()
+    const originalCwd = process.cwd()
+    process.chdir(cwd)
+    try {
+      let listing: "open" | "closed" = "open"
+      let pullRequestCalls = 0
+      mockOctokitDefault((op, params) => {
+        if (op !== "graphql") return null
+        const query: string = params?.query ?? ""
+        if (query.includes("query Viewer")) return { viewer: { login: "octocat" } }
+        if (query.includes("pullRequests(")) {
+          pullRequestCalls++
+          if (pullRequestCalls === 1) return makeSearchResponse(3)
+          const err: any = new Error("API rate limit already exceeded")
+          err.status = 200
+          err.response = {
+            headers: { "x-ratelimit-reset": String(Math.floor(Date.now() / 1000) + 60) },
+          }
+          throw err
+        }
+        return makeThreadCountResponse()
+      })
+
+      const { api } = createMockTuiApi()
+      const { state, refresh } = createDashboard(api, () => listing)
+      for (let i = 0; i < 50 && state().status !== DashboardStatus.Ok; i++) {
+        await new Promise((resolve) => setTimeout(resolve, 10))
+      }
+      expect(state().prs).toHaveLength(3)
+
+      await refresh()
+      expect(state().errorKind).toBe("rate-limit")
+      expect(pullRequestCalls).toBe(2)
+
+      listing = "closed"
+      await refresh()
+
+      expect(pullRequestCalls).toBe(2)
+      expect(state().status).toBe(DashboardStatus.Error)
+      expect(state().pagination.listing).toBe("closed")
+      expect(state().pagination.loading).toBe(false)
+      expect(state().errorKind).toBe("rate-limit")
+      expect(state().prs).toHaveLength(3)
+    } finally {
+      process.chdir(originalCwd)
+    }
+  })
+
+  test("secondary Retry-After suppresses refresh requests until its cooldown expires", async () => {
+    const cwd = makeFakeRepo()
+    const originalCwd = process.cwd()
+    const originalNow = Date.now
+    let pullRequestCalls = 0
+    process.chdir(cwd)
+    try {
+      mockOctokitDefault((op, params) => {
+        if (op !== "graphql") return null
+        const query: string = params?.query ?? ""
+        if (query.includes("query Viewer")) return { viewer: { login: "octocat" } }
+        if (query.includes("pullRequests(")) {
+          pullRequestCalls++
+          const err: any = new Error("You have exceeded a secondary rate limit")
+          err.status = 429
+          err.response = { headers: { "retry-after": "30" } }
+          throw err
+        }
+        return makeThreadCountResponse()
+      })
+
+      const { api } = createMockTuiApi()
+      const { state, refresh } = createDashboard(api)
+      for (let i = 0; i < 50 && state().status !== DashboardStatus.Error; i++) {
+        await new Promise((resolve) => setTimeout(resolve, 10))
+      }
+      expect(state().errorKind).toBe("rate-limit")
+      expect(pullRequestCalls).toBe(1)
+
+      await refresh()
+      expect(pullRequestCalls).toBe(1)
+
+      Date.now = () => originalNow() + 33_000
+      await refresh()
+      expect(pullRequestCalls).toBe(2)
+    } finally {
+      Date.now = originalNow
+      process.chdir(originalCwd)
+    }
+  })
+
   test("non-rate-limit errors still clear the PR list", async () => {
     const cwd = makeFakeRepo()
     const origCwd = process.cwd()
@@ -181,6 +271,58 @@ describe("useDashboard rate limit handling", () => {
       expect(state().prs.length).toBe(0)
     } finally {
       process.chdir(origCwd)
+    }
+  })
+})
+
+describe("manual PR refresh rate-limit toast", () => {
+  test("reports the reset time when /pr-refresh is suppressed", async () => {
+    const cwd = makeFakeRepo()
+    const originalCwd = process.cwd()
+    let cleanup: (() => void) | undefined
+    process.chdir(cwd)
+    try {
+      mockOctokitDefault((op, params) => {
+        if (op !== "graphql") return null
+        const query: string = params?.query ?? ""
+        if (query.includes("query Viewer")) return { viewer: { login: "octocat" } }
+        if (query.includes("pullRequests(")) {
+          const resetEpoch = Math.floor(Date.now() / 1000) + 60
+          const err: any = new Error("API rate limit already exceeded")
+          err.status = 200
+          err.response = { headers: { "x-ratelimit-reset": String(resetEpoch) } }
+          throw err
+        }
+        return makeThreadCountResponse()
+      })
+
+      const { default: plugin } = await import("../../plugins/pr-dashboard.tui")
+      const { api, registry } = createMockTuiApi()
+      const dispose = await plugin.setup(api)
+      if (typeof dispose === "function") cleanup = dispose
+      const appSlot = registry.slots.find((slot) => slot.append === "app")
+      appSlot.render({})
+      const refreshCommand = registry.keymaps[0].commands.find(
+        (command: any) => command.id === "opencode-github-pr.refresh",
+      )
+
+      await new Promise((resolve) => setTimeout(resolve, 50))
+      await refreshCommand.run()
+      for (let i = 0; i < 50 && registry.toasts.length < 1; i++) {
+        await new Promise((resolve) => setTimeout(resolve, 10))
+      }
+
+      expect(registry.toasts.at(-1)?.message).toContain("PR refresh paused")
+      expect(registry.toasts.at(-1)?.message).toContain("resets at")
+      await refreshCommand.run()
+      for (let i = 0; i < 50 && registry.toasts.length < 2; i++) {
+        await new Promise((resolve) => setTimeout(resolve, 10))
+      }
+      expect(registry.toasts.at(-1)?.message).toContain("PR refresh paused")
+      expect(registry.toasts.at(-1)?.message).toContain("resets at")
+    } finally {
+      cleanup?.()
+      process.chdir(originalCwd)
     }
   })
 })

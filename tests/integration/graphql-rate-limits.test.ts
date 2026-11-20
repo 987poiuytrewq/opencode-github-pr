@@ -178,6 +178,33 @@ describe("rate-limit handling", () => {
     if (info.isRateLimit) expect(info.resetAt).toBeLessThan(now + 31_000)
   })
 
+  test("uses the server Date header to correct primary reset times for local clock skew", () => {
+    const originalNow = Date.now
+    const localNow = Date.UTC(2026, 10, 20, 12, 0, 0)
+    const serverNow = localNow + 5 * 60_000
+    Date.now = () => localNow
+    try {
+      const error = Object.assign(new Error("API rate limit exceeded"), {
+        status: 403,
+        response: {
+          headers: {
+            date: new Date(serverNow).toUTCString(),
+            "x-ratelimit-reset": String(Math.floor((serverNow + 90_000) / 1000)),
+          },
+        },
+      })
+
+      const info = parseRateLimitError(error)
+      expect(info.isRateLimit).toBe(true)
+      if (info.isRateLimit) {
+        expect(info.resetAt).toBeGreaterThanOrEqual(localNow + 89_000)
+        expect(info.resetAt).toBeLessThanOrEqual(localNow + 91_000)
+      }
+    } finally {
+      Date.now = originalNow
+    }
+  })
+
   test("classifies GraphQL RATE_LIMITED errors as primary rate limits", () => {
     const error = Object.assign(new Error("GraphQL request failed"), {
       status: 200,
@@ -234,7 +261,7 @@ describe("rate-limit handling", () => {
       await refresh()
       expect(calls).toBe(1)
 
-      Date.now = () => originalNow() + 3_601_000
+      Date.now = () => originalNow() + 3_604_000
       await refresh()
       expect(calls).toBe(2)
       expect(state().status).toBe(DashboardStatus.Ok)
