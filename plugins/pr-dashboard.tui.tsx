@@ -58,12 +58,20 @@ async function setup(api: TuiPluginContext) {
     setScope(nextScope)
     setSelectedIdx(0)
     if (demoMode) {
+      const currentState = state()
       setState((s) => ({
         ...s,
         pagination: {
           ...s.pagination,
           scope: nextScope,
           scopeValue: nextScope === "branch" ? s.currentBranch : null,
+          totalCount: filterPRs(
+            currentState.prs,
+            nextScope,
+            statusFilter(),
+            currentState.currentBranch,
+            currentState.viewerLogin,
+          ).length,
         },
       }))
     } else {
@@ -76,7 +84,21 @@ async function setup(api: TuiPluginContext) {
     setSelectedIdx(0)
     // Each status is queried separately so GitHub applies the status filter.
     if (demoMode) {
-      setState((s) => ({ ...s, pagination: { ...s.pagination, listing: nextStatus } }))
+      const currentState = state()
+      setState((s) => ({
+        ...s,
+        pagination: {
+          ...s.pagination,
+          listing: nextStatus,
+          totalCount: filterPRs(
+            currentState.prs,
+            scope(),
+            nextStatus,
+            currentState.currentBranch,
+            currentState.viewerLogin,
+          ).length,
+        },
+      }))
     } else {
       void dash.refresh()
     }

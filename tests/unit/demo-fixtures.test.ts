@@ -16,6 +16,7 @@ describe("dashboard demo data", () => {
 
     expect(state.status).toBe(DashboardStatus.Ok);
     expect(authoredOpen.length).toBeGreaterThan(5);
+    expect(state.pagination.totalCount).toBe(authoredOpen.length);
     expect(
       authoredOpen.some((pr) => pr.headRefName === state.currentBranch),
     ).toBe(true);

@@ -3,6 +3,7 @@ import {
   type DashboardState,
   type PR,
 } from "../plugins/domain/types";
+import { filterPRs } from "../plugins/domain/pr-filters";
 
 function demoPR(overrides: Partial<PR> & Pick<PR, "number" | "title">): PR {
   const { number, title, ...values } = overrides;
@@ -158,7 +159,7 @@ export function demoDashboardState(): DashboardState {
       scopeValue: null,
       cursor: null,
       hasMore: false,
-      totalCount: demoPRs.length,
+      totalCount: filterPRs(demoPRs, "author", "open", "feature/passkeys", "octocat").length,
       pagesLoaded: 1,
       loading: false,
       limitReached: false,
