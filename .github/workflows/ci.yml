@@ -10,7 +10,15 @@ permissions:
 
 jobs:
   test:
+    name: Test with OpenCode ${{ matrix.version }}
     runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        # Latest published stable patch from each V2 minor line.
+        version: ["2.0.32", "2.1.4", "2.2.7", "2.3.2"]
+    env:
+      OPENCODE_VERSION: ${{ matrix.version }}
     steps:
       - name: Check out repository
         uses: actions/checkout@v4
@@ -22,6 +30,12 @@ jobs:
 
       - name: Install E2E system tools
         run: make ci-tools
+
+      - name: Verify OpenCode version
+        run: |
+          version="$(opencode --version)"
+          echo "$version"
+          [[ "$version" == *"$OPENCODE_VERSION"* ]]
 
       - name: Run formatting and full test suite
         run: make ci

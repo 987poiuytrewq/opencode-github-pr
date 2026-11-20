@@ -391,14 +391,16 @@ OpenCode config isn't changed. It uses `GH_TOKEN`, `GITHUB_TOKEN` or `GITHUB_PER
 | `make test-integration` | Integration tests. |
 | `make test-e2e` | End-to-end tests against a real OpenCode TUI in tmux. |
 
-The end-to-end tests need `tmux` and the OpenCode CLI (version `2.0.20` by default). Point them at a different binary
-with:
+The end-to-end tests need `tmux` and the OpenCode CLI. `make ci-tools` installs version `2.0.20` by default; override it
+with `OPENCODE_VERSION` to install another version. To run against an already installed binary, use:
 
 ```bash
 make test-e2e OPENCODE_BIN=/path/to/opencode
 ```
 
-CI installs these with `make ci-tools` and runs `make ci` on every pull request.
+CI runs the full test suite against the latest stable patch from each current OpenCode V2 minor line: `2.0.32`,
+`2.1.4`, `2.2.7` and `2.3.2`. OpenCode V1 and older patch releases are not covered by this matrix. Update the matrix
+in `.github/workflows/ci.yml` as new V2 minor lines are released.
 
 ### Recording the demo
 
