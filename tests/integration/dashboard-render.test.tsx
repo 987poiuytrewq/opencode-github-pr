@@ -133,19 +133,17 @@ describe("DashboardView render", () => {
     expect(description?.fg).toEqual(muted?.fg)
   })
 
-  test("no-matching-PR description wraps under its text", async () => {
+  test("no-matching-PR message is muted and single-line", async () => {
     const r = await renderState(okState({ prs: [] }), {}, 32)
     await r.flush()
-    const lines = captureFrame(r).split("\n")
-    const titleLine = lines.find((line) => line.includes("No matching PRs"))
-    const descriptionStart = lines.findIndex((line) => line.includes("Try a different scope"))
-    const descriptionLines = lines.slice(descriptionStart).filter((line) => line.trim().length > 0).slice(0, 2)
+    const frame = captureFrame(r)
+    const titleLines = frame.split("\n").filter((line) => line.includes("No matching PRs"))
+    const spans = r.captureSpans().lines.flatMap((line) => line.spans)
+    const title = spans.find((span) => span.text.includes("No matching PRs"))
 
-    expect(titleLine).toBeDefined()
-    expect(descriptionStart).toBeGreaterThanOrEqual(0)
-    expect(descriptionLines).toHaveLength(2)
-    const titleTextStart = titleLine!.indexOf("No matching PRs")
-    expect(descriptionLines.every((line) => line.search(/\S/) === titleTextStart)).toBe(true)
+    expect(titleLines).toHaveLength(1)
+    expect(frame).not.toContain("Try a different scope or status.")
+    expect(title?.fg?.toInts()).toEqual([136, 136, 136, 255])
   })
 
   test("ok state with empty PRs", async () => {
