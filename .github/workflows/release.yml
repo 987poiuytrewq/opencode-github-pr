@@ -73,5 +73,13 @@ jobs:
       - name: Ensure npm supports trusted publishing
         run: npm install --global npm@latest
 
+      - name: Set up Bun
+        uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: 1.4.4
+
+      - name: Install package build dependencies
+        run: bun install --frozen-lockfile
+
       - name: Publish package with provenance
         run: npm publish --access public --provenance

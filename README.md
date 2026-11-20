@@ -71,6 +71,9 @@ global CLI config at `~/.config/opencode/cli.json` (or `$XDG_CONFIG_HOME/opencod
    bun install
    ```
 
+   The install also builds the package's TUI entrypoint. The npm artifact ships this precompiled JavaScript so
+   OpenCode's isolated plugin cache can resolve the OpenTUI JSX runtime through the host's shared runtime modules.
+
 2. Add the clone's absolute path to the `plugins` array in your OpenCode config. Use the global config at
    `~/.config/opencode/opencode.json` to get the dashboard in every project, or a project's `opencode.json` for just
    that project:

@@ -1,4 +1,4 @@
-.PHONY: opencode install format-check typecheck test test-unit test-integration test-e2e test-watch demo ci ci-tools ci-debug
+.PHONY: opencode install build-tui format-check typecheck test test-unit test-integration test-e2e test-e2e-packed test-watch demo ci ci-tools ci-debug
 
 BUN ?= bun
 OPENCODE_BIN ?= opencode
@@ -7,8 +7,11 @@ OPENCODE_VERSION ?= 2.0.20
 install:
 	$(BUN) install --frozen-lockfile
 
+build-tui:
+	$(BUN) run build:tui
+
 format-check:
-	$(BUN) fmt --check package.json .github/workflows/ci.yml .github/workflows/release.yml tests/integration/github-loader.test.ts
+	$(BUN) fmt --check package.json .github/workflows/ci.yml .github/workflows/release.yml tests/integration/github-loader.test.ts tests/e2e/packed-install.test.ts
 	$(BUN) -e 'const readme = await Bun.file("README.md").text(); const match = readme.match(/```json\s*\n([\s\S]*?)\n\s*```/); if (!match) throw new Error("README strict JSON example not found"); JSON.parse(match[1])'
 
 typecheck:
@@ -24,6 +27,12 @@ test-e2e:
 	@command -v tmux >/dev/null || { echo "tmux is required for E2E tests" >&2; exit 1; }
 	@command -v "$(OPENCODE_BIN)" >/dev/null || { echo "OpenCode binary not found: $(OPENCODE_BIN)" >&2; exit 1; }
 	E2E=1 OPENCODE_BIN="$(OPENCODE_BIN)" $(BUN) test tests/e2e
+
+test-e2e-packed:
+	@command -v tmux >/dev/null || { echo "tmux is required for E2E tests" >&2; exit 1; }
+	@command -v "$(OPENCODE_BIN)" >/dev/null || { echo "OpenCode binary not found: $(OPENCODE_BIN)" >&2; exit 1; }
+	@command -v npm >/dev/null || { echo "npm is required to pack and install the artifact" >&2; exit 1; }
+	E2E=1 PACKED_E2E=1 OPENCODE_BIN="$(OPENCODE_BIN)" $(BUN) test tests/e2e/packed-install.test.ts
 
 test-watch:
 	$(BUN) test --watch
