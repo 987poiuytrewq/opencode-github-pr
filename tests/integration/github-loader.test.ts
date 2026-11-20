@@ -32,6 +32,7 @@ describe("repositoryPRs", () => {
         viewer: { login: "octocat" },
         repository: {
           pullRequests: {
+            totalCount: 2,
             pageInfo: secondPage
               ? { hasNextPage: false, endCursor: "cursor-2" }
               : { hasNextPage: true, endCursor: "cursor-1" },
@@ -72,6 +73,7 @@ describe("repositoryPRs", () => {
       },
     ]);
     expect(result.viewerLogin).toBe("octocat");
+    expect(result.totalCount).toBe(2);
     expect(result.hasMore).toBe(false);
     expect(result.fetchedPages).toBe(2);
     expect(
@@ -109,6 +111,7 @@ describe("repositoryPRs", () => {
         viewer: { login: "octocat" },
         repository: {
           pullRequests: {
+            totalCount: 11,
             pageInfo: { hasNextPage: true, endCursor: `cursor-${calls}` },
             nodes: [{ number: calls, title: `PR ${calls}`, state: "OPEN" }],
           },
@@ -121,6 +124,7 @@ describe("repositoryPRs", () => {
     expect(DEFAULT_PR_BATCH_SIZE).toBe(4);
     expect(calls).toBe(4);
     expect(result.hasMore).toBe(true);
+    expect(result.totalCount).toBe(11);
     expect(result.endCursor).toBe("cursor-4");
   });
 
@@ -231,6 +235,7 @@ describe("repositoryPRs", () => {
       return {
         viewer: { login: "octocat" },
         search: {
+          issueCount: 7,
           pageInfo: { hasNextPage: false, endCursor: "search-cursor-1" },
           nodes: [
             {
@@ -253,12 +258,14 @@ describe("repositoryPRs", () => {
       "author",
     );
 
-    expect(captured.query).toContain("search(query: $query");
-    expect(captured.params.query).toContain(
+    expect(captured.query).toContain("search(query: $searchQuery");
+    expect(captured.query).toContain("issueCount");
+    expect(captured.params.searchQuery).toContain(
       "repo:foo/bar is:pr author:@me is:closed",
     );
     expect(result.prs.map(({ number }) => number)).toEqual([7]);
     expect(result.viewerLogin).toBe("octocat");
+    expect(result.totalCount).toBe(7);
   });
 
   test("uses the pull-request connection head filter for the branch scope", async () => {
@@ -398,6 +405,7 @@ describe("repositoryPRs", () => {
       "cursor-1",
       "cursor-2",
     ]);
+    expect(lastQuery).toContain("totalCount");
     expect(lastQuery).toContain("pullRequests(first: $first");
     expect(result.prs.map(({ number }) => number)).toEqual([1, 2, 3]);
     expect(result.fetchedPages).toBe(3);

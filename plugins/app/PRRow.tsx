@@ -183,26 +183,30 @@ export function PRRow(props: {
             )}
           </For>
         </Show>
-        <For each={reviews}>
-          {(group) => (
-            <ClickableText
-              label={`${props.icons.review}${reviews.length > 1 ? group.count : ""}`}
-              color={statusColor(group.status, props)}
-              target="overview"
-              onClick={props.onClick}
-            />
-          )}
-        </For>
-        <For each={checks}>
-          {(group) => (
-            <ClickableText
-              label={`${props.icons.check}${checks.length > 1 ? group.count : ""}`}
-              color={statusColor(group.status, props)}
-              target="checks"
-              onClick={props.onClick}
-            />
-          )}
-        </For>
+        <box flexDirection="row" gap={0}>
+          <For each={reviews}>
+            {(group) => (
+              <ClickableText
+                label={`${props.icons.review}${reviews.length > 1 ? group.count : ""}`}
+                color={statusColor(group.status, props)}
+                target="overview"
+                onClick={props.onClick}
+              />
+            )}
+          </For>
+        </box>
+        <box flexDirection="row" gap={0}>
+          <For each={checks}>
+            {(group) => (
+              <ClickableText
+                label={`${props.icons.check}${checks.length > 1 ? group.count : ""}`}
+                color={statusColor(group.status, props)}
+                target="checks"
+                onClick={props.onClick}
+              />
+            )}
+          </For>
+        </box>
       </box>
     </box>
   )

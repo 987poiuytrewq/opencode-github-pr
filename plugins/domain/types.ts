@@ -64,6 +64,7 @@ export type DashboardState = {
     scopeValue: string | null
     cursor: string | null
     hasMore: boolean
+    totalCount: number | null
     pagesLoaded: number
     loading: boolean
     limitReached: boolean

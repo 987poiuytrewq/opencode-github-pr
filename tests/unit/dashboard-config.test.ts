@@ -9,7 +9,7 @@ describe("dashboard options", () => {
     expect(dashboardOptions({ iconStyle: "nerd" }).iconStyle).toBe("nerd")
   })
 
-  test("preserves the existing dashboard defaults", () => {
+  test("defaults to Nerd Font icons", () => {
     expect(dashboardOptions()).toEqual({
       enabled: true,
       pageSize: 5,
@@ -18,9 +18,9 @@ describe("dashboard options", () => {
       requestTimeoutMs: 15_000,
       defaultScope: "author",
       defaultStatusFilter: "open",
-      iconStyle: "unicode",
+      iconStyle: "nerd",
       colors: {},
-      icons: { ...UNICODE_ICONS },
+      icons: { ...DEFAULT_ICONS },
     })
   })
 
@@ -44,9 +44,9 @@ describe("dashboard options", () => {
       requestTimeoutMs: 10_000,
       defaultScope: "assignee",
       defaultStatusFilter: "closed",
-      iconStyle: "unicode",
+      iconStyle: "nerd",
       colors: { accent: "#123456", merged: "magenta" },
-      icons: { ...UNICODE_ICONS, openPR: "P", nextPage: ">" },
+      icons: { ...DEFAULT_ICONS, openPR: "P", nextPage: ">" },
     })
   })
 
@@ -54,7 +54,7 @@ describe("dashboard options", () => {
     expect(dashboardOptions({ pagesPerBatch: 1 }).pagesPerBatch).toBe(4)
   })
 
-  test("uses Unicode icons when selected and lets explicit icon overrides take precedence", () => {
+  test("uses Nerd or Unicode icons as selected and lets explicit icon overrides take precedence", () => {
     expect(dashboardOptions({ iconStyle: "nerd" })).toMatchObject({
       iconStyle: "nerd",
       icons: DEFAULT_ICONS,
@@ -96,9 +96,9 @@ describe("dashboard options", () => {
       requestTimeoutMs: 15_000,
       defaultScope: "author",
       defaultStatusFilter: "open",
-      iconStyle: "unicode",
+      iconStyle: "nerd",
       colors: {},
-      icons: UNICODE_ICONS,
+      icons: DEFAULT_ICONS,
     })
     expect(Object.keys(DEFAULT_SKIN)).toHaveLength(12)
   })

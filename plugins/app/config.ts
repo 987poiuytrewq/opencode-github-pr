@@ -95,7 +95,7 @@ function mergeStrings<T extends Record<string, string>>(defaults: T, input: unkn
 }
 
 export function dashboardOptions(input: DashboardOptionsInput = {}): DashboardOptions {
-  const iconStyle: IconStyle = input.iconStyle === "nerd" ? "nerd" : "unicode"
+  const iconStyle: IconStyle = input.iconStyle === "unicode" ? "unicode" : "nerd"
   const defaultIcons = iconStyle === "unicode" ? UNICODE_ICONS : DEFAULT_ICONS
 
   return {

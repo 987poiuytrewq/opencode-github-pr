@@ -158,6 +158,7 @@ export function demoDashboardState(): DashboardState {
       scopeValue: null,
       cursor: null,
       hasMore: false,
+      totalCount: demoPRs.length,
       pagesLoaded: 1,
       loading: false,
       limitReached: false,

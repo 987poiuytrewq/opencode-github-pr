@@ -61,6 +61,7 @@ export const PULL_REQUESTS_QUERY = `query PullRequests($owner: String!, $name: S
   }
   repository(owner: $owner, name: $name) {
     pullRequests(first: $first, after: $after, states: $states, headRefName: $head, orderBy: {field: UPDATED_AT, direction: DESC}) {
+      totalCount
       pageInfo {
         hasNextPage
         endCursor
@@ -73,11 +74,12 @@ ${PULL_REQUEST_FIELDS}`
 
 // GitHub doesn't expose author or assignee filters on Repository.pullRequests,
 // so those scope filters use issue search, which supports both qualifiers.
-export const PULL_REQUESTS_SEARCH_QUERY = `query SearchPullRequests($query: String!, $after: String, $first: Int!) {
+export const PULL_REQUESTS_SEARCH_QUERY = `query SearchPullRequests($searchQuery: String!, $after: String, $first: Int!) {
   viewer {
     login
   }
-  search(query: $query, type: ISSUE, first: $first, after: $after) {
+  search(query: $searchQuery, type: ISSUE, first: $first, after: $after) {
+    issueCount
     pageInfo {
       hasNextPage
       endCursor

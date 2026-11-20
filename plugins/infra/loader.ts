@@ -27,6 +27,7 @@ const LISTING_STATES: Record<PRListing, string[]> = {
 export type RepositoryPRsResult = {
   prs: PR[]
   viewerLogin: string | null
+  totalCount: number | null
   hasMore: boolean
   fetchedPages: number
   endCursor: string | null
@@ -40,6 +41,7 @@ function isRecord(value: unknown): value is Record<string, unknown> {
 function readPullRequestPage(value: unknown, connectionName: "pullRequests" | "search"): {
   nodes: unknown[]
   viewerLogin: string | null
+  totalCount: number | null
   hasNextPage: boolean
   endCursor: string | null
 } {
@@ -49,9 +51,13 @@ function readPullRequestPage(value: unknown, connectionName: "pullRequests" | "s
   const rawConnection = connectionName === "search" ? root.search : repository.pullRequests
   const connection = isRecord(rawConnection) ? rawConnection : {}
   const pageInfo = isRecord(connection.pageInfo) ? connection.pageInfo : {}
+  const rawTotalCount = connectionName === "search" ? connection.issueCount : connection.totalCount
   return {
     nodes: Array.isArray(connection.nodes) ? connection.nodes.filter((node) => node != null) : [],
     viewerLogin: typeof viewer.login === "string" ? viewer.login : null,
+    totalCount: typeof rawTotalCount === "number" && Number.isFinite(rawTotalCount)
+      ? rawTotalCount
+      : null,
     hasNextPage: pageInfo.hasNextPage === true,
     endCursor: typeof pageInfo.endCursor === "string" ? pageInfo.endCursor : null,
   }
@@ -85,17 +91,25 @@ export async function repositoryPRs(
   resultsAlreadyFetched = 0,
 ): Promise<RepositoryPRsResult> {
   if (!repo) {
-    return { prs: [], viewerLogin: null, hasMore: false, fetchedPages: 0, endCursor: null, limitReached: false }
+    return { prs: [], viewerLogin: null, totalCount: 0, hasMore: false, fetchedPages: 0, endCursor: null, limitReached: false }
   }
   if (scope === "branch" && !scopeValue) {
-    return { prs: [], viewerLogin: null, hasMore: false, fetchedPages: 0, endCursor: null, limitReached: false }
+    return { prs: [], viewerLogin: null, totalCount: 0, hasMore: false, fetchedPages: 0, endCursor: null, limitReached: false }
   }
   const isSearch = scope === "author" || scope === "assignee"
   const requestedRecords = isSearch
     ? Math.min(batchSize, Math.max(0, MAX_SEARCH_RESULTS - resultsAlreadyFetched))
     : batchSize
   if (requestedRecords <= 0) {
-    return { prs: [], viewerLogin: null, hasMore: false, fetchedPages: 0, endCursor: after, limitReached: isSearch }
+    return {
+      prs: [],
+      viewerLogin: null,
+      totalCount: isSearch ? Math.min(resultsAlreadyFetched, MAX_SEARCH_RESULTS) : null,
+      hasMore: false,
+      fetchedPages: 0,
+      endCursor: after,
+      limitReached: isSearch,
+    }
   }
   const searchQuery = isSearch
     ? [
@@ -109,6 +123,7 @@ export async function repositoryPRs(
   const nodes: unknown[] = []
   let cursor = after
   let viewerLogin: string | null = null
+  let totalCount: number | null = null
   let fetchedPages = 0
   let hasNextPage = false
   let endCursor: string | null = null
@@ -119,7 +134,7 @@ export async function repositoryPRs(
     const first = Math.min(100, remainingRecords)
     const data = isSearch
       ? await graphqlPartial(PULL_REQUESTS_SEARCH_QUERY, {
-          query: searchQuery,
+          searchQuery,
           after: cursor,
           first,
         }, requestTimeoutMs)
@@ -136,6 +151,9 @@ export async function repositoryPRs(
     remainingRecords -= page.nodes.length
     consecutiveEmptyPages = page.nodes.length === 0 ? consecutiveEmptyPages + 1 : 0
     if (page.viewerLogin) viewerLogin = page.viewerLogin
+    if (page.totalCount !== null) {
+      totalCount = isSearch ? Math.min(page.totalCount, MAX_SEARCH_RESULTS) : page.totalCount
+    }
     hasNextPage = page.hasNextPage
     endCursor = page.endCursor
     fetchedPages++
@@ -156,6 +174,7 @@ export async function repositoryPRs(
   return {
     prs: nodes.map(mapPullFromGraphQL),
     viewerLogin,
+    totalCount,
     hasMore: hasNextPage && !limitReached,
     fetchedPages,
     endCursor,

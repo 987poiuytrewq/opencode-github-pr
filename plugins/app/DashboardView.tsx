@@ -75,6 +75,10 @@ export function DashboardView(props: {
     props.state.viewerLogin,
   )
   const pageCount = () => Math.max(1, Math.ceil(prs().length / props.pageSize))
+  const totalPageCount = () => {
+    const totalCount = props.state.pagination.totalCount
+    return totalCount === null ? null : Math.max(1, Math.ceil(totalCount / props.pageSize))
+  }
   const currentPage = () => Math.min(page(), pageCount() - 1)
   const pagePRs = () =>
     prs().slice(currentPage() * props.pageSize, (currentPage() + 1) * props.pageSize)
@@ -186,16 +190,21 @@ export function DashboardView(props: {
           <b>Pull Requests</b>
         </text>
         <box flexGrow={1}></box>
-        <box flexDirection="row" gap={2}>
-          <text
-            fg={scopeHovered() ? sk.accent : sk.muted}
-            selectable={false}
+        <box flexDirection="row" gap={1}>
+          <box
+            flexDirection="row"
+            gap={1}
             onMouseOver={() => setScopeHovered(true)}
             onMouseOut={() => setScopeHovered(false)}
             onMouseUp={() => props.onCycleScope()}
           >
-            {withIcon(props.icons.scope, props.scope)}
-          </text>
+            <Show when={props.icons.scope}>
+              <text fg={sk.muted} selectable={false}>{props.icons.scope}</text>
+            </Show>
+            <text fg={scopeHovered() ? sk.accent : sk.muted} selectable={false}>
+              {props.scope}
+            </text>
+          </box>
           <text
             fg={statusHovered() ? sk.accent : sk.muted}
             selectable={false}
@@ -209,23 +218,26 @@ export function DashboardView(props: {
       </box>
 
       <Show when={props.state.status === DashboardStatus.Loading}>
-        <box flexDirection="column" paddingLeft={1} paddingTop={1} paddingRight={1}>
-          <text fg={sk.muted} selectable={false}>{withIcon(props.icons.loading, "Loading PRs")}</text>
-          <text fg={sk.muted} selectable={false}>  Checking GitHub…</text>
-        </box>
+        <StatusMessage
+          icon={props.icons.loading}
+          title="Loading PRs"
+          titleColor={sk.muted}
+          descriptionColor={sk.muted}
+        />
       </Show>
 
-      <Show when={listingPending()}>
-        <box flexDirection="column" paddingLeft={1} paddingTop={1} paddingRight={1}>
-          <text fg={sk.muted} selectable={false}>
-            {withIcon(props.icons.loading, `Loading ${props.statusFilter} PRs`)}
-          </text>
-        </box>
+      <Show when={listingPending() && props.state.status !== DashboardStatus.Loading}>
+        <StatusMessage
+          icon={props.icons.loading}
+          title={`Loading ${props.statusFilter} PRs`}
+          titleColor={sk.muted}
+          descriptionColor={sk.muted}
+        />
       </Show>
 
       <Show when={props.state.status === DashboardStatus.NoRepo}>
         <box flexDirection="column" paddingLeft={1} paddingTop={1} paddingRight={1}>
-          <text fg={sk.muted} selectable={false}>{withIcon(props.icons.info, "No GitHub repo")}</text>
+          <text fg={sk.text} selectable={false}>{withIcon(props.icons.info, "No GitHub repo")}</text>
           <text fg={sk.muted} selectable={false}>  Add a GitHub remote or switch to the right project.</text>
         </box>
       </Show>
@@ -253,7 +265,7 @@ export function DashboardView(props: {
           icon={props.icons.info}
           title={errorMessages.noMatchingPRs}
           description="Try a different scope or status."
-          titleColor={sk.muted}
+          titleColor={sk.text}
           descriptionColor={sk.muted}
         />
       </Show>
@@ -289,6 +301,7 @@ export function DashboardView(props: {
               justifyContent="flex-end"
               gap={1}
               paddingTop={1}
+              paddingRight={1}
               width="100%"
             >
               <text
@@ -301,7 +314,7 @@ export function DashboardView(props: {
                 {props.icons.previousPage}
               </text>
               <text fg={sk.muted} selectable={false}>
-                {`${currentPage() + 1} of ${pageCount()}${filtersMatch() && props.state.pagination.hasMore ? "+" : ""}`}
+                {`${currentPage() + 1} of ${totalPageCount() ?? pageCount()}${totalPageCount() === null && filtersMatch() && props.state.pagination.hasMore ? "+" : ""}`}
               </text>
               <text
                 fg={canGoNext() && nextHovered() ? sk.accent : sk.muted}
@@ -313,9 +326,6 @@ export function DashboardView(props: {
                 {props.icons.nextPage}
               </text>
             </box>
-          </Show>
-          <Show when={filtersMatch() && props.state.pagination.loading}>
-            <text fg={sk.muted} selectable={false}>{props.icons.loading} Loading more PRs…</text>
           </Show>
           <Show when={filtersMatch() && props.state.pagination.limitReached}>
             <text fg={sk.warning} selectable={false}>GitHub search is limited to 1,000 matching PRs</text>

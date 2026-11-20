@@ -37,6 +37,7 @@ async function setup(api: TuiPluginContext) {
       scopeValue: null,
       cursor: null,
       hasMore: false,
+      totalCount: null,
       pagesLoaded: 0,
       loading: false,
       limitReached: false,
