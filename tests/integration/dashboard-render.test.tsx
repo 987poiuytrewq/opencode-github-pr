@@ -165,7 +165,7 @@ describe("DashboardView render", () => {
     expect(frame).toContain(" Merged feature")
     const mergedIcon = r.captureSpans().lines.flatMap((line) => line.spans)
       .find((span) => span.text.includes(""))
-    expect(mergedIcon?.fg?.toInts()).toEqual([163, 113, 247, 255])
+    expect(mergedIcon?.fg?.toInts()).toEqual([94, 168, 245, 255])
     expect(frame).toContain("#42 +17 -4")
     expect(frame).toContain("●")
     expect(frame).not.toContain("󰅺0")

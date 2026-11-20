@@ -14,14 +14,17 @@ function color(hex: string) {
 }
 
 describe("skin", () => {
-  test("uses the primary action background for merged PRs", () => {
+  test("uses the primary interactive hue for merged PRs", () => {
     const primaryText = "#123abc"
-    const primaryBackground = "#a371f7"
+    const primaryHue = "#5ea8f5"
     const theme = {
+      hue: {
+        interactive: { 200: color(primaryHue) },
+      },
       background: {
         base: color("#161616"),
         raised: { base: color("#1d1d1d") },
-        action: { primary: { base: color(primaryBackground) } },
+        action: { primary: { base: color("#000000") } },
       },
       border: { base: color("#3a3a3a") },
       text: {
@@ -36,6 +39,6 @@ describe("skin", () => {
       },
     } as ResolvedTheme
 
-    expect(skin(theme).merged).toBe(primaryBackground)
+    expect(skin(theme).merged).toBe(primaryHue)
   })
 })
