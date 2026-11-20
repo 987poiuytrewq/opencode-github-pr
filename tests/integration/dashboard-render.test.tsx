@@ -348,6 +348,51 @@ describe("DashboardView render", () => {
     await r.dispose()
   })
 
+  test("updates PR-row icon colors when the theme changes", async () => {
+    const { api } = createMockTuiApi()
+    const [theme, setTheme] = createSignal(api.theme)
+    const options = dashboardOptions()
+    const r = await testRender(
+      () => (
+        <DashboardView
+          theme={theme()}
+          state={okState({ prs: [makeTUIPR({ mergeStateStatus: "CLEAN" })] })}
+          setSelectedIdx={() => {}}
+          onOpen={() => {}}
+          scope="branch"
+          statusFilter="open"
+          onCycleScope={() => {}}
+          onCycleStatus={() => {}}
+          onLoadMore={async () => {}}
+          pageSize={options.pageSize}
+          colors={options.colors}
+          icons={options.icons}
+        />
+      ),
+      { width: 50, height: 20 },
+    )
+    await r.flush()
+    const iconColor = () =>
+      r.captureSpans().lines.flatMap((line) => line.spans)
+        .find((span) => span.text.includes(options.icons.openPR))?.fg?.toInts()
+
+    expect(iconColor()).toEqual([95, 191, 95, 255])
+    setTheme({
+      ...api.theme,
+      text: {
+        ...api.theme.text,
+        feedback: {
+          ...api.theme.text.feedback,
+          success: api.theme.text.feedback.error,
+        },
+      },
+    })
+    await r.flush()
+
+    expect(iconColor()).toEqual([216, 101, 101, 255])
+    await r.dispose()
+  })
+
   test("merged PR uses the merged icon and displays change totals", async () => {
     const r = await renderState(okState({
       prs: [makeTUIPR({
@@ -425,6 +470,21 @@ describe("DashboardView render", () => {
 
     expect(titleLine).toContain("A very long pull…")
     expect(lines.filter((line) => line.includes("request title")).length).toBe(0)
+  })
+
+  test("uses the available title width on the first laid-out frame", async () => {
+    const r = await renderState(okState({
+      prs: [makeTUIPR({
+        title: "A very long pull request title that must remain on one line",
+      })],
+    }), {}, 24)
+    await r.renderOnce()
+    const titleLine = r.captureCharFrame().split("\n")
+      .find((line) => line.includes(`${dashboardOptions().icons.openPR} A`))
+
+    expect(titleLine).toContain("A very long pull…")
+    expect(titleLine?.length).toBeLessThanOrEqual(24)
+    await r.dispose()
   })
 
   test("updates title width on terminal resize", async () => {

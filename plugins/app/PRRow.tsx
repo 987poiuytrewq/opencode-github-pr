@@ -112,24 +112,25 @@ export function PRRow(props: {
 }) {
   const [titleHovered, setTitleHovered] = createSignal(false)
   const title = () => truncateTitle(props.pr.title, props.titleWidth)
-  const icon = props.pr.isMerged
+  const icon = () => props.pr.isMerged
     ? props.icons.mergedPR
     : props.pr.isDraft
       ? props.icons.draftPR
       : props.pr.isClosed
         ? props.icons.closedPR
         : props.icons.openPR
-  const iconColor = props.pr.isMerged
+  const iconColor = () => props.pr.isMerged
     ? props.merged
     : props.pr.isDraft
       ? props.draft
       : statusColor(mergeReadiness(props.pr), props)
-  const checks = checkStatusGroups(props.pr)
-  const reviews = reviewStatusGroups(props.pr)
-  const comments = commentThreadCounts(props.pr)
-  const commentStatuses = comments?.open
-    ? [{ icon: props.icons.openComment, count: comments.open }]
-    : []
+  const checks = () => checkStatusGroups(props.pr)
+  const reviews = () => reviewStatusGroups(props.pr)
+  const comments = () => commentThreadCounts(props.pr)
+  const commentStatuses = () => {
+    const open = comments()?.open
+    return open ? [{ icon: props.icons.openComment, count: open }] : []
+  }
 
   return (
     <box
@@ -147,8 +148,8 @@ export function PRRow(props: {
         onMouseUp={() => props.onClick("overview")}
       >
         <ClickableText
-          label={icon}
-          color={iconColor}
+          label={icon()}
+          color={iconColor()}
           target="mergeStatus"
           onClick={props.onClick}
         />
@@ -176,8 +177,8 @@ export function PRRow(props: {
           onClick={props.onClick}
         />
         <box flexGrow={1}></box>
-        <Show when={commentStatuses.length > 0}>
-          <For each={commentStatuses}>
+        <Show when={commentStatuses().length > 0}>
+          <For each={commentStatuses()}>
             {(comment) => (
               <ClickableComment
                 icon={comment.icon}
@@ -189,10 +190,10 @@ export function PRRow(props: {
           </For>
         </Show>
         <box flexDirection="row" gap={0}>
-          <For each={reviews}>
+          <For each={reviews()}>
             {(group) => (
               <ClickableText
-                label={`${props.icons.review}${reviews.length > 1 ? group.count : ""}`}
+                label={`${props.icons.review}${reviews().length > 1 ? group.count : ""}`}
                 color={statusColor(group.status, props)}
                 target="overview"
                 onClick={props.onClick}
@@ -201,10 +202,10 @@ export function PRRow(props: {
           </For>
         </box>
         <box flexDirection="row" gap={0}>
-          <For each={checks}>
+          <For each={checks()}>
             {(group) => (
               <ClickableText
-                label={`${props.icons.check}${checks.length > 1 ? group.count : ""}`}
+                label={`${props.icons.check}${checks().length > 1 ? group.count : ""}`}
                 color={statusColor(group.status, props)}
                 target="checks"
                 onClick={props.onClick}
