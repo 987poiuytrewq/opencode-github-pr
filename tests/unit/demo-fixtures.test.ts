@@ -1,5 +1,6 @@
 import { describe, expect, test } from "bun:test";
 import { filterPRs } from "../../plugins/domain/pr-filters";
+import { reviewStatusGroups } from "../../plugins/domain/pr-status";
 import { DashboardStatus } from "../../plugins/domain/types";
 import { demoDashboardState } from "../../demo/fixtures";
 
@@ -49,6 +50,30 @@ describe("dashboard demo data", () => {
 
     expect(new Set(prs.map((pr) => pr.additions)).size).toBe(prs.length);
     expect(new Set(prs.map((pr) => pr.deletions)).size).toBe(prs.length);
+  });
+
+  test("shows merge readiness, review decisions, and mixed review requests", () => {
+    const { prs } = demoDashboardState();
+    const mergeStates = new Set(prs.map((pr) => pr.mergeStateStatus));
+    const reviewDecisions = new Set(prs.map((pr) => pr.reviewDecision));
+    const requestTypes = new Set(
+      prs.flatMap((pr) =>
+        (pr.reviewRequests ?? []).map((request) => request.type),
+      ),
+    );
+    const requestedReviewerCounts = prs
+      .map((pr) => pr.reviewRequests?.length ?? 0)
+      .filter((count) => count > 0);
+
+    expect(mergeStates).toContain("HAS_HOOKS");
+    expect(mergeStates).toContain("BLOCKED");
+    expect(mergeStates).toContain("BEHIND");
+    expect(mergeStates).toContain("UNSTABLE");
+    expect(reviewDecisions).toContain("CHANGES_REQUESTED");
+    expect(reviewDecisions).toContain("REVIEW_REQUIRED");
+    expect(requestTypes).toEqual(new Set(["user", "team"]));
+    expect(new Set(requestedReviewerCounts).size).toBeGreaterThan(1);
+    expect(prs.some((pr) => reviewStatusGroups(pr).length > 1)).toBe(true);
   });
 
   test("returns independent fixture arrays for each TUI instance", () => {

@@ -39,6 +39,12 @@ const demoPRs: PR[] = [
     headRefName: "feature/passkeys",
     additions: 128,
     deletions: 36,
+    mergeStateStatus: "HAS_HOOKS",
+    reviewDecision: "APPROVED",
+    reviewRequests: [
+      { type: "user", login: "alex" },
+      { type: "team", slug: "platform" },
+    ],
     reviewThreads: [{ isResolved: true }],
     latestReviews: [{ author: { login: "samantha" }, state: "APPROVED" }],
   }),
@@ -48,10 +54,17 @@ const demoPRs: PR[] = [
     additions: 86,
     deletions: 14,
     assigneeLogins: ["mia"],
+    mergeStateStatus: "BLOCKED",
+    reviewDecision: "REVIEW_REQUIRED",
     statusCheckRollup: { state: "FAILURE" },
     checkStatuses: ["SUCCESS", "FAILURE"],
-    reviewRequests: [{ type: "user", login: "alex" }],
+    reviewRequests: [
+      { type: "user", login: "alex" },
+      { type: "user", login: "mia" },
+      { type: "team", slug: "release-engineering" },
+    ],
     reviewThreads: [{ isResolved: false }, { isResolved: true }],
+    latestReviews: [{ author: { login: "jules" }, state: "COMMENTED" }],
   }),
   demoPR({
     number: 246,
@@ -59,8 +72,10 @@ const demoPRs: PR[] = [
     additions: 52,
     deletions: 21,
     headRefName: "feature/audit-filters",
+    mergeStateStatus: "BEHIND",
     statusCheckRollup: { state: "PENDING" },
     checkStatuses: ["SUCCESS", "IN_PROGRESS"],
+    reviewRequests: [{ type: "team", slug: "design-systems" }],
     latestReviews: [{ author: { login: "jules" }, state: "COMMENTED" }],
   }),
   demoPR({
@@ -69,7 +84,12 @@ const demoPRs: PR[] = [
     additions: 41,
     deletions: 11,
     assigneeLogins: ["mia"],
-    latestReviews: [{ author: { login: "samantha" }, state: "APPROVED" }],
+    mergeStateStatus: "UNSTABLE",
+    reviewDecision: "CHANGES_REQUESTED",
+    reviewRequests: [{ type: "user", login: "alex" }],
+    latestReviews: [
+      { author: { login: "samantha" }, state: "CHANGES_REQUESTED" },
+    ],
   }),
   demoPR({
     number: 244,
@@ -78,7 +98,15 @@ const demoPRs: PR[] = [
     deletions: 6,
     statusCheckRollup: { state: "PENDING" },
     checkStatuses: ["QUEUED"],
-    reviewRequests: [{ type: "user", login: "jules" }],
+    reviewRequests: [
+      { type: "user", login: "mia" },
+      { type: "user", login: "jules" },
+      { type: "team", slug: "docs" },
+    ],
+    latestReviews: [
+      { author: { login: "samantha" }, state: "APPROVED" },
+      { author: { login: "jules" }, state: "APPROVED" },
+    ],
   }),
   demoPR({
     number: 243,

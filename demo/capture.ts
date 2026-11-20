@@ -254,6 +254,10 @@ async function exerciseDashboard(
   session: string,
 ): Promise<void> {
   await waitForText(socket, session, "Add passkey sign-in", START_TIMEOUT_MS);
+  await waitForText(socket, session, "Retry expired sessions");
+  await waitForText(socket, session, "Add audit log filters");
+  await waitForText(socket, session, "Improve keyboard navigation");
+  await waitForText(socket, session, "Cache organization membership");
   await waitForText(socket, session, "1 of 2");
   await Bun.sleep(700);
 
@@ -571,6 +575,8 @@ async function main(): Promise<void> {
         String(COLUMNS),
         "--rows",
         String(ROWS),
+        "--text-font-family",
+        "CommitMono Nerd Font Mono,JetBrains Mono,Fira Code,SF Mono,Menlo,Consolas,DejaVu Sans Mono,Liberation Mono",
         "--idle-time-limit",
         String(GIF_IDLE_LIMIT_SECONDS),
         "--select",
