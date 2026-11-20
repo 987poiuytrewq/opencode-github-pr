@@ -41,13 +41,15 @@ Add the package name to the `plugins` array in your OpenCode config, either glob
 }
 ```
 
-Restart OpenCode. It installs the package from npm and the **Pull Requests** panel appears in the session sidebar.
+Run `/reload` in the TUI. OpenCode installs the package from npm and the **Pull Requests** panel appears in the session
+sidebar.
 
-To pass [options](#configuration), use the object form of the entry:
+To pass [options](#configuration), keep the plugin registered in `opencode.json` and add a matching entry to the
+global CLI config at `~/.config/opencode/cli.json` (or `$XDG_CONFIG_HOME/opencode/cli.json`):
 
 ```json
 {
-  "$schema": "https://opencode.ai/config.json",
+  "$schema": "https://opencode.ai/v2/cli.json",
   "plugins": [
     {
       "package": "opencode-github-pr",
@@ -84,10 +86,11 @@ To pass [options](#configuration), use the object form of the entry:
    }
    ```
 
-3. Restart OpenCode. The **Pull Requests** panel appears in the session sidebar.
+3. Run `/reload` in the TUI. The **Pull Requests** panel appears in the session sidebar.
 
-However you install it, add the plugin to `opencode.json`, not `cli.json`. The package has a server part and a TUI part; the TUI loads its part
-from the server's plugin list, including when it is connected to a remote server.
+However you install it, register the package in `opencode.json` so its server part is available. Put TUI
+[options](#configuration) in the global `cli.json` entry for the same package. The CLI loads the TUI part from the
+server's plugin list, including when it is connected to a remote server.
 
 ## Authentication
 
@@ -180,12 +183,14 @@ batch. Use [`pageSize` and `pagesPerBatch`](#configuration) to change how much i
 
 ## Configuration
 
-Pass options in the plugin entry's `options` object. Every option is optional. If you installed from source, use
-the clone's path as the `package` value instead:
+Pass options in the matching plugin entry's `options` object in the global
+`~/.config/opencode/cli.json` (or `$XDG_CONFIG_HOME/opencode/cli.json`). CLI config is global, so these options apply
+to all projects. Every option is optional. For a source installation, use the clone's absolute path as the `package`
+value:
 
 ```json
 {
-  "$schema": "https://opencode.ai/config.json",
+  "$schema": "https://opencode.ai/v2/cli.json",
   "plugins": [
     {
       "package": "opencode-github-pr",
@@ -233,23 +238,29 @@ By default, colours come from your active OpenCode theme. Override any of them w
 | `merged` | Merged PR icon | Info text |
 
 To show merged PRs in GitHub's purple instead of your theme's info colour, set `merged` to `"#a371f7"` (GitHub's dark
-theme) or `"#8250df"` (GitHub's light theme). Colour and icon overrides go inside the plugin entry's `options`, next to
-the other options:
+theme) or `"#8250df"` (GitHub's light theme). Colour and icon overrides go inside the plugin entry's `options` in
+`cli.json`, next to the other options:
 
 ```json
 {
-  "options": {
-    "colors": {
-      "merged": "#a371f7"
+  "$schema": "https://opencode.ai/v2/cli.json",
+  "plugins": [
+    {
+      "package": "opencode-github-pr",
+      "options": {
+        "colors": {
+          "merged": "#a371f7"
+        }
+      }
     }
-  }
+  ]
 }
 ```
 
 ### Icons
 
 `iconStyle` picks the icon set. Nerd Font glyphs are the default; set `"unicode"` if your terminal font doesn't have
-them:
+them. Set it in the matching plugin entry's `options` in `cli.json`:
 
 ```json
 {
@@ -320,7 +331,8 @@ unset for GitHub.com.
 
 | You see | What to do |
 | --- | --- |
-| No **Pull Requests** panel | Check that the plugin is in `opencode.json` (not `cli.json`) and that `enabled` isn't `false`, then restart OpenCode. If you installed from source, check that `bun install` has run in the clone. Plugin load errors are written to `~/.local/share/opencode/log/opencode.log`. |
+| No **Pull Requests** panel | Check that the package is registered in `opencode.json` and that `enabled` isn't `false`, then reload OpenCode. If you installed from source, check that `bun install` has run in the clone. Plugin load errors are written to `~/.local/share/opencode/log/opencode.log`. |
+| Plugin options or colour overrides have no effect | Put the options in the matching plugin entry in the global `~/.config/opencode/cli.json` (or `$XDG_CONFIG_HOME/opencode/cli.json`), not in `opencode.json`, then run `/reload` in the TUI. For a source install, the `package` path in `cli.json` must point to the same clone registered in `opencode.json`. |
 | Icons show as boxes or question marks | Your terminal font doesn't have Nerd Font glyphs. Set `iconStyle` to `"unicode"`, install a Nerd Font, or use [plain-text icons](#plain-text-icons). |
 | **No GitHub repo** | The session's directory isn't a Git repository with a GitHub remote. Add a remote, or open a session in the right project. For Enterprise, check `GITHUB_ENTERPRISE_URL`. |
 | **GitHub sign-in failed** | No valid token was found. Run `gh auth login`, or set `GITHUB_TOKEN` where the OpenCode server starts. |
