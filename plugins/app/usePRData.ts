@@ -64,9 +64,26 @@ export function useDashboard(
   const loadMoreInFlight = new Map<string, Promise<void>>()
   let refreshToken = 0
   let currentRefreshToken = 0
+  let primaryRateLimitResetAt: number | null = null
+  const primaryLimitActive = (): boolean => {
+    if (primaryRateLimitResetAt === null) return false
+    if (Date.now() >= primaryRateLimitResetAt) {
+      primaryRateLimitResetAt = null
+      return false
+    }
+    return true
+  }
+  const recordPrimaryRateLimit = (error: unknown) => {
+    const rateLimit = parseRateLimitError(error)
+    if (rateLimit.isRateLimit && !rateLimit.isSecondary && rateLimit.resetAt > Date.now()) {
+      primaryRateLimitResetAt = rateLimit.resetAt
+    }
+    return rateLimit
+  }
   const pageBatchSize = pageSize * Math.max(MIN_PAGES_PER_BATCH, pagesPerBatch)
 
   const refresh = async (): Promise<void> => {
+    if (primaryLimitActive()) return
     const listing = statusFilter()
     const scope = scopeFilter()
     const filterKey = `${listing}:${scope}`
@@ -159,7 +176,7 @@ export function useDashboard(
         }))
       } catch (e: unknown) {
         if (isStale()) return
-        const rl = parseRateLimitError(e)
+        const rl = recordPrimaryRateLimit(e)
         setState((s) => ({
           ...s,
           status: DashboardStatus.Error,
@@ -202,6 +219,7 @@ export function useDashboard(
   }
 
   const loadMore = async (): Promise<void> => {
+    if (primaryLimitActive()) return
     const before = state()
     const listing = statusFilter()
     const scope = scopeFilter()
@@ -275,7 +293,7 @@ export function useDashboard(
           }
         })
       } catch (e: unknown) {
-        const rl = parseRateLimitError(e)
+        const rl = recordPrimaryRateLimit(e)
         setState((s) =>
           s.pagination.listing === listing &&
             s.pagination.scope === scope &&
@@ -301,6 +319,7 @@ export function useDashboard(
   }
 
   const refreshOne = async (n: number) => {
+    if (primaryLimitActive()) return
     const prs = state().prs
     const idx = prs.findIndex((p) => p.number === n)
     if (idx < 0) return
@@ -319,7 +338,9 @@ export function useDashboard(
           : p),
         fetchedAt: Date.now(),
       }))
-    } catch {}
+    } catch (e: unknown) {
+      recordPrimaryRateLimit(e)
+    }
   }
 
   return { refresh, loadMore, refreshOne }
