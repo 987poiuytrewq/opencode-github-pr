@@ -52,9 +52,17 @@ async function setup(api: TuiPluginContext) {
   }
   const [selectedIdx, setSelectedIdx] = createSignal(0)
   const [scope, setScope] = createSignal<PRScope>(options.defaultScope)
-  const [statusFilter, setStatusFilter] = createSignal<PRStatusFilter>(options.defaultStatusFilter)
+  const [statusFilter, setStatusFilter] = createSignal<PRStatusFilter>(
+    options.defaultStatusFilter,
+  )
   const visiblePRs = () =>
-    filterPRs(state().prs, scope(), statusFilter(), state().currentBranch, state().viewerLogin)
+    filterPRs(
+      state().prs,
+      scope(),
+      statusFilter(),
+      state().currentBranch,
+      state().viewerLogin,
+    )
   const cycleScope = () => {
     const nextScope = nextPRScope(scope())
     setScope(nextScope)
@@ -151,13 +159,15 @@ async function setup(api: TuiPluginContext) {
   })
   // OpenCode 2.0 provides Keymap.Provider through the TUI's Solid render
   // context. Register this from a slot render rather than setup so the
-  // provider is present on early V2 host releases as well.
-  let unregisterKeymap: (() => void) | undefined
+  // provider is present on early V2 host releases as well. Keymap.createLayer
+  // returns void and owns its useBindings cleanup through this Solid owner, so
+  // tearing down the app slot also tears down the layer.
+  let keymapRegistered = false
   const unregisterKeymapSlot = api.ui.slot({
     append: "app",
     render: () => {
-      if (!unregisterKeymap) {
-        const keymapLayer = api.keymap.layer(() => ({
+      if (!keymapRegistered) {
+        api.keymap.layer(() => ({
           mode: "global",
           commands: [
             {
@@ -177,7 +187,11 @@ async function setup(api: TuiPluginContext) {
                     })
                     return
                   }
-                  api.ui.toast.show({ variant: "info", message: "Refreshing PRs…", duration: 1200 })
+                  api.ui.toast.show({
+                    variant: "info",
+                    message: "Refreshing PRs…",
+                    duration: 1200,
+                  })
                 })
               },
             },
@@ -195,7 +209,7 @@ async function setup(api: TuiPluginContext) {
             },
           ],
         }))
-        if (typeof keymapLayer === "function") unregisterKeymap = keymapLayer
+        keymapRegistered = true
       }
       return null
     },
@@ -213,7 +227,6 @@ async function setup(api: TuiPluginContext) {
     stopOnIdle()
     unregisterSlot()
     unregisterKeymapSlot()
-    unregisterKeymap?.()
   }
 }
 
