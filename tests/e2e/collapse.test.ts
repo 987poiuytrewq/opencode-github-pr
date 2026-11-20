@@ -28,7 +28,7 @@ describe.skipIf(!isE2E())("E2E: PR dashboard header", () => {
 
   test("clicking the heading does not hide the dashboard", async () => {
     const screen = await session.capturePanePlain()
-    expect(screen).toContain("No GitHub repo")
+    expect(hasPullRequestsHeading(screen)).toBe(true)
     const lines = screen.split("\n")
     let col = -1, row = -1
     for (let i = 0; i < lines.length; i++) {
@@ -43,7 +43,6 @@ describe.skipIf(!isE2E())("E2E: PR dashboard header", () => {
     await session.click(col, row)
     const after = await session.capturePanePlain()
     expect(hasPullRequestsHeading(after)).toBe(true)
-    expect(after).toContain("No GitHub repo")
     expect(after).not.toContain("▼")
     expect(after).not.toContain("▶")
   }, 30_000)

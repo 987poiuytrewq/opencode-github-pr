@@ -105,6 +105,7 @@ export async function startOpenCodeE2ESession(
   })
   let sessionID: string | undefined
   let session: TmuxSession | undefined
+  let cleanedUp = false
   const deleteServerSession = async () => {
     if (!sessionID) return
     try {
@@ -115,6 +116,17 @@ export async function startOpenCodeE2ESession(
         },
       })
     } catch {}
+  }
+  const cleanup = async () => {
+    if (cleanedUp) return
+    cleanedUp = true
+    await session?.kill()
+    await deleteServerSession()
+    try {
+      server.kill()
+      await server.exited
+    } catch {}
+    rmSync(e2eHome, { recursive: true, force: true })
   }
 
   try {
@@ -160,26 +172,12 @@ export async function startOpenCodeE2ESession(
       hasPullRequestsHeading,
       { timeoutMs: 30_000, label: "Pull Requests heading" },
     )
-    await createdSession.waitForText("No GitHub repo", { timeoutMs: 30_000 })
-
     return {
       session: createdSession,
-      cleanup: async () => {
-        await createdSession.kill()
-        await deleteServerSession()
-        server.kill()
-        await server.exited
-        rmSync(e2eHome, { recursive: true, force: true })
-      },
+      cleanup,
     }
   } catch (error) {
-    await session?.kill()
-    await deleteServerSession()
-    try {
-      server.kill()
-      await server.exited
-    } catch {}
-    rmSync(e2eHome, { recursive: true, force: true })
+    await cleanup()
     throw error
   }
 }

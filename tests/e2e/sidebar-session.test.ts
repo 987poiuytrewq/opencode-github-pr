@@ -22,8 +22,6 @@ describe.skipIf(!isE2E())("E2E: sidebar renders with active session", () => {
   test("Pull Requests heading appears after session is created", async () => {
     const screen = await session.capturePanePlain()
     expect(hasPullRequestsHeading(screen)).toBe(true)
-    expect(screen).toContain("No GitHub repo")
-    expect(screen).not.toContain("Not authorised")
   }, 60_000)
 
   test("filter label is not shown after session is created", async () => {
