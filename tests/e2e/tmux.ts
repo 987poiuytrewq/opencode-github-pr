@@ -35,14 +35,16 @@ export class TmuxSession {
       args.push("-e", `${k}=${v}`)
     }
     args.push("--", ...opts.command)
+    let created = false
     try {
       await session.run(session.tmuxBin, args)
+      created = true
       await session.run(session.tmuxBin, ["set-option", "-t", opts.name, "mouse", "off"])
       return session
     } catch (error) {
-      // Try to kill by name even when `new-session` reports a failure: tmux
-      // may have created the session before a later setup step failed.
-      await session.kill()
+      // Only clean up sessions this call created; a failed new-session may
+      // indicate that a same-name session already existed.
+      if (created) await session.kill()
       throw error
     }
   }
