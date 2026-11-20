@@ -76,8 +76,8 @@ exports[`DashboardView render error state 1`] = `
 "Pull Requests                         branch open
 
  GitHub sign-in failed
-  Set GITHUB_TOKEN or GH_TOKEN.
-
+  Run gh auth login or set GITHUB_TOKEN or
+  GH_TOKEN.
 
 
 
