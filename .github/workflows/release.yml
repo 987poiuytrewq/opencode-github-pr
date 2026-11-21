@@ -54,7 +54,8 @@ jobs:
 
   publish:
     needs: test
-    if: github.event.release.prerelease == false
+    # v0.1.0 is already published to npm; its GitHub Release is archival only.
+    if: github.event.release.prerelease == false && github.event.release.tag_name != 'v0.1.0'
     runs-on: ubuntu-latest
     environment: npm
     permissions:
