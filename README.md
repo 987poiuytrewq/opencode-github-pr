@@ -137,6 +137,9 @@ and removed, and on the right, the unresolved comment count, review status and c
 
 When reviews or checks are in more than one state, each state gets its own icon with a count, for example three green
 dots and one red dot for three passing checks and one failing.
+You can configure comments, reviews and checks independently with [`statusIndicatorStyles`](#configuration): `"count"` keeps this display,
+`"merged"` shows one icon in the worst status colour, and `"repeat"` shows one coloured icon per item up to
+`statusIndicatorRepeatCap`. Larger groups collapse to one icon and a count.
 
 On older GitHub Enterprise Server versions that report `mergeStateStatus` or `reviewDecision` as unknown GraphQL fields,
 the dashboard retries once without those fields and continues with the remaining PR data. It does not retry unrelated
@@ -213,7 +216,13 @@ value:
           "sameTypeGroups": 0,
           "differentTypeGroups": 1
         },
-        "showSingleStatusCount": false
+        "showSingleStatusCount": false,
+        "statusIndicatorStyles": {
+          "comments": "count",
+          "reviews": "count",
+          "checks": "count"
+        },
+        "statusIndicatorRepeatCap": 3
       }
     }
   ]
@@ -235,6 +244,8 @@ value:
 | `icons` | From `iconStyle` | Overrides for individual icons. See [Icons](#icons). |
 | `spacing` | See below | Gaps, in terminal cells, between an indicator's icon and count, between same-type groups, and between comment/review/check types. Each gap is clamped to `0`–`4`. |
 | `showSingleStatusCount` | `false` | Show counts for review and check badges even when there is only one status group. |
+| `statusIndicatorStyles` | `{"comments":"count","reviews":"count","checks":"count"}` | Set comment, review and check display styles independently. `"count"` displays the count (reviews/checks show counts as needed), `"merged"` shows one icon without a count, and `"repeat"` shows one icon per item up to the cap; larger groups collapse to one icon plus a count. |
+| `statusIndicatorRepeatCap` | `3` | In `"repeat"` mode, groups up to this count repeat icons; larger groups collapse to one icon plus the count. Values are clamped to `0`–`20`. |
 
 `spacing` accepts `iconToCount`, `sameTypeGroups` and `differentTypeGroups`. Its defaults are `0`, `0` and `1`,
 respectively. For example, set `iconToCount` to `1` to put one cell between each status icon and its count.

@@ -61,6 +61,8 @@ async function renderState(state: DashboardState, handlers: Partial<{
         icons={options.icons}
         spacing={options.spacing}
         showSingleStatusCount={options.showSingleStatusCount}
+        statusIndicatorStyles={options.statusIndicatorStyles}
+        statusIndicatorRepeatCap={options.statusIndicatorRepeatCap}
       />
     ),
     { width, height: 20 },
@@ -256,6 +258,8 @@ describe("DashboardView render", () => {
           icons={options.icons}
           spacing={options.spacing}
           showSingleStatusCount={options.showSingleStatusCount}
+          statusIndicatorStyles={options.statusIndicatorStyles}
+          statusIndicatorRepeatCap={options.statusIndicatorRepeatCap}
         />
       ),
       { width: 50, height: 20 },
@@ -298,6 +302,8 @@ describe("DashboardView render", () => {
           icons={options.icons}
           spacing={options.spacing}
           showSingleStatusCount={options.showSingleStatusCount}
+          statusIndicatorStyles={options.statusIndicatorStyles}
+          statusIndicatorRepeatCap={options.statusIndicatorRepeatCap}
         />
       ),
       { width: 50, height: 20 },
@@ -347,6 +353,8 @@ describe("DashboardView render", () => {
           icons={options.icons}
           spacing={options.spacing}
           showSingleStatusCount={options.showSingleStatusCount}
+          statusIndicatorStyles={options.statusIndicatorStyles}
+          statusIndicatorRepeatCap={options.statusIndicatorRepeatCap}
         />
       ),
       { width: 50, height: 20 },
@@ -388,6 +396,8 @@ describe("DashboardView render", () => {
           icons={options.icons}
           spacing={options.spacing}
           showSingleStatusCount={options.showSingleStatusCount}
+          statusIndicatorStyles={options.statusIndicatorStyles}
+          statusIndicatorRepeatCap={options.statusIndicatorRepeatCap}
         />
       ),
       { width: 50, height: 20 },
@@ -682,6 +692,102 @@ describe("DashboardView render", () => {
     expect(noCheckStatusFrame).not.toContain("K 0")
   })
 
+  test("merges review groups to the worst status color without counts", async () => {
+    const icons = { openComment: "C", review: "R", check: "K" }
+    const r = await renderState(okState({
+      prs: [makeTUIPR({
+        latestReviews: [
+          { author: { login: "alice" }, state: "APPROVED" },
+          { author: { login: "bob" }, state: "CHANGES_REQUESTED" },
+        ],
+        checkStatuses: ["SUCCESS", "FAILURE"],
+      })],
+    }), {
+      options: {
+        icons,
+        colors: { error: "#ff0000" },
+        statusIndicatorStyles: { reviews: "merged", checks: "count" },
+        spacing: { iconToCount: 1 },
+      },
+    })
+    await r.flush()
+
+    const frame = captureFrame(r)
+    const spans = r.captureSpans().lines.flatMap((line) => line.spans)
+    const reviewIcon = spans.find((span) => span.text === "R")
+
+    expect(frame).toContain("R K 1K 1")
+    expect(reviewIcon?.fg?.toInts()).toEqual([255, 0, 0, 255])
+  })
+
+  test("repeats status icons through the cap without numeric labels", async () => {
+    const icons = { openComment: "C", review: "R", check: "K" }
+    const r = await renderState(okState({
+      prs: [makeTUIPR({
+        latestReviews: [
+          { author: { login: "alice" }, state: "APPROVED" },
+          { author: { login: "bob" }, state: "APPROVED" },
+          { author: { login: "carol" }, state: "APPROVED" },
+        ],
+        checkStatuses: ["SUCCESS", "SUCCESS", "SUCCESS"],
+      })],
+    }), {
+      options: {
+        icons,
+        statusIndicatorStyles: { reviews: "repeat", checks: "repeat" },
+      },
+    })
+    await r.flush()
+
+    const frame = captureFrame(r)
+    expect(frame).toContain("RRR KKK")
+    expect(frame).not.toContain("R 3")
+    expect(frame).not.toContain("K 3")
+  })
+
+  test("collapses repeated status groups above the configured cap to counts", async () => {
+    const icons = { openComment: "C", review: "R", check: "K" }
+    const r = await renderState(okState({
+      prs: [makeTUIPR({
+        latestReviews: ["alice", "bob", "carol", "dave"].map((login) => ({
+          author: { login },
+          state: "APPROVED",
+        })),
+        checkStatuses: ["SUCCESS", "SUCCESS", "SUCCESS", "SUCCESS"],
+      })],
+    }), {
+      options: {
+        icons,
+        statusIndicatorStyles: { reviews: "repeat", checks: "repeat" },
+      },
+    })
+    await r.flush()
+
+    expect(captureFrame(r)).toContain("R4 K4")
+  })
+
+  test("uses a custom repeated-status cap", async () => {
+    const icons = { openComment: "C", review: "R", check: "K" }
+    const r = await renderState(okState({
+      prs: [makeTUIPR({
+        latestReviews: ["alice", "bob", "carol"].map((login) => ({
+          author: { login },
+          state: "APPROVED",
+        })),
+        checkStatuses: ["SUCCESS", "SUCCESS", "SUCCESS"],
+      })],
+    }), {
+      options: {
+        icons,
+        statusIndicatorStyles: { reviews: "repeat", checks: "repeat" },
+        statusIndicatorRepeatCap: 2,
+      },
+    })
+    await r.flush()
+
+    expect(captureFrame(r)).toContain("R3 K3")
+  })
+
   test("spaces the heading, PR titles, and status rows as requested", async () => {
     const r = await renderState(okState({
       prs: [
@@ -714,6 +820,41 @@ describe("DashboardView render", () => {
     expect(frame).toContain(icons.review)
     expect(frame).toContain(`${icons.openComment}1`)
     expect(frame).not.toContain("")
+  })
+
+  test("applies comment count, merged, and repeat styles independently", async () => {
+    const icons = { openComment: "C", review: "R", check: "K" }
+    const prs = [makeTUIPR({
+      reviewThreads: [
+        { isResolved: false },
+        { isResolved: false },
+        { isResolved: false },
+      ],
+      reviewThreadsTruncated: true,
+    })]
+    const renderComments = (options: Parameters<typeof dashboardOptions>[0]) =>
+      renderState(okState({ prs }), { options: { icons, ...options } })
+
+    const merged = await renderComments({
+      statusIndicatorStyles: { comments: "merged" },
+    })
+    await merged.flush()
+    expect(captureFrame(merged)).toContain("C")
+    expect(captureFrame(merged)).not.toContain("C3+")
+
+    const repeated = await renderComments({
+      statusIndicatorStyles: { comments: "repeat" },
+    })
+    await repeated.flush()
+    expect(captureFrame(repeated)).toContain("CCC")
+    expect(captureFrame(repeated)).not.toContain("C3+")
+
+    const capped = await renderComments({
+      statusIndicatorStyles: { comments: "repeat" },
+      statusIndicatorRepeatCap: 2,
+    })
+    await capped.flush()
+    expect(captureFrame(capped)).toContain("C3+")
   })
 
 })

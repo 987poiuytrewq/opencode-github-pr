@@ -3,6 +3,8 @@ import {
   dashboardOptions,
   DEFAULT_ICONS,
   DEFAULT_SPACING,
+  DEFAULT_STATUS_INDICATOR_REPEAT_CAP,
+  DEFAULT_STATUS_INDICATOR_STYLES,
   UNICODE_ICONS,
 } from "../../plugins/app/config"
 import { DEFAULT_SKIN } from "../../plugins/app/theme"
@@ -28,6 +30,8 @@ describe("dashboard options", () => {
       defaultStatusFilter: "open",
       iconStyle: "nerd",
       showSingleStatusCount: false,
+      statusIndicatorStyles: DEFAULT_STATUS_INDICATOR_STYLES,
+      statusIndicatorRepeatCap: DEFAULT_STATUS_INDICATOR_REPEAT_CAP,
       spacing: DEFAULT_SPACING,
       colors: {},
       icons: { ...DEFAULT_ICONS },
@@ -58,6 +62,8 @@ describe("dashboard options", () => {
       defaultStatusFilter: "closed",
       iconStyle: "nerd",
       showSingleStatusCount: false,
+      statusIndicatorStyles: DEFAULT_STATUS_INDICATOR_STYLES,
+      statusIndicatorRepeatCap: DEFAULT_STATUS_INDICATOR_REPEAT_CAP,
       spacing: DEFAULT_SPACING,
       colors: { accent: "#123456", merged: "magenta" },
       icons: { ...DEFAULT_ICONS, openPR: "P", nextPage: ">" },
@@ -81,6 +87,26 @@ describe("dashboard options", () => {
       showSingleStatusCount: false,
     })
     expect(dashboardOptions({ spacing: [] })).toMatchObject({ spacing: DEFAULT_SPACING })
+  })
+
+  test("validates per-group status indicator styles", () => {
+    expect(dashboardOptions({
+      statusIndicatorStyles: { comments: "merged", reviews: "repeat", checks: "merged" },
+    }).statusIndicatorStyles).toEqual({ comments: "merged", reviews: "repeat", checks: "merged" })
+
+    expect(dashboardOptions({
+      statusIndicatorStyles: { comments: "invalid", reviews: "invalid", checks: "repeat" },
+    }).statusIndicatorStyles).toEqual({ comments: "count", reviews: "count", checks: "repeat" })
+    expect(dashboardOptions({
+      statusIndicatorStyles: [],
+    }).statusIndicatorStyles).toEqual(DEFAULT_STATUS_INDICATOR_STYLES)
+  })
+
+  test("validates the repeated status icon cap", () => {
+    expect(dashboardOptions({ statusIndicatorRepeatCap: 2.8 }).statusIndicatorRepeatCap).toBe(2)
+    expect(dashboardOptions({ statusIndicatorRepeatCap: 30 }).statusIndicatorRepeatCap).toBe(20)
+    expect(dashboardOptions({ statusIndicatorRepeatCap: -1 }).statusIndicatorRepeatCap)
+      .toBe(DEFAULT_STATUS_INDICATOR_REPEAT_CAP)
   })
 
   test("keeps each fetch batch at least four TUI pages", () => {

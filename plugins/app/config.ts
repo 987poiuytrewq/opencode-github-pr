@@ -49,13 +49,30 @@ export type DashboardSpacing = {
   differentTypeGroups: number
 }
 
+export type StatusIndicatorStyle = "count" | "merged" | "repeat"
+
+export type StatusIndicatorStyles = {
+  comments: StatusIndicatorStyle
+  reviews: StatusIndicatorStyle
+  checks: StatusIndicatorStyle
+}
+
 export const DEFAULT_SPACING: DashboardSpacing = {
   iconToCount: 0,
   sameTypeGroups: 0,
   differentTypeGroups: 1,
 }
 
+export const DEFAULT_STATUS_INDICATOR_STYLES: StatusIndicatorStyles = {
+  comments: "count",
+  reviews: "count",
+  checks: "count",
+}
+
+export const DEFAULT_STATUS_INDICATOR_REPEAT_CAP = 3
+
 const MAX_SPACING_GAP = 4
+const MAX_STATUS_INDICATOR_REPEAT_CAP = 20
 
 export type DashboardOptions = {
   enabled: boolean
@@ -68,6 +85,8 @@ export type DashboardOptions = {
   defaultStatusFilter: PRStatusFilter
   iconStyle: IconStyle
   showSingleStatusCount: boolean
+  statusIndicatorStyles: StatusIndicatorStyles
+  statusIndicatorRepeatCap: number
   spacing: DashboardSpacing
   colors: Partial<Skin>
   icons: DashboardIcons
@@ -84,6 +103,8 @@ type DashboardOptionsInput = {
   defaultStatusFilter?: unknown
   iconStyle?: unknown
   showSingleStatusCount?: unknown
+  statusIndicatorStyles?: unknown
+  statusIndicatorRepeatCap?: unknown
   spacing?: unknown
   colors?: unknown
   icons?: unknown
@@ -118,6 +139,22 @@ function spacingOverrides(input: unknown): DashboardSpacing {
       DEFAULT_SPACING.differentTypeGroups,
       MAX_SPACING_GAP,
     ),
+  }
+}
+
+function statusIndicatorStyle(value: unknown): StatusIndicatorStyle {
+  return value === "merged" || value === "repeat" ? value : "count"
+}
+
+function statusIndicatorStyles(input: unknown): StatusIndicatorStyles {
+  if (!input || typeof input !== "object" || Array.isArray(input)) {
+    return { ...DEFAULT_STATUS_INDICATOR_STYLES }
+  }
+  const values = input as Record<string, unknown>
+  return {
+    comments: statusIndicatorStyle(values.comments),
+    reviews: statusIndicatorStyle(values.reviews),
+    checks: statusIndicatorStyle(values.checks),
   }
 }
 
@@ -158,6 +195,12 @@ export function dashboardOptions(input: DashboardOptionsInput = {}): DashboardOp
       : "open",
     iconStyle,
     showSingleStatusCount: input.showSingleStatusCount === true,
+    statusIndicatorStyles: statusIndicatorStyles(input.statusIndicatorStyles),
+    statusIndicatorRepeatCap: nonNegativeInteger(
+      input.statusIndicatorRepeatCap,
+      DEFAULT_STATUS_INDICATOR_REPEAT_CAP,
+      MAX_STATUS_INDICATOR_REPEAT_CAP,
+    ),
     spacing: spacingOverrides(input.spacing),
     colors: stringOverrides(DEFAULT_SKIN, input.colors),
     icons: mergeStrings(defaultIcons, input.icons, true),

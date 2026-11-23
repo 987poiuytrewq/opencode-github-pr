@@ -29,6 +29,8 @@ describe("DashboardView reactivity", () => {
           icons={dashboardOptions().icons}
           spacing={dashboardOptions().spacing}
           showSingleStatusCount={dashboardOptions().showSingleStatusCount}
+          statusIndicatorStyles={dashboardOptions().statusIndicatorStyles}
+          statusIndicatorRepeatCap={dashboardOptions().statusIndicatorRepeatCap}
         />
       ),
       { width: 80, height: 30 },
