@@ -15,7 +15,7 @@ import { filterPRs } from "../domain/pr-filters"
 import { skin, type Skin } from "./theme"
 import { errorMessages } from "../domain/messages"
 import { PRRow } from "./PRRow"
-import type { DashboardIcons, DashboardSpacing } from "./config"
+import type { DashboardIcons, DashboardSpacing, StatusIndicatorStyles } from "./config"
 import { StatusMessage } from "./StatusMessage"
 
 export function DashboardView(props: {
@@ -33,6 +33,8 @@ export function DashboardView(props: {
   icons: DashboardIcons
   spacing: DashboardSpacing
   showSingleStatusCount: boolean
+  statusIndicatorStyles: StatusIndicatorStyles
+  statusIndicatorRepeatCap: number
 }) {
   const sk = createMemo(() => skin(props.theme, props.colors))
   const [scopeHovered, setScopeHovered] = createSignal(false)
@@ -304,6 +306,8 @@ export function DashboardView(props: {
                   icons={props.icons}
                   spacing={props.spacing}
                   showSingleStatusCount={props.showSingleStatusCount}
+                  statusIndicatorStyles={props.statusIndicatorStyles}
+                  statusIndicatorRepeatCap={props.statusIndicatorRepeatCap}
                 />
               )}
             </For>

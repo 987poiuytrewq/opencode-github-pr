@@ -156,6 +156,8 @@ async function setup(api: TuiPluginContext) {
         icons={options.icons}
         spacing={options.spacing}
         showSingleStatusCount={options.showSingleStatusCount}
+        statusIndicatorStyles={options.statusIndicatorStyles}
+        statusIndicatorRepeatCap={options.statusIndicatorRepeatCap}
       />
     ),
   })
