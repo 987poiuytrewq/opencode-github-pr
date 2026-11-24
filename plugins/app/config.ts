@@ -64,9 +64,9 @@ export const DEFAULT_SPACING: DashboardSpacing = {
 }
 
 export const DEFAULT_STATUS_INDICATOR_STYLES: StatusIndicatorStyles = {
-  comments: "count",
-  reviews: "count",
-  checks: "count",
+  comments: "merged",
+  reviews: "merged",
+  checks: "merged",
 }
 
 export const DEFAULT_STATUS_INDICATOR_REPEAT_CAP = 3

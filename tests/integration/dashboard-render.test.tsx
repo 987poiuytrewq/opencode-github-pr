@@ -468,7 +468,9 @@ describe("DashboardView render", () => {
       prs: [makeTUIPR({
         reviewThreads: [{ isResolved: false }],
       })],
-    }))
+    }), {
+      options: { statusIndicatorStyles: { comments: "count" } },
+    })
     await r.flush()
     const frame = captureFrame(r)
     const commentIcon = dashboardOptions().icons.openComment
@@ -480,7 +482,9 @@ describe("DashboardView render", () => {
   test("renders the comment icon and count in adjacent cells", async () => {
     const r = await renderState(okState({
       prs: [makeTUIPR({ reviewThreads: [{ isResolved: false }] })],
-    }))
+    }), {
+      options: { statusIndicatorStyles: { comments: "count" } },
+    })
     await r.flush()
     const frame = captureFrame(r)
     const commentIcon = dashboardOptions().icons.openComment
@@ -627,7 +631,11 @@ describe("DashboardView render", () => {
           { author: { login: "bob" }, state: "CHANGES_REQUESTED" },
         ],
       })],
-    }))
+    }), {
+      options: {
+        statusIndicatorStyles: { comments: "count", reviews: "count", checks: "count" },
+      },
+    })
     await r.flush()
     const frame = captureFrame(r)
     const icons = dashboardOptions().icons
@@ -651,6 +659,7 @@ describe("DashboardView render", () => {
     }), {
       options: {
         icons,
+        statusIndicatorStyles: { comments: "count", reviews: "count", checks: "count" },
         spacing: { iconToCount: 2, sameTypeGroups: 1, differentTypeGroups: 3 },
       },
     })
@@ -668,6 +677,7 @@ describe("DashboardView render", () => {
       options: {
         icons,
         showSingleStatusCount: true,
+        statusIndicatorStyles: { reviews: "count", checks: "count" },
         spacing: { iconToCount: 1 },
       },
     })
@@ -683,6 +693,7 @@ describe("DashboardView render", () => {
       options: {
         icons,
         showSingleStatusCount: true,
+        statusIndicatorStyles: { checks: "count" },
       },
     })
     await noCheckStatus.flush()
@@ -813,13 +824,44 @@ describe("DashboardView render", () => {
         latestReviews: [{ author: { login: "alice" }, state: "APPROVED" }],
         reviewThreads: [{ isResolved: false }, { isResolved: true }],
       })],
-    }))
+    }), {
+      options: { statusIndicatorStyles: { comments: "count" } },
+    })
     await r.flush()
     const frame = r.captureCharFrame()
     const icons = dashboardOptions().icons
     expect(frame).toContain(icons.review)
     expect(frame).toContain(`${icons.openComment}1`)
     expect(frame).not.toContain("")
+  })
+
+  test("defaults all indicator groups to one merged icon without counts", async () => {
+    const icons = { openComment: "C", review: "R", check: "K" }
+    const r = await renderState(okState({
+      prs: [makeTUIPR({
+        reviewThreads: [{ isResolved: false }, { isResolved: false }],
+        latestReviews: [
+          { author: { login: "alice" }, state: "APPROVED" },
+          { author: { login: "bob" }, state: "CHANGES_REQUESTED" },
+        ],
+        checkStatuses: ["SUCCESS", "FAILURE"],
+      })],
+    }), {
+      options: { icons, colors: { error: "#ff0000" } },
+    })
+    await r.flush()
+
+    const frame = captureFrame(r)
+    const spans = r.captureSpans().lines.flatMap((line) => line.spans)
+    const reviewIcon = spans.find((span) => span.text === "R")
+    const checkIcon = spans.find((span) => span.text === "K")
+
+    expect(frame).toContain("C R K")
+    expect(frame).not.toContain("C2")
+    expect(frame).not.toContain("R1")
+    expect(frame).not.toContain("K1")
+    expect(reviewIcon?.fg?.toInts()).toEqual([255, 0, 0, 255])
+    expect(checkIcon?.fg?.toInts()).toEqual([255, 0, 0, 255])
   })
 
   test("applies comment count, merged, and repeat styles independently", async () => {
