@@ -302,29 +302,6 @@ async function clickText(
   await clickCell(socket, session, cell.col, cell.row);
 }
 
-async function clickPageArrow(
-  socket: string,
-  session: string,
-  currentPage: string,
-  direction: "next" | "previous",
-): Promise<void> {
-  const screen = await capturePane(socket, session);
-  const lines = screen.split("\n");
-  const row = lines.findIndex((line) => line.includes(currentPage));
-  if (row === -1)
-    fail(
-      `Couldn't locate pagination ${JSON.stringify(currentPage)}:\n${screen}`,
-    );
-  const line = lines[row];
-  const start = line.indexOf(currentPage);
-  const offset = displayWidth(line.slice(0, start));
-  const col =
-    direction === "next"
-      ? offset + displayWidth(currentPage) + 1
-      : Math.max(0, offset - 2);
-  await clickCell(socket, session, col, row);
-}
-
 async function exerciseDashboard(
   socket: string,
   session: string,
@@ -337,13 +314,6 @@ async function exerciseDashboard(
   await waitForText(socket, session, "1 of 2");
   await Bun.sleep(700);
 
-  await clickPageArrow(socket, session, "1 of 2", "next");
-  await waitForText(socket, session, "2 of 2");
-  await waitForText(socket, session, "Simplify session settings");
-  await Bun.sleep(700);
-
-  await clickPageArrow(socket, session, "2 of 2", "previous");
-  await waitForText(socket, session, "1 of 2");
   await clickText(socket, session, "author");
   await waitForText(socket, session, "assignee");
   await clickText(socket, session, "assignee");

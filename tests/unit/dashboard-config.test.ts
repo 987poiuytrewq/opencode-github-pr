@@ -19,6 +19,11 @@ describe("dashboard options", () => {
   })
 
   test("defaults to Nerd Font icons", () => {
+    expect(DEFAULT_STATUS_INDICATOR_STYLES).toEqual({
+      comments: "merged",
+      reviews: "merged",
+      checks: "merged",
+    })
     expect(dashboardOptions()).toEqual({
       enabled: true,
       pageSize: 5,
