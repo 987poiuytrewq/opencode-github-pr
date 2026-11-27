@@ -283,7 +283,6 @@ describe.skipIf(!enabled)("E2E: npm-packed plugin installation", () => {
         GH_TOKEN: "",
         GITHUB_PERSONAL_ACCESS_TOKEN: "",
         npm_config_registry: registryUrl,
-        npm_config_legacy_peer_deps: "true",
         BUN_CONFIG_REGISTRY: registryUrl,
         NODE_PATH: join(hostDir, "node_modules"),
       },

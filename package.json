@@ -1,6 +1,6 @@
 {
   "name": "opencode-github-pr",
-  "version": "0.2.1",
+  "version": "0.2.2",
   "description": "GitHub pull request dashboard for the OpenCode sidebar: CI, review and merge status for your PRs.",
   "keywords": [
     "opencode",
@@ -60,8 +60,8 @@
   "peerDependencies": {
     "@opencode/plugin": "^2.0.20",
     "@opencode/theme": "^2.0.20",
-    "@opentui/core": "^0.6.6",
-    "@opentui/solid": "^0.6.6",
+    "@opentui/core": ">=0.6.6",
+    "@opentui/solid": ">=0.6.6",
     "solid-js": "^1.9.12"
   }
 }

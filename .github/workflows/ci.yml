@@ -16,7 +16,7 @@ jobs:
       fail-fast: false
       matrix:
         # Latest published stable patch from each V2 minor line.
-        version: ["2.0.32", "2.1.4", "2.2.7", "2.3.2"]
+        version: ["2.0.32", "2.1.4", "2.2.7", "2.3.2", "2.4.2"]
     env:
       OPENCODE_VERSION: ${{ matrix.version }}
     steps:
@@ -45,10 +45,14 @@ jobs:
         run: make ci-debug
 
   packed-install:
-    name: Test packed npm installation
+    name: Test packed npm installation with OpenCode ${{ matrix.version }}
     runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        version: ["2.3.2", "2.4.2"]
     env:
-      OPENCODE_VERSION: "2.3.2"
+      OPENCODE_VERSION: ${{ matrix.version }}
     steps:
       - name: Check out repository
         uses: actions/checkout@v4
